@@ -1,0 +1,10 @@
+.streamlit/secrets.toml
+studio.db
+studio.db.backup_before_migration
+studio.db.snapshot_investigate
+studio.db-*
+uploads/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
