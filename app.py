@@ -20,6 +20,33 @@ from export import (
 )
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
+
+
+def _check_app_password():
+    app_password = st.secrets.get("APP_PASSWORD") if hasattr(st, "secrets") else None
+    if not app_password:
+        return True
+    if st.session_state.get("_authenticated"):
+        return True
+    st.markdown(
+        "<h2 style='text-align:center; margin-top:15vh;'>🎬 CimaFast Studio</h2>",
+        unsafe_allow_html=True,
+    )
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        entered = st.text_input("كلمة السر / Password", type="password", key="_password_input")
+        if st.button("دخول / Enter", use_container_width=True):
+            if entered == app_password:
+                st.session_state["_authenticated"] = True
+                st.rerun()
+            else:
+                st.error("كلمة السر غلط / Wrong password")
+    return False
+
+
+if not _check_app_password():
+    st.stop()
+
 init_db()
 
 if "ui_lang" not in st.session_state:
