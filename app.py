@@ -1,9 +1,10 @@
-import hmac
 import os
 import re
 import sys
+import time
 import uuid
 import streamlit as st
+from auth import authenticate, no_login_allowed, resolve_users
 from database import (
     init_db, FIELD_HELP,
     fetch_all, run_query, run_delete,
@@ -24,87 +25,103 @@ from export import (
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
 
-def _resolve_app_password():
-    """بيجيب كلمة سر الدخول من متغيرات البيئة الأول (مفيد وقت التطوير المحلي)
-    وبعدين من st.secrets. لو ملف secrets.toml ناقص خالص، st.secrets بيرمي
-    استثناء، فبنمسكه هنا ونرجّع None بدل ما البرنامج يقع."""
-    password = os.environ.get("APP_PASSWORD")
-    if not password:
-        try:
-            password = st.secrets.get("APP_PASSWORD")
-        except Exception:
-            password = None
-    password = (password or "").strip()
-    return password or None
-
-
-def _no_password_allowed():
-    """الفتح من غير كلمة سر لازم يتطلب صراحةً بـ CIMAFAST_ALLOW_NO_PASSWORD=1.
-    السيرفر المنشور عمره ما هيبقى المتغير ده متظبط عنده، فلو السر ضاع لأي سبب
-    البرنامج بيتقفل بدل ما يفتح للناس من غير ما حد ياخد باله."""
-    return os.environ.get("CIMAFAST_ALLOW_NO_PASSWORD", "").strip().lower() in (
-        "1", "true", "yes", "on",
-    )
-
-
 def _render_locked_screen():
-    """شاشة القفل لما كلمة السر مش متظبطة — بنقفل الباب ونقول للمسؤول السبب."""
+    """شاشة القفل لما مفيش حسابات متظبطة — بنقفل الباب ونقول للمسؤول السبب."""
     st.markdown(
         "<h2 style='text-align:center; margin-top:15vh;'>🎬 CimaFast Studio</h2>"
         "<p dir='auto' style='text-align:center; font-size:1.1rem;'>"
-        "🔒 الدخول مقفول: كلمة السر مش متظبطة على السيرفر."
-        "<br>Access locked: APP_PASSWORD is not configured.</p>"
+        "🔒 الدخول مقفول: مفيش حسابات متظبطة على السيرفر."
+        "<br>Access locked: no user accounts are configured.</p>"
         "<p dir='auto' style='text-align:center; opacity:0.7;'>"
-        "المسؤول لازم يظبط APP_PASSWORD وبعدين يعيد تشغيل الخدمة."
-        "<br>An administrator must set APP_PASSWORD and restart the service.</p>",
+        "المسؤول لازم يظبط قسم [users] في ملف الأسرار وبعدين يعيد تشغيل الخدمة."
+        "<br>An administrator must set the [users] section in secrets.toml "
+        "and restart the service.</p>",
         unsafe_allow_html=True,
     )
 
 
-def _check_app_password():
-    app_password = _resolve_app_password()
-    if not app_password:
-        # مفيش كلمة سر: بنقفل افتراضيًا (fail closed). الاستثناء الوحيد هو
+def _render_login_screen():
+    """شاشة تسجيل الدخول: اسم مستخدم + كلمة سر.
+
+    بتظهر قبل ما نعرف لغة الواجهة، فالتسميات مكتوبة بالعربي والإنجليزي مع
+    بعض. الاتجاه RTL عشان العربي هو الأساس، بس خانات الإدخال نفسها LTR لأن
+    اسم المستخدم وكلمة السر بالإنجليزي."""
+    st.markdown(
+        """
+        <style>
+        .cf-login h2 { text-align: center; margin-top: 12vh; }
+        .cf-login p { text-align: center; opacity: 0.75; margin-bottom: 0; }
+        div[data-testid="stForm"] label p { direction: rtl; text-align: right; }
+        div[data-testid="stForm"] input { direction: ltr; text-align: left; }
+        </style>
+        <div class="cf-login" dir="rtl">
+            <h2>🎬 CimaFast Studio</h2>
+            <p>تسجيل الدخول / Sign in</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    _, mid, _ = st.columns([1, 1.4, 1])
+    with mid:
+        # فورم عشان زرار Enter في الموبايل يبعت من غير ما المستخدم يدوّر على الزرار
+        with st.form("_login_form", clear_on_submit=False):
+            username = st.text_input("اسم المستخدم / Username", key="_login_username")
+            password = st.text_input(
+                "كلمة السر / Password", type="password", key="_login_password"
+            )
+            submitted = st.form_submit_button("دخول / Log in", use_container_width=True)
+        if submitted:
+            user = authenticate(username, password, resolve_users())
+            if user:
+                st.session_state["_authenticated"] = True
+                st.session_state["_auth_user"] = user
+                st.session_state.pop("_login_attempts", None)
+                st.rerun()
+            # تأخير بسيط ومتزايد بعد كل محاولة فاشلة عشان نصعّب التخمين الآلي
+            attempts = st.session_state.get("_login_attempts", 0) + 1
+            st.session_state["_login_attempts"] = attempts
+            if attempts > 2:
+                time.sleep(min(attempts - 2, 4) * 0.5)
+            st.error("اسم المستخدم أو كلمة السر غلط / Wrong username or password")
+
+
+def _check_login():
+    """بوابة الدخول. بترجّع True بس لما يكون فيه مستخدم داخل فعلًا."""
+    if st.session_state.get("_authenticated") and st.session_state.get("_auth_user"):
+        return True
+    users = resolve_users()
+    if not users:
+        # مفيش حسابات: بنقفل افتراضيًا (fail closed). الاستثناء الوحيد هو
         # التطوير المحلي لما المطور يطلب كده صراحةً بالمتغير ده.
-        if _no_password_allowed():
+        if no_login_allowed():
             st.warning(
-                "⚠️ البرنامج شغال من غير كلمة سر (وضع التطوير المحلي) — "
+                "⚠️ البرنامج شغال من غير تسجيل دخول (وضع التطوير المحلي) — "
                 "متستخدمش الإعداد ده على سيرفر منشور.\n\n"
-                "Running without a password (local development mode) — "
+                "Running without login (local development mode) — "
                 "do not use this on a deployed server."
             )
             return True
         print(
-            "[auth] APP_PASSWORD is not set — locking the app. "
-            "Set APP_PASSWORD, or CIMAFAST_ALLOW_NO_PASSWORD=1 for local dev.",
+            "[auth] no user accounts configured — locking the app. "
+            "Set a [users] section in secrets.toml, "
+            "or CIMAFAST_ALLOW_NO_PASSWORD=1 for local dev.",
             file=sys.stderr,
             flush=True,
         )
         _render_locked_screen()
         return False
-    if st.session_state.get("_authenticated"):
-        return True
-    st.markdown(
-        "<h2 style='text-align:center; margin-top:15vh;'>🎬 CimaFast Studio</h2>",
-        unsafe_allow_html=True,
-    )
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        entered = st.text_input("كلمة السر / Password", type="password", key="_password_input")
-        if st.button("دخول / Enter", use_container_width=True):
-            # بنقارن بالبايتس عشان hmac.compare_digest بيرفض النصوص اللي
-            # فيها حروف غير إنجليزية (يعني كلمة سر بالعربي كانت هتعمل خطأ)
-            if hmac.compare_digest(
-                (entered or "").encode("utf-8"), app_password.encode("utf-8")
-            ):
-                st.session_state["_authenticated"] = True
-                st.rerun()
-            else:
-                st.error("كلمة السر غلط / Wrong password")
+    _render_login_screen()
     return False
 
 
-if not _check_app_password():
+def _logout():
+    """خروج: بنمسح مفاتيح الدخول بس وسايبين باقي حالة الجلسة زي ما هي عشان
+    المستخدم ميخسرش اختياراته لو رجع دخل تاني."""
+    for key in ("_authenticated", "_auth_user", "_login_attempts"):
+        st.session_state.pop(key, None)
+
+
+if not _check_login():
     st.stop()
 
 init_db()
@@ -153,6 +170,8 @@ UI_TEXT = {
     "btn_export_pdf": {"ar": "⬇️ تحميل PDF", "en": "⬇️ Download PDF"},
     "studio_tagline": {"ar": "استوديو الإنتاج بالذكاء الاصطناعي", "en": "AI Production Studio"},
     "sidebar_owner_label": {"ar": "بيستخدمه", "en": "Used by"},
+    "logged_in_as": {"ar": "داخل باسم", "en": "Signed in as"},
+    "logout": {"ar": "🚪 تسجيل الخروج", "en": "🚪 Log out"},
 }
 
 
@@ -961,6 +980,14 @@ with _lang_col1:
 with _lang_col2:
     if st.button("AR", use_container_width=True, disabled=st.session_state["ui_lang"] == "ar", key="lang_btn_ar"):
         st.session_state["ui_lang"] = "ar"
+        st.rerun()
+
+# المستخدم الحالي وزرار الخروج (بيظهر بس لما يكون فيه تسجيل دخول فعلي)
+_current_user = st.session_state.get("_auth_user")
+if _current_user:
+    st.sidebar.caption(f"{tr('logged_in_as')}: {_current_user}")
+    if st.sidebar.button(tr("logout"), use_container_width=True, key="logout_btn"):
+        _logout()
         st.rerun()
 
 st.sidebar.markdown(
