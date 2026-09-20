@@ -14,9 +14,12 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
         'props_added': [],
     }
 
-    existing_scene_numbers = {
-        row['scene_number'] for row in fetch_all(
-            "SELECT scene_number FROM scenes WHERE project_id=?", (project_id,)
+    # المفتاح هو (الرقم، الحرف) مش الرقم لوحده: مشهد 35 ومشهد 35A مشهدين
+    # مختلفين، ولو اعتبرناهم واحد إعادة الاستيراد بتتخطى المشهد الغلط.
+    existing_scene_keys = {
+        (row['scene_number'], (row['scene_suffix'] if 'scene_suffix' in row.keys() else None) or None)
+        for row in fetch_all(
+            "SELECT scene_number, scene_suffix FROM scenes WHERE project_id=?", (project_id,)
         )
     }
 
@@ -111,8 +114,10 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
         return char_id
 
     for sc in scenes:
-        if sc['scene_number'] in existing_scene_numbers:
-            summary['scenes_skipped'].append(sc['scene_number'])
+        _suffix = sc.get('scene_suffix') or None
+        _key = (sc['scene_number'], _suffix)
+        if _key in existing_scene_keys:
+            summary['scenes_skipped'].append(f"{sc['scene_number']}{_suffix or ''}")
             continue
 
         location_variant_id = None
@@ -124,12 +129,13 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
 
         new_scene_id = run_query(
             """INSERT INTO scenes
-            (project_id, scene_number, int_ext, day_night, weather, location_variant_id, notes)
-            VALUES (?,?,?,?,?,?,?)""",
-            (project_id, sc['scene_number'], sc['int_ext'], sc['day_night'],
+            (project_id, scene_number, scene_suffix, int_ext, day_night, weather,
+             location_variant_id, notes)
+            VALUES (?,?,?,?,?,?,?,?)""",
+            (project_id, sc['scene_number'], _suffix, sc['int_ext'], sc['day_night'],
              sc.get('weather'), location_variant_id, sc.get('notes', '')),
         )
-        existing_scene_numbers.add(sc['scene_number'])
+        existing_scene_keys.add(_key)
         summary['scenes_added'] += 1
 
         # بنسجل رابط المشهد بكل شخصية وإكسسوار ظهر فيه من وقت الاستيراد -

@@ -490,6 +490,12 @@ _MIGRATIONS = {
     "locations": [
         ("parent_location_id", "INTEGER"),
     ],
+    # حرف المشهد المقسوم (35A / 35B). scene_number فضل رقم صحيح عن قصد:
+    # فيه حسابات بتعتمد عليه (scene_number + 1 وقت الإدراج) وكانت هتتكسر لو
+    # بقى نص. الحرف بيتخزن لوحده والعرض بيجمعهم.
+    "scenes": [
+        ("scene_suffix", "TEXT"),
+    ],
     "location_variants": [
         ("reference_image_path", "TEXT"),
     ],
@@ -511,6 +517,22 @@ _MIGRATIONS = {
         ("has_dialogue", "INTEGER DEFAULT 1"),
     ],
 }
+
+
+def scene_label(scene):
+    """رقم المشهد زي ما بيتكتب في الورق: 35 أو 35A.
+
+    كل حتة بتعرض رقم مشهد لازم تعدي من هنا، عشان الرقم في البرنامج يفضل هو
+    نفسه الرقم اللي الفريق ماسكه في التصوير."""
+    if scene is None:
+        return ""
+    try:
+        number = scene["scene_number"]
+        suffix = scene["scene_suffix"] if "scene_suffix" in scene.keys() else None
+    except (TypeError, KeyError, AttributeError):
+        number = scene.get("scene_number") if hasattr(scene, "get") else scene
+        suffix = scene.get("scene_suffix") if hasattr(scene, "get") else None
+    return f"{number}{suffix or ''}"
 
 
 def _existing_columns(conn, table):
