@@ -16,3 +16,4 @@ uploads/
 .pytest_cache/
 *.log
 backups/
+.discord_config
