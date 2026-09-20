@@ -8,7 +8,7 @@ from datetime import date
 from io import BytesIO
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 
@@ -134,6 +134,12 @@ _NUMERIC_KEYS = {
 _LIST_NUMBER_KEYS = {"scene_numbers"}
 # خانة الحوار - محتاجة فونت أصغر وبولد وعرض أوسع شوية عن باقي الخانات
 _DIALOGUE_KEYS = {"dialogue"}
+# خانات بتحتوي اسم علم (شخصية/مكان/ديكور) - المستخدم عايزها بولد زي الأرقام
+_BOLD_NAME_KEYS = {
+    "name", "location", "decor", "characters", "main_characters",
+    "secondary_characters", "locations",
+}
+_THIN_BORDER = Border(*(Side(style="thin", color="BFBFBF") for _ in range(4)))
 
 
 def _project_type_name_line(project):
@@ -194,6 +200,7 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
         cell = ws.cell(row=header_row, column=col_idx, value=label)
         cell.font = header_font
         cell.fill = header_fill
+        cell.border = _THIN_BORDER
         # النص متلف بس على حدود الكلمات (زي ما هو دايمًا في Excel) - مفيش
         # قطع لأي كلمة نفسها؛ لو اسم العمود كلمتين ممكن كل كلمة تقف في سطر
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -207,6 +214,7 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
         for col_idx, (key, _label, _width) in enumerate(columns, start=1):
             value = row.get(key, "")
             cell = ws.cell(row=r, column=col_idx, value=value)
+            cell.border = _THIN_BORDER
             if key == "number":
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.font = Font(bold=True)
@@ -221,10 +229,17 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
             elif key in _DIALOGUE_KEYS:
                 cell.alignment = Alignment(horizontal="right", vertical="top", wrap_text=True)
                 cell.font = Font(bold=True, size=9)
+            elif key in _BOLD_NAME_KEYS:
+                cell.alignment = Alignment(horizontal="right", vertical="top", wrap_text=True)
+                cell.font = Font(bold=True)
             else:
                 cell.alignment = Alignment(horizontal="right", vertical="top", wrap_text=True)
+            # صفوف متبدلة الألوان (رصاصي فاتح / أبيض) عشان العين تتابع السطر
+            # بسهولة في الأوراق الطويلة
             if r % 2 == 0:
                 cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+            else:
+                cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
 
     buf = BytesIO()
     wb.save(buf)
@@ -405,6 +420,48 @@ def build_locations_sheet_excel(project, project_id, fetch_all):
             "scene_numbers": "، ".join(str(n) for n in scene_numbers),
         })
     return _build_generic_excel("كشف أماكن التصوير", "كشف اماكن التصوير", project, LOCATIONS_SHEET_COLUMNS, rows)
+
+
+# ---------- كشف الإكسسوار ----------
+PROPS_SHEET_COLUMNS = [
+    ("number", "الرقم", 8),
+    ("name", "الإكسسوار", 24),
+    ("owner_character", "تابع لشخصية", 22),
+    ("continuity", "حساس للاستمرارية", 16),
+    ("scene_count", "عدد المشاهد", 12),
+    ("scene_numbers", "ارقام المشاهد", 30),
+]
+
+
+def build_props_sheet_excel(project, project_id, fetch_all):
+    """كشف الإكسسوار: ورقة واحدة لكل إكسسوار، بعدد وأرقام المشاهد اللي
+    ظاهر فيها (من ربط scene_props)، والشخصية التابع لها لو محدد، وعلامة
+    لو الإكسسوار حساس للاستمرارية (يحتاج انتباه خاص وقت التصوير)."""
+    props = fetch_all(
+        "SELECT * FROM props WHERE project_id=? ORDER BY id", (project_id,)
+    )
+    character_name_by_id = {
+        c["id"]: c["name"]
+        for c in fetch_all("SELECT id, name FROM characters WHERE project_id=?", (project_id,))
+    }
+    rows = []
+    for idx, prop in enumerate(props, start=1):
+        scene_rows = fetch_all("""
+            SELECT s.scene_number FROM scene_props sp
+            JOIN scenes s ON sp.scene_id = s.id
+            WHERE sp.prop_id = ?
+            ORDER BY s.scene_number
+        """, (prop["id"],))
+        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        rows.append({
+            "number": idx,
+            "name": prop["name"],
+            "owner_character": character_name_by_id.get(prop["character_id"], ""),
+            "continuity": "نعم" if prop["continuity_sensitive"] else "",
+            "scene_count": len(scene_numbers),
+            "scene_numbers": "، ".join(str(n) for n in scene_numbers),
+        })
+    return _build_generic_excel("كشف الإكسسوار", "كشف الإكسسوار", project, PROPS_SHEET_COLUMNS, rows)
 
 
 def _set_rtl(paragraph):

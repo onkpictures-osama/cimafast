@@ -20,6 +20,7 @@ from importer import import_parsed_scenes
 from export import (
     build_shot_list_excel, build_shot_list_word, build_shot_list_pdf,
     build_characters_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel,
+    build_props_sheet_excel,
 )
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
@@ -495,6 +496,7 @@ TRANSLATIONS = {
     "⬇️ كشف الشخصيات": "⬇️ Characters Sheet",
     "⬇️ التفريغ العام": "⬇️ General Breakdown",
     "⬇️ كشف أماكن التصوير": "⬇️ Filming Locations Sheet",
+    "⬇️ كشف الإكسسوار": "⬇️ Props Sheet",
 }
 
 
@@ -2331,6 +2333,7 @@ with tab_dashboard:
             st.session_state["_export_characters_bytes"] = build_characters_sheet_excel(project, project_id, fetch_all)
             st.session_state["_export_general_breakdown_bytes"] = build_general_breakdown_excel(project, project_id, fetch_all)
             st.session_state["_export_locations_bytes"] = build_locations_sheet_excel(project, project_id, fetch_all)
+            st.session_state["_export_props_bytes"] = build_props_sheet_excel(project, project_id, fetch_all)
             st.session_state["_export_cache_key"] = _export_cache_key
 
         exp_col1, exp_col2, exp_col3, exp_col4 = st.columns(4)
@@ -2370,7 +2373,7 @@ with tab_dashboard:
             "التصوير)، متملية أوتوماتيك من بيانات مشروعك. الخانات اللي محتاجة قرار بشري (زي الترشيح، عدد "
             "أيام التصوير، عدد الصفحات) سايبينها فاضية عشان تملاها إنت وقت التحضير الفعلي للتصوير."
         ))
-        rep_col1, rep_col2, rep_col3 = st.columns(3)
+        rep_col1, rep_col2, rep_col3, rep_col4 = st.columns(4)
         with rep_col1:
             st.download_button(
                 t("⬇️ كشف الشخصيات"),
@@ -2394,6 +2397,14 @@ with tab_dashboard:
                 file_name=f"{project['name']}_كشف_اماكن_التصوير.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_locations_sheet_{project_id}",
+            )
+        with rep_col4:
+            st.download_button(
+                t("⬇️ كشف الإكسسوار"),
+                data=st.session_state["_export_props_bytes"],
+                file_name=f"{project['name']}_كشف_الإكسسوار.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"dl_props_sheet_{project_id}",
             )
         st.divider()
 
