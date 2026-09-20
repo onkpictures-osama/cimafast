@@ -140,10 +140,12 @@ def _extract_props_from_text(text, speaker_roster):
         'جهاز': 'جهاز', 'موبايل': 'موبايل', 'هاتف': 'هاتف', 'كتاب': 'كتاب',
         'سيجارة': 'سيجارة', 'فنجان': 'فنجان', 'كوب': 'كوب', 'سلاح': 'سلاح',
         'مسدس': 'مسدس', 'سكين': 'سكين', 'سيف': 'سيف', 'مفتاح': 'مفتاح',
+        'درج': 'درج', 'رسالة': 'رسالة', 'صورة': 'صورة', 'خريطة': 'خريطة',
     }
     found_props = []
     for prop_key, prop_name in props_lexicon.items():
-        if re.search(r'\b' + re.escape(prop_key) + r'\b', text):
+        arabic_pattern = r'(?:ال|و|ب|ل|ك)?' + re.escape(prop_key)
+        if re.search(arabic_pattern, text):
             if prop_name not in found_props:
                 found_props.append(prop_name)
     return found_props

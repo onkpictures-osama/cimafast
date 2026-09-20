@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "bypassPermissions": true,
     "allow": [
       "Bash",
       "Bash(sudo *)",
