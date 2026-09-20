@@ -4,7 +4,10 @@ import sys
 import time
 import uuid
 import streamlit as st
-from auth import authenticate, no_login_allowed, resolve_users
+from auth import (
+    authenticate, no_login_allowed, resolve_users,
+    make_session_token, verify_session_token, SESSION_COOKIE_NAME,
+)
 from database import (
     init_db, FIELD_HELP,
     fetch_all, run_query, run_delete,
@@ -38,6 +41,27 @@ def _render_locked_screen():
         "<br>An administrator must set the [users] section in secrets.toml "
         "and restart the service.</p>",
         unsafe_allow_html=True,
+    )
+
+
+def _set_session_cookie(token):
+    """بيحط توكن الجلسة في كوكي بالمتصفح (30 يوم) عشان المستخدم يفضل داخل
+    حتى بعد ريفريش أو نشر تحديث جديد للبرنامج. مفيش API جاهزة في Streamlit
+    لكتابة كوكي، فبنعملها بسطر JS صغير."""
+    st.html(
+        f"<script>document.cookie="
+        f"'{SESSION_COOKIE_NAME}={token}; Max-Age={30*24*60*60}; Path=/; SameSite=Lax; Secure';"
+        f"</script>",
+        unsafe_allow_javascript=True,
+    )
+
+
+def _clear_session_cookie():
+    st.html(
+        f"<script>document.cookie="
+        f"'{SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; SameSite=Lax; Secure';"
+        f"</script>",
+        unsafe_allow_javascript=True,
     )
 
 
@@ -77,6 +101,10 @@ def _render_login_screen():
                 st.session_state["_authenticated"] = True
                 st.session_state["_auth_user"] = user
                 st.session_state.pop("_login_attempts", None)
+                # الكوكي بيتحط في الـ run الجاي (مش هنا) عشان لو حطيناها قبل
+                # st.rerun() مباشرة، الصفحة بتتغير قبل ما المتصفح ياخد فرصة
+                # ينفّذ السكريبت اللي بيحط الكوكي فعليًا
+                st.session_state["_pending_session_cookie"] = make_session_token(user)
                 st.rerun()
             # تأخير بسيط ومتزايد بعد كل محاولة فاشلة عشان نصعّب التخمين الآلي
             attempts = st.session_state.get("_login_attempts", 0) + 1
@@ -88,9 +116,24 @@ def _render_login_screen():
 
 def _check_login():
     """بوابة الدخول. بترجّع True بس لما يكون فيه مستخدم داخل فعلًا."""
+    # لو المستخدم لسه خارج (Log out) دلوقتي، لازم نمسح كوكي الجلسة فعليًا
+    # في المتصفح، ونتجاهل قيمتها القديمة في الـ run ده بالذات (لسه وصلت
+    # مع نفس الطلب اللي جبنا بيه الصفحة، قبل ما سكريبت المسح يتنفذ فعلًا)
+    just_logged_out = st.session_state.pop("_just_logged_out", False)
+    if just_logged_out:
+        _clear_session_cookie()
     if st.session_state.get("_authenticated") and st.session_state.get("_auth_user"):
         return True
     users = resolve_users()
+    # جلسة جديدة (ريفريش أو بعد نشر تحديث) - نشوف لو فيه كوكي دخول ساري
+    # قبل ما نعرض شاشة تسجيل الدخول من الأول
+    if users and not just_logged_out:
+        cookie_token = st.context.cookies.get(SESSION_COOKIE_NAME)
+        remembered_user = verify_session_token(cookie_token, users)
+        if remembered_user:
+            st.session_state["_authenticated"] = True
+            st.session_state["_auth_user"] = remembered_user
+            return True
     if not users:
         # مفيش حسابات: بنقفل افتراضيًا (fail closed). الاستثناء الوحيد هو
         # التطوير المحلي لما المطور يطلب كده صراحةً بالمتغير ده.
@@ -120,10 +163,15 @@ def _logout():
     المستخدم ميخسرش اختياراته لو رجع دخل تاني."""
     for key in ("_authenticated", "_auth_user", "_login_attempts"):
         st.session_state.pop(key, None)
+    st.session_state["_just_logged_out"] = True
 
 
 if not _check_login():
     st.stop()
+
+_pending_cookie_token = st.session_state.pop("_pending_session_cookie", None)
+if _pending_cookie_token:
+    _set_session_cookie(_pending_cookie_token)
 
 init_db()
 

@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 
 # الصيغة: pbkdf2_sha256$<iterations>$<salt_b64>$<hash_b64>
 ALGORITHM = "pbkdf2_sha256"
@@ -158,6 +159,67 @@ def authenticate(username, password, users):
 # hash وهمي لكلمة سر عشوائية، بيتحسب مرة واحدة وقت التحميل عشان المقارنة
 # الوهمية فوق تاخد نفس وقت المقارنة الحقيقية.
 _DUMMY_HASH = hash_password(base64.b64encode(os.urandom(18)).decode("ascii"))
+
+
+# ---------------- جلسة دخول دايمة (Cookie) ----------------
+# عشان المستخدم ميضطرش يسجل دخول تاني كل ريفريش أو بعد كل نشر جديد للبرنامج،
+# بنحط توكن موقّع (HMAC) في كوكي بالمتصفح بعد أول دخول ناجح. التوكن نفسه مالوش
+# تخزين على السيرفر - بس اسم المستخدم وتاريخ الانتهاء وتوقيع، فأي تلاعب فيه
+# بيفشل التحقق فورًا. لو SESSION_SECRET مش متظبط، الميزة دي بترجع None بهدوء
+# والبرنامج يرجع لسلوكه القديم (تسجيل دخول عادي من غير كوكي).
+SESSION_COOKIE_NAME = "cf_session"
+SESSION_TTL_SECONDS = 60 * 60 * 24 * 30  # 30 يوم
+
+
+def _session_secret():
+    secret = os.environ.get("CIMAFAST_SESSION_SECRET")
+    if secret:
+        return secret
+    try:
+        import streamlit as st
+        return st.secrets.get("SESSION_SECRET")
+    except Exception:
+        return None
+
+
+def make_session_token(username, secret=None):
+    """بيرجّع توكن جلسة جاهز يتحط في كوكي، أو None لو مفيش SESSION_SECRET متظبط."""
+    secret = _session_secret() if secret is None else secret
+    if not secret:
+        return None
+    name = normalize_username(username)
+    if not name:
+        return None
+    expiry = int(time.time()) + SESSION_TTL_SECONDS
+    payload = f"{name}.{expiry}"
+    sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
+
+
+def verify_session_token(token, users, secret=None):
+    """بيرجّع اسم المستخدم لو التوكن صحيح وموجود ولسه ساري ومستخدمه لسه له
+    حساب فعلي، وإلا None. أي شك بسيط بيرجّع None بدل ما يفتح الباب."""
+    secret = _session_secret() if secret is None else secret
+    if not secret or not token or not isinstance(token, str):
+        return None
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    name, expiry_text, sig = parts
+    payload = f"{name}.{expiry_text}"
+    expected_sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected_sig):
+        return None
+    try:
+        expiry = int(expiry_text)
+    except ValueError:
+        return None
+    if expiry < int(time.time()):
+        return None
+    name = normalize_username(name)
+    if name not in (users or {}):
+        return None
+    return name
 
 
 def _cli():
