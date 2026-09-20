@@ -15,8 +15,8 @@ flipping it. Nothing in here changes the default path.
 |---|---|---|
 | 0 | theme/ module, self-hosted fonts, `?theme=glass` plumbing — **no visual change** | `e975f97` (see warning below) |
 | 0 | screenshot harness (`tests/visual/`) | `348d91f` (see warning below) |
-| 0 | theme tests, blur-depth check, docs | _not yet committed_ |
-| 1 | ground mesh gradient + glass base theming | _not yet committed_ |
+| 0 | theme tests, blur-depth check, docs | `f07e976` (see warning below) |
+| 1 | ground mesh gradient + glass base theming | `f07e976` (see warning below) |
 | 2 | three material tiers + `cf-*` migration | _not yet committed_ |
 | 3 | component pass in frequency order | _not yet committed_ |
 | 4 | chrome: 72% gold glass sidebar, header, stepper redesign | _not yet committed_ |
@@ -31,7 +31,7 @@ Unrelated work that got committed in the same window, kept separate on purpose:
 |---|---|
 | `15ffcf7` | scene number suffixes (35A) carried through script import. Not redesign. |
 
-## Warning: two commits have misleading subject lines
+## Warning: three commits have misleading subject lines
 
 Do not rewrite this history — republishing rewritten history on a public repo is
 riskier than the mislabelling. Instead, know what is actually inside:
@@ -58,6 +58,21 @@ the one remaining positional row access, `database.py:112`, already guards with
 
 **`348d91f` "Fix sqlite3.Row AttributeError globally in fetch_all"** — contains
 `ai_jobs.py`, `script_parser.py` changes, and 388 lines of screenshot harness.
+
+**`f07e976` "Remove outdated auto-link characters button"** — contains the rest
+of Phase 0 *and* all of Phase 1, not just the `app.py` button removal:
+
+- `REDESIGN.md`, `REDESIGN-PLAN.md`, and the theme/hazards sections of `CLAUDE.md`
+- `tests/test_theme.py` (+259) and `tests/visual/blur_depth.py` (+103)
+- `theme/glass.py` (+131): the mesh-gradient ground, the type rules and the
+  concentric radius rules — i.e. Phase 1 in full
+- `theme/tokens.py`, `theme/inject.py`, `theme/classic.py` adjustments
+- and the actual titled change: the legacy character-linking expander in `app.py`
+
+Phase 1's "Streamlit built-in theme settings" half is deliberately *not* there:
+`.streamlit/config.toml` is read once at service start and cannot vary per
+request, so anything glass-specific has to live in the CSS layer or it would
+change the default look for every user. See CLAUDE.md.
 
 ## How to undo each piece
 
@@ -104,6 +119,27 @@ git checkout 6d387ca -- .streamlit/config.toml
 That directory is outside the git tree on purpose (same reasoning as
 `studio.db`): binary screenshots do not belong in a public repo, and the live
 box is where they are useful.
+
+**The `6d387ca` set is no longer a flag-off regression reference.** It predates
+both the font change (`font = "sans serif"` plus Google-CDN `<link>` tags → the
+self-hosted `Readex Pro` faces now in `.streamlit/config.toml`) and four commits
+of unrelated feature work (episodes, AI analysis, scene suffixes). Shooting
+`classic` at `f07e976` against it gives 4/30 identical, with the differences
+concentrated exactly where you would expect: typography everywhere, and the
+analysis screen where new UI landed. Keep it as the record of the pre-redesign
+look; do not read a `DIFF` against it as a regression.
+
+For "did this phase change the default look?" use the flag-off set shot at the
+commit you are building on:
+
+```
+/var/lib/cimafast/visual-baseline/f07e976-classic/   # 30 PNGs, classic at f07e976
+/var/lib/cimafast/visual-baseline/f07e976-glass/     # 30 PNGs, glass at f07e976 (end of phase 1)
+```
+
+The `-glass` set is the other half of the same idea: each phase's glass shots
+compared against the previous phase's show exactly which screens that phase
+touched, which is how you catch a selector that reached further than intended.
 
 To rebuild it from scratch:
 
