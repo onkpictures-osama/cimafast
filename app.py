@@ -30,6 +30,36 @@ from export import (
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
+# Global RTL/LTR CSS
+st.markdown("""
+<style>
+    /* Global RTL/LTR styling */
+    * { box-sizing: border-box; }
+    
+    /* Form labels: RTL for Arabic, LTR for English */
+    label { direction: auto; text-align: right; }
+    
+    /* Text areas and inputs: LTR by default */
+    textarea, input { direction: ltr !important; text-align: left; }
+    
+    /* Paragraphs with Arabic: RTL */
+    p[dir="rtl"], div[dir="rtl"] { direction: rtl; text-align: right; }
+    p[dir="ltr"], div[dir="ltr"] { direction: ltr; text-align: left; }
+    
+    /* Error messages: auto-direction */
+    .stError, .stWarning, .stSuccess, .stInfo { 
+        direction: auto; 
+        text-align: right;
+    }
+    
+    /* Buttons: center alignment */
+    button { text-align: center; }
+    
+    /* Sidebar: RTL */
+    .sidebar .sidebar-content { direction: rtl; }
+</style>
+""", unsafe_allow_html=True)
+
 
 def _render_locked_screen():
     """شاشة القفل لما مفيش حسابات متظبطة — بنقفل الباب ونقول للمسؤول السبب."""
