@@ -18,7 +18,7 @@ the mouse pointer (a fixed highlight on touch screens).
   (over images only) — opaque 100% (dense text: tables, long Arabic)
 - Edge: 1px hairline rgba(255,255,255,.12) + inset top highlight .18
 - Radius: 22 / 14 / 10 · Shadow 0 8px 32px rgba(0,0,0,.35)
-- Type: IBM Plex Sans Arabic; -apple-system first for Latin (real SF Pro on Apple)
+- Type: Readex Pro everywhere, Arabic and Latin (owner's decision; replaces IBM Plex / SF Pro)
 
 ## Hard limits
 - Text contrast ≥4.5:1 (headings ≥3:1), in both modes

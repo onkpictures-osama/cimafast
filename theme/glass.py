@@ -107,13 +107,11 @@ def _ground_rules(mode, dir_):
 
 def _type_rules():
     return """
-    /* العربي بيتكتب بـ IBM Plex Sans Arabic (مستضاف محليًا).
-       اللاتيني بيبدأ بـ ‎-apple-system‎ عشان iOS وmacOS يرسموا SF Pro
-       الحقيقي — إحساس أصلي على أجهزة آبل من غير رخصة خط ولا ملف زيادة.
-       باقي الأجهزة بترجع لـ IBM Plex Sans عادي. */
+    /* Readex Pro للعربي والإنجليزي في كل حتة (قرار صاحب المشروع) — مستضاف
+       محليًا. خطوط النظام بس احتياطي لو الملف متحملش. */
     [dir="ltr"] {
-        font-family: -apple-system, BlinkMacSystemFont, "IBM Plex Sans",
-                     "IBM Plex Sans Arabic", "Segoe UI", sans-serif;
+        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont,
+                     "Segoe UI", sans-serif;
     }
     /* العناوين: أتقل شوية وبتقارب أحرف أضيق. العربي مبياخدش
        ‎letter-spacing‎ سالب — الحروف موصولة والتقريب بيبوّش الوصلات —

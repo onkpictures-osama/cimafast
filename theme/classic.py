@@ -72,15 +72,15 @@ MAIN_CSS = r'''
         direction: ltr;
         text-align: left;
     }
-    /* IBM Plex Sans Arabic for Arabic text */
+    /* Readex Pro للعربي والإنجليزي */
     .stApp {
-        font-family: "IBM Plex Sans Arabic", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     [dir="rtl"] {
-        font-family: "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont, sans-serif;
     }
     [dir="ltr"] {
-        font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     /* Streamlit نفسه بيحط text-align: left افتراضيًا على العناوين والنصوص
        التوضيحية (caption) وفقرات الـ markdown، من غير ما يهتم باتجاه
