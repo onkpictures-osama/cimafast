@@ -168,7 +168,8 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
 
     n_cols = len(columns)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
-    title_cell = ws.cell(row=1, column=1, value=f"🎬 {report_name}")
+    # الإيموجي بيتحول لعلامة استفهام في إكسل لأن خط Calibri مش بيدعمه، فبنسيبه للواجهة بس
+    title_cell = ws.cell(row=1, column=1, value=report_name)
     title_cell.font = title_font
     title_cell.fill = title_fill
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
