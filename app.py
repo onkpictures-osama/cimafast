@@ -145,7 +145,7 @@ UI_TEXT = {
     "select_project": {"ar": "اختر مشروع للعمل عليه", "en": "Select a project"},
     "edit_delete_project": {"ar": "✏️ تعديل / حذف المشروع الحالي", "en": "✏️ Edit / Delete Current Project"},
     "settings": {"ar": "⚙️ الإعدادات", "en": "⚙️ Settings"},
-    "tab_import": {"ar": "📤 استيراد السكريبت", "en": "📤 Import Script"},
+    "tab_import": {"ar": "📤 إضافة سيناريو", "en": "📤 Add Screenplay"},
     "tab_locations": {"ar": "📍 الأماكن", "en": "📍 Locations"},
     "tab_characters": {"ar": "🎭 الشخصيات", "en": "🎭 Characters"},
     "tab_props": {"ar": "🎒 الإكسسوارات", "en": "🎒 Props"},
@@ -235,12 +235,24 @@ TRANSLATIONS = {
         "\"Character Name: line\".",
     "📋 السكريبت شكله معقد والبرنامج مبيحللوش كويس؟ استخدم أي AI بدله":
         "📋 Script format too complex and the app can't parse it well? Use any AI instead",
-    "لو شكل سكريبتك غريب أو التحليل التلقائي مبيطلعش نتيجة كويسة، انسخ البرومبت ده "
-    "وابعته لأي AI (Claude، ChatGPT، Gemini...) مع نص السكريبت، واحفظ الرد اللي هيرجعلك "
-    "في ملف اسمه مثلاً `script.json`، وارفعه هنا زي أي ملف تاني.":
-        "If your script's format is unusual or the automatic analysis isn't giving good results, copy this "
-        "prompt and send it to any AI (Claude, ChatGPT, Gemini...) along with your script text, save the "
-        "reply it gives you to a file like `script.json`, and upload it here like any other file.",
+    "لو شكل سكريبتك غريب أو التحليل التلقائي مبيطلعش نتيجة كويسة، اتبع الخطوات البسيطة دي:":
+        "If your script's format is unusual or the automatic analysis isn't giving good results, follow these simple steps:",
+    "**1.** دوس على زرار \"📋 نسخ البرومبت\" تحت (هيتنسخ تلقائي).\n\n"
+    "**2.** روح لبرنامج الـ AI اللي بتستخدمه (Claude، ChatGPT، Gemini...) وافتح محادثة جديدة.\n\n"
+    "**3.** الصق البرومبت اللي نسخته، وارفق معاه ملف السكريبت (PDF أو نص) أو الصق نص "
+    "السكريبت كامل بعد البرومبت.\n\n"
+    "**4.** بعد ما الـ AI يرد عليك بالنتيجة، احفظها في ملف اسمه `script.json`.\n\n"
+    "**5.** ارفع ملف `script.json` ده من الزرار تحت في الصفحة دي زي أي ملف تاني، وهيتم "
+    "استيراده تلقائي.":
+        "**1.** Click the \"📋 Copy Prompt\" button below (it copies automatically).\n\n"
+        "**2.** Go to the AI app you use (Claude, ChatGPT, Gemini...) and open a new chat.\n\n"
+        "**3.** Paste the prompt you copied, and attach the script file (PDF or text) or paste the "
+        "full script text after the prompt.\n\n"
+        "**4.** Once the AI replies with the result, save it to a file named `script.json`.\n\n"
+        "**5.** Upload that `script.json` file from the button below on this page like any other file, "
+        "and it will be imported automatically.",
+    "اضغط على أيقونة النسخ 📋 اللي هتظهر فوق يمين الصندوق ده عشان تاخد البرومبت كامل دفعة واحدة":
+        "Click the 📋 copy icon that appears at the top of this box to copy the whole prompt at once",
     "اختر ملف السكريبت": "Choose script file", "🔍 تحليل الملف": "🔍 Analyze File",
     "🚫 استبعد المشهد ده من الاستيراد (مثلاً لو ده صفحة عنوان مش مشهد حقيقي)":
         "🚫 Exclude this scene from import (e.g. if it's a title page, not a real scene)",
@@ -807,6 +819,18 @@ _CSS_TEMPLATE = """
     .cf-stage-done { background: rgba(45, 156, 219, 0.14); border-color: #2D9CDB; }
     .cf-stage-current { border-color: #E8B923; box-shadow: 0 0 0 1px rgba(232, 185, 35, 0.35); }
     .cf-stage-pending { opacity: 0.5; }
+    .cf-copy-hint {
+        font-weight: 700;
+        color: #E8B923;
+        margin-bottom: 6px;
+    }
+    div[data-testid="stCodeBlock"] button[title="Copy to clipboard"],
+    div[data-testid="stCodeBlock"] [data-testid="stCodeCopyButton"] {
+        opacity: 1 !important;
+        transform: scale(1.4);
+        background: #E8B923 !important;
+        border-radius: 6px !important;
+    }
     </style>
     """
 
@@ -1192,7 +1216,12 @@ tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
 
 # ---------------- تبويب استيراد السكريبت ----------------
 
-AI_JSON_PROMPT = """حلل السيناريو المرفق بالتفصيل الكامل، وطلعلي بياناته في صيغة JSON بالشكل ده بالظبط، من غير أي نص زيادة قبله أو بعده (من غير ```json ولا أي شرح):
+AI_JSON_PROMPT = """أنت مساعد إخراج ومدير إنتاج محترف بتحلل سيناريو فيلم/مسلسل تحليل شامل وعميق جدًا،
+عشان بياناته هتتحط في برنامج إدارة إنتاج بيبني منه تقارير رسمية (كشوفات تصوير، تفريغ لقطات...).
+الدقة هنا مهمة جدًا لأن أي غلطة هتتكرر في كل تقرير بعد كده.
+
+حلل السيناريو المرفق بالكامل، وطلعلي بياناته في صيغة JSON بالشكل ده بالظبط، من غير أي نص زيادة
+قبله أو بعده (من غير ```json ولا أي شرح):
 
 {
   "scenes": [
@@ -1210,10 +1239,35 @@ AI_JSON_PROMPT = """حلل السيناريو المرفق بالتفصيل ال
 
 قواعد مهمة لازم تلتزم بيها بالظبط - اقرا كل واحدة كويس، لأن الهدف إنك تذاكر السكريبت زي مساعد إخراج محترف بيحلل كل تفصيلة، مش بس الحوار:
 
+## الشخصيات والإكسسوارات
 - "characters": **كل** الشخصيات الموجودة فعليًا في المشهد، سواء كانت شخصية رئيسية أو ثانوية أو حتى كومبارس بدور صغير - حتى لو الشخصية دي **ملهاش أي حوار وساكتة طول المشهد**. لو مشهد فيه شخصية واقفة في الخلفية أو بتعمل حركة من غير ما تتكلم، لازم اسمها يتسجل هنا برضو. استخدم نفس الاسم بالظبط لكل ظهور لنفس الشخصية من غير ما تنوّع في كتابة الاسم (مثلاً "أحمد" في كل مرة، مش "أحمد" وبعدين "الشاب").
-- "props": أي إكسسوار أو حاجة بتتلمس أو بتتستخدم أو مذكورة في وصف المشهد ولها دور في الحدث (زي: سكينة، تليفون، شنطة، مفاتيح عربية، سلاح، مجلة، فلوس...). لو مفيش حاجة واضحة سيبها [] فاضية. مش المفروض تسجل حاجات الديكور الثابتة (زي أثاث الغرفة) إلا لو لها دور في الحدث.
+- "props": أي إكسسوار أو حاجة بتتلمس أو بتتستخدم أو مذكورة في وصف المشهد ولها دور في الحدث (زي: سكينة، تليفون، شنطة، مفاتيح عربية، سلاح، مجلة، فلوس...). لو مفيش حاجة واضحة سيبها [] فاضية. مش المفروض تسجل حاجات الديكور الثابتة (زي أثاث الغرفة) إلا لو لها دور في الحدث. اكتب في "notes" لو الإكسسوار مرتبط بشخصية معينة (مثلاً "طاسة أحمد" أو "شنطة سارة") عشان يبان واضح إنه ملكها.
+
+## المكان والديكور (مهم جدًا)
+كتير المشاهد بتحصل في "ديكور" فرعي جوه "مكان" عام أكبر - مثلاً المكان العام هو "شقة حسين"،
+والديكور الفرعي جواه هو "غرفة نوم حسين" أو "صالة شقة حسين". لما ده يحصل:
+- اكتب "location_name" بالصيغة: "المكان العام - الديكور الفرعي" بالظبط (مثال: "شقة حسين - غرفة نوم حسين").
+- لو المشهد بياخد المكان كله من غير ديكور فرعي محدد، اكتب اسم المكان لوحده من غير شرطة.
+- **دمج الأسماء المتكررة بصيغ مختلفة**: السيناريست أحيانًا بيوصف نفس المكان بصيغ مختلفة في أماكن
+  مختلفة من السكريبت (مثلاً "شقة صلاح" في مشهد، و"شقة صلاح والد مصطفى" في مشهد تاني - دول نفس
+  المكان). لازم تراجع كل أسماء الأماكن في السكريبت كله قبل ما تطلع النتيجة النهائية، وتوحّد كل
+  الإشارات لنفس المكان تحت **اسم واحد متسق بالظبط** في كل المشاهد اللي بتحصل فيه، بدل ما تسيبها
+  متنوعة زي ما السيناريست كتبها.
+
+## المشاهد اللي فيها أكتر من ديكور أو مكان (زي الفوتومونتاج)
+لو مشهد واحد في السكريبت (برقم واحد) فعليًا بيتنقل بين أكتر من مكان أو ديكور مختلف (زي مشهد
+فوتومونتاج قصير بيولّف بين عدة أماكن)، **متسيبوش مشهد واحد بمكان غامض** - قسّمه لعدة مشاهد
+منفصلة في الناتج، كل واحد برقم صحيح متتابع خاص بيه (يعني لو السكريبت مشهد رقم 35 فوتومونتاج
+فيه 4 أماكن، طلّعهم كأربع عناصر منفصلين في "scenes" بأرقام متتالية زي 35، 36، 37، 38 - **مش**
+حروف زي 35A/35B، البرنامج لسه ما بيدعمش ترقيم بالحروف). اكتب في "notes" بداية كل واحد منهم
+إشارة إنه جزء من مشهد الفوتومونتاج الأصلي (مثلاً "من مونتاج مشهد 35 الأصلي") عشان الترتيب يفضل
+مفهوم.
+
+## باقي الحقول
 - "int_ext": لازم يكون "INT" (داخلي) أو "EXT" (خارجي) بس - من غير أي قيمة تانية.
-- "day_night": لازم يكون واحد من القيم دي بالظبط: "نهار" أو "ليل" أو "غروب" أو "فجر".
+- "day_night": لازم يكون واحد من القيم دي بالظبط: "نهار" أو "ليل" أو "غروب" أو "فجر". لو المشهد
+  متحدد إنه ليل، أي لقطة جواه هي ليل بالتبعية إلا لو السكريبت نفسه بيقول صراحة إن جزء منه في
+  وقت مختلف - في الحالة دي اكتب ده في "notes" بوضوح عشان اليوزر يعدّل اللقطة المعنية يدويًا.
 - "scene_number": رقم صحيح بترتيب ظهور المشهد في السكريبت.
 - "notes": لازم يشمل كل التفاصيل دي مرتبة ووصفها واضح، من غير ما تلخص أو تختصر أي جزء:
   1. وصف الحركة والفعل الكامل (مين بيعمل إيه، فين، وأي تغيير في الملابس أو المظهر أو الحالة يحصل خلال المشهد).
@@ -1238,10 +1292,22 @@ with tab_import:
 
     with st.expander(t("📋 السكريبت شكله معقد والبرنامج مبيحللوش كويس؟ استخدم أي AI بدله")):
         st.markdown(t(
-            "لو شكل سكريبتك غريب أو التحليل التلقائي مبيطلعش نتيجة كويسة، انسخ البرومبت ده "
-            "وابعته لأي AI (Claude، ChatGPT، Gemini...) مع نص السكريبت، واحفظ الرد اللي هيرجعلك "
-            "في ملف اسمه مثلاً `script.json`، وارفعه هنا زي أي ملف تاني."
+            "لو شكل سكريبتك غريب أو التحليل التلقائي مبيطلعش نتيجة كويسة، اتبع الخطوات البسيطة دي:"
         ))
+        st.markdown(t(
+            "**1.** دوس على زرار \"📋 نسخ البرومبت\" تحت (هيتنسخ تلقائي).\n\n"
+            "**2.** روح لبرنامج الـ AI اللي بتستخدمه (Claude، ChatGPT، Gemini...) وافتح محادثة جديدة.\n\n"
+            "**3.** الصق البرومبت اللي نسخته، وارفق معاه ملف السكريبت (PDF أو نص) أو الصق نص "
+            "السكريبت كامل بعد البرومبت.\n\n"
+            "**4.** بعد ما الـ AI يرد عليك بالنتيجة، احفظها في ملف اسمه `script.json`.\n\n"
+            "**5.** ارفع ملف `script.json` ده من الزرار تحت في الصفحة دي زي أي ملف تاني، وهيتم "
+            "استيراده تلقائي."
+        ))
+
+        st.markdown(
+            f'<div class="cf-copy-hint">👇 {t("اضغط على أيقونة النسخ 📋 اللي هتظهر فوق يمين الصندوق ده عشان تاخد البرومبت كامل دفعة واحدة")}</div>',
+            unsafe_allow_html=True,
+        )
         st.code(AI_JSON_PROMPT, language="text")
 
     uploaded_file = st.file_uploader(t("اختر ملف السكريبت"), type=["docx", "txt", "pdf", "json"], key="script_upload")
@@ -1969,7 +2035,7 @@ with tab_breakdown:
         scene_map = {f"{t('مشهد')} {s['scene_number']}": s["id"] for s in scenes}
         sel_scene = st.selectbox(t("اختر المشهد"), list(scene_map.keys()))
         scene_id = scene_map[sel_scene]
-        current_scene_row = fetch_all("SELECT notes FROM scenes WHERE id=?", (scene_id,))[0]
+        current_scene_row = fetch_all("SELECT notes, day_night FROM scenes WHERE id=?", (scene_id,))[0]
         available_dialogue_lines = unused_dialogue_lines(current_scene_row["notes"], scene_id, fetch_all)
 
         with st.form(f"add_shot_{scene_id}"):
@@ -1986,7 +2052,10 @@ with tab_breakdown:
 
             col4, col5 = st.columns(2)
             with col4:
+                # اللقطة الجديدة بتاخد نهار/ليل المشهد بتاعها كقيمة افتراضية، والمستخدم
+                # يقدر يغيّرها لو اللقطة دي بالذات اتصورت في وقت مختلف عن باقي المشهد
                 sh_day_night = st.selectbox(t("النهار/الليل"), DAY_NIGHT_OPTIONS,
+                                             index=safe_index(DAY_NIGHT_OPTIONS, current_scene_row["day_night"]),
                                              format_func=fmt_day_night,
                                              help=FIELD_HELP["day_night"])
             with col5:
