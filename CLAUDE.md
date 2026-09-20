@@ -69,11 +69,72 @@ Plain-assert scripts, no pytest, no extra dependency:
 ```
 venv/bin/python tests/test_auth.py         # login logic (pure functions)
 venv/bin/python tests/test_login_flow.py   # login screen via Streamlit AppTest
+venv/bin/python tests/test_theme.py        # theme tokens, contrast floors, theme flag
 ```
 
 `test_login_flow.py` runs the real `app.py` against a temp DB via
 `STUDIO_DB_PATH` — it must never be pointed at the live database. Fixtures use
 throwaway credentials on purpose; see the login hazard below.
+
+`test_gui.py` is an HTTP smoke test against the *running* service on
+`127.0.0.1:8501`. Two of its eight checks (`Claude Signature`, `Signup Module`)
+look for features that do not exist in this codebase and have failed since
+before the theme work — 6/8 is the expected baseline, not a regression.
+
+### Visual regression
+
+A restyle on a live app needs a repeatable pixel check, not one-off screenshots.
+The harness starts its own Streamlit on a spare port with a seeded temp DB and a
+throwaway login, so it never touches production or the live database:
+
+```
+venv/bin/python tests/visual/shots.py   --out /tmp/shots/after  --port 8592
+venv/bin/python tests/visual/shots.py   --out /tmp/shots/glass  --port 8593 --theme glass
+venv/bin/python tests/visual/compare.py /tmp/shots/before /tmp/shots/after
+venv/bin/python tests/visual/blur_depth.py --port 8596        # backdrop-filter nesting
+```
+
+30 shots per run: 3 viewports (phone/tablet/desktop) × 2 languages × 5 screens
+(login, project list, scene editor, final reports, script analysis). To shoot an
+older commit for comparison, add a worktree and point `--tree` at it:
+
+```
+git worktree add /tmp/cf-baseline <commit>
+venv/bin/python tests/visual/shots.py --out /tmp/shots/before --tree /tmp/cf-baseline --port 8591
+git worktree remove /tmp/cf-baseline
+```
+
+## Theme layer
+
+All CSS lives in `theme/` — it used to be three separate `st.markdown` blocks
+inside `app.py`.
+
+| File | Holds |
+|---|---|
+| `theme/tokens.py` | every colour, alpha, blur, radius and shadow, for dark and light |
+| `theme/contrast.py` | WCAG maths: alpha compositing, luminance, ratio, audit table |
+| `theme/classic.py` | the current look, verbatim — the default all users see |
+| `theme/glass.py` | the Liquid Glass material layer, flag-gated |
+| `theme/inject.py` | the only place that writes CSS into the page |
+| `theme/flag.py` | `?theme=glass` resolution; defaults to `classic`, always |
+| `theme/components.py` | `glass_panel()` / `glass_card()` helpers |
+
+Rules that are load-bearing:
+
+- **`classic` is the default and must stay pixel-identical.** The glass look ships
+  only behind `?theme=glass` until the owner approves flipping it. `.streamlit/
+  config.toml` is read once at startup and cannot vary per request, so nothing
+  glass-specific belongs in it — that is why radius, borders and light mode are
+  in the CSS layer rather than in native theme keys.
+- **At most two nested `backdrop-filter` layers.** The third material tier is
+  opaque by definition, which is what makes the rule structural instead of a
+  thing to remember. `tests/visual/blur_depth.py` measures it in a real browser.
+- **Contrast floors are measured, not eyeballed.** Body text ≥ 4.5:1, headings
+  ≥ 3:1, in both modes. The gold sidebar holds AA body text only at ≥ 72% tint;
+  60% gives 3.69:1 and fails. `tests/test_theme.py` asserts this.
+- Fonts are self-hosted in `static/fonts/` via `[[theme.fontFaces]]`, which needs
+  `server.enableStaticServing = true`. Do not reintroduce the Google CDN `<link>`
+  tags: they were render-blocking and re-injected on every rerun.
 
 ## Hazards
 

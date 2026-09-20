@@ -31,12 +31,24 @@ BASE_CSS = r'''
     button { text-align: center; }
    '''
 
-LOGIN_CSS = r'''        
+LOGIN_CSS = r'''
+        /* شاشة تسجيل الدخول.
+           الحاجة الوحيدة اللي اتغيرت عن النسخة اللي كانت في app.py: القواعد
+           بقت متربطة بمفاتيح الخانتين (st-key-_login_username /
+           st-key-_login_password) بدل stForm العام. ملحوظة: ‎st.form‎ نفسه
+           مبياخدش كلاس ‎st-key-*‎ في Streamlit 1.64 — الخانات اللي بياخدوه.
+           السبب إن البلوك ده بقى بيتحقن مرة واحدة في الأول مع باقي الستايل
+           الجلوبال، عشان ميعملش حاوية Streamlit زيادة على شاشة الدخول —
+           الحاوية الزيادة دي كانت بتزح الفورم كله ١٦ بكسل لتحت. الربط
+           بالمفتاح بيخلي القواعد تفضل مأثرة على فورم الدخول بس، مش على كل
+           الفورمات في البرنامج. */
         .cf-login h2 { text-align: center; margin-top: 12vh; }
         .cf-login p { text-align: center; opacity: 0.75; margin-bottom: 0; }
-        div[data-testid="stForm"] label p { direction: rtl; text-align: right; }
-        div[data-testid="stForm"] input { direction: ltr; text-align: left; }
-        '''
+        div[class*="st-key-_login_username"] label p,
+        div[class*="st-key-_login_password"] label p { direction: rtl; text-align: right; }
+        div[class*="st-key-_login_username"] input,
+        div[class*="st-key-_login_password"] input { direction: ltr; text-align: left; }
+'''
 
 MAIN_CSS = r'''    
     

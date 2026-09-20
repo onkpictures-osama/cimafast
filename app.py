@@ -497,7 +497,7 @@ TRANSLATIONS = {
         "(Characters Sheet, General Breakdown) will stay empty until you manually link each scene to its "
         "characters, or click here so we try to find your character library's names inside each scene's "
         "text and link them automatically (without removing any existing links).",
-    "🔍 ابحث واربط الشخصيات دلوقتي": "🔍 Find and Link Characters Now",
+
     "تم ربط": "Linked",
     "علاقة شخصية-مشهد جديدة.": "new character-scene link(s).",
     "دول سطور الحوار اللي لسه في حوار المشهد ومتحطوش في لقطة تانية - اختار بس اللي موجود في "
@@ -1855,36 +1855,6 @@ with tab_props:
 # ---------------- تبويب السكريبت (المشاهد) ----------------
 with tab_scenes:
     st.subheader(tr("sub_scenes"))
-
-    with st.expander(t("🔄 استخراج الشخصيات من نص المشاهد (لمشاريع قديمة)")):
-        st.caption(t(
-            "لو المشروع ده استوردته قبل ما ميزة ربط الشخصيات بالمشاهد تتضاف، التقارير (كشف الشخصيات، "
-            "التفريغ العام) هتبقى فاضية لحد ما تربط كل مشهد بشخصياته يدويًا، أو تدوس هنا عشان نحاول نلاقي "
-            "أسماء شخصيات مكتبتك داخل نص كل مشهد ونربطها أوتوماتيك (من غير ما نمسح أي ربط موجود بالفعل)."
-        ))
-        if st.button(t("🔍 ابحث واربط الشخصيات دلوقتي")):
-            all_chars_backfill = fetch_all("SELECT id, name FROM characters WHERE project_id=?", (project_id,))
-            all_scenes_backfill = fetch_all("SELECT id, notes FROM scenes WHERE project_id=?", (project_id,))
-            links_added = 0
-            for _sc in all_scenes_backfill:
-                _notes = _sc["notes"] or ""
-                if not _notes:
-                    continue
-                for _ch in all_chars_backfill:
-                    if _ch["name"] and _ch["name"] in _notes:
-                        _before = fetch_all(
-                            "SELECT id FROM scene_characters WHERE scene_id=? AND character_id=?",
-                            (_sc["id"], _ch["id"]),
-                        )
-                        if not _before:
-                            run_query(
-                                "INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)",
-                                (_sc["id"], _ch["id"]),
-                            )
-                            links_added += 1
-            bump_version(project_id)
-            st.success(f"{t('تم ربط')} {links_added} {t('علاقة شخصية-مشهد جديدة.')}")
-            st.rerun()
 
     locations_all = fetch_all("""
         SELECT lv.id, l.name || ' - ' || lv.variant_name AS label

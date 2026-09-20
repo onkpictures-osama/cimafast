@@ -139,6 +139,10 @@ class AppUnderTest:
              "--server.port", str(self.port),
              "--server.address", "127.0.0.1",
              "--server.headless", "true",
+             # مراقب الملفات لازم يتقفل: لو أي ملف اتغير وإحنا بنصوّر،
+             # Streamlit بيحط شريط "File change / Rerun" فوق الصفحة وبيفسد
+             # المقارنة بالبكسل
+             "--server.fileWatcherType", "none",
              "--browser.gatherUsageStats", "false"],
             cwd=self.tree, env=env, stdout=self.log, stderr=subprocess.STDOUT,
         )
@@ -191,26 +195,6 @@ def _shot(page, out_dir, name):
     return path
 
 
-def _open_sidebar(page):
-    """على الموبايل الشريط الجانبي مقفول — بنفتحه عشان نوصل لأزرار اللغة."""
-    try:
-        if page.locator('section[data-testid="stSidebar"]').is_visible(timeout=1500):
-            return
-    except Exception:
-        pass
-    for sel in ('[data-testid="stSidebarCollapsedControl"] button',
-                '[data-testid="collapsedControl"]',
-                'button[aria-label="Open sidebar"]'):
-        try:
-            btn = page.locator(sel).first
-            if btn.count() and btn.is_visible():
-                btn.click()
-                page.wait_for_timeout(700)
-                return
-        except Exception:
-            continue
-
-
 def _login(page, app):
     page.get_by_label("اسم المستخدم / Username").fill(app.username)
     page.get_by_label("كلمة السر / Password").fill(app.password)
@@ -237,15 +221,24 @@ def capture(app, out_dir, lang, viewport, theme_flag, browser, shots):
     prefix = f"{lang}-{viewport}"
     shots.append(_shot(page, out_dir, f"{prefix}-01-login"))
 
+    # الدخول وتبديل اللغة بيتعملوا على مقاس سطح المكتب وبعدين بنرجّع المقاس
+    # المطلوب. السبب: على الموبايل الشريط الجانبي بيبقى طبقة فوق المحتوى،
+    # وزرار اللغة جواه بيتلقّط منها فالكليك مبيوصلش. الشاشات اللي بنصوّرها
+    # بتترسم بعد الرجوع للمقاس، فالنتيجة هي نفسها.
+    desktop = VIEWPORTS["desktop"]
+    if (w, h) != desktop:
+        page.set_viewport_size({"width": desktop[0], "height": desktop[1]})
+        page.wait_for_timeout(400)
+
     _login(page, app)
 
     if lang == "en":
-        _open_sidebar(page)
         page.get_by_role("button", name="EN", exact=True).first.click()
         _settle(page, 1200)
-        if viewport == "phone":
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(400)
+
+    if (w, h) != desktop:
+        page.set_viewport_size({"width": w, "height": h})
+        _settle(page, 800)
 
     shots.append(_shot(page, out_dir, f"{prefix}-02-projects"))
 

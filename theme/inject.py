@@ -6,6 +6,11 @@
 
 الترتيب مهم: ‎classic‎ هو الطبقة البنيوية (الاتجاه، RTL، مواضع العناصر)،
 و‎glass‎ طبقة مادة فوقها. كده منطق RTL بيفضل في مكان واحد ومش متكرر.
+
+ملحوظة مهمة عن الفراغ الرأسي: كل نداء ‎st.markdown‎ بيعمل حاوية عنصر في
+شبكة Streamlit، والحاوية بتاخد فراغ رأسي حتى لو جواها ‎<style>‎ بس. فأي
+حقن فاضي لازم ميحصلش خالص — ‎_emit‎ بترجع من غير ما تنادي Streamlit لو
+مفيش CSS، وستايل شاشة الدخول بقى جوه البلوك الجلوبال لنفس السبب.
 """
 
 from __future__ import annotations
@@ -22,25 +27,35 @@ def _template(css, dir_, align, rowdir):
     )
 
 
-def _wrap(css):
-    return "<style>\n%s\n</style>" % css
+def _emit(st, css):
+    """بتحقن بلوك ستايل، وبتسكت خالص لو مفيش حاجة تتحقن."""
+    if not css or not css.strip():
+        return
+    st.markdown("<style>\n%s\n</style>" % css, unsafe_allow_html=True)
 
 
 def inject_base(st, variant=CLASSIC):
     """الستايل الجلوبال — بيتحقن قبل بوابة الدخول، فلازم يبقى مستقل عن
-    اللغة (لسه مش عارفين اختيار المستخدم في المرحلة دي)."""
-    css = classic.BASE_CSS
+    اللغة (لسه مش عارفين اختيار المستخدم في المرحلة دي).
+
+    ستايل شاشة الدخول داخل معاه عن قصد: هو متربط بمفتاح فورم الدخول
+    فمبيأثرش على أي حاجة تانية، وكده شاشة الدخول ماخدتش حاوية زيادة.
+    """
+    parts = [classic.BASE_CSS, classic.LOGIN_CSS]
     if variant == GLASS:
-        css += "\n" + glass.base_css()
-    st.markdown(_wrap(css), unsafe_allow_html=True)
+        parts.append(glass.base_css())
+        parts.append(glass.login_css())
+    _emit(st, "\n".join(parts))
 
 
 def inject_login(st, variant=CLASSIC):
-    """ستايل شاشة تسجيل الدخول."""
-    css = classic.LOGIN_CSS
-    if variant == GLASS:
-        css += "\n" + glass.login_css()
-    st.markdown(_wrap(css), unsafe_allow_html=True)
+    """موجودة عشان ‎app.py‎ بينادي عليها على شاشة الدخول.
+
+    ستايل الدخول بقى بيتحقن مع البلوك الجلوبال في ‎inject_base‎، فالدالة
+    دي مش بتحقن حاجة — ومهم إنها متناديش Streamlit خالص، لأن أي عنصر زيادة
+    بياخد فراغ رأسي في الشبكة وبيزح الفورم لتحت.
+    """
+    return None
 
 
 def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reverse"):
@@ -50,9 +65,9 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     فالقوالب ‎__DIR__‎ / ‎__ALIGN__‎ / ‎__ROWDIR__‎ بتتبدل في النسختين
     بنفس الطريقة.
     """
-    css = classic.MAIN_CSS
+    parts = [classic.MAIN_CSS]
     if variant == GLASS:
-        css += "\n" + glass.main_css()
-    st.markdown(_wrap(_template(css, dir_, align, rowdir)), unsafe_allow_html=True)
+        parts.append(glass.main_css(dir_))
+    _emit(st, _template("\n".join(parts), dir_, align, rowdir))
     if variant == GLASS:
         glass.inject_runtime(st)

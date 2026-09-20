@@ -119,15 +119,31 @@ def css_vars(mode="dark", selector=":root"):
     return "%s {\n%s\n}" % (selector, "\n".join(rows))
 
 
-def ground_css(mode="dark"):
+# تجمّعات الضوء في الأرضية: (عرض, طول, س%, ص%, اللون, نهاية)
+# س% مكتوبة بمنطق RTL (العربي هو الأساس) وبتتعكس للإنجليزي
+_POOLS = [
+    (1180, 780, 18, 10, "pool_indigo", 62),
+    (940, 640, 86, 26, "pool_navy", 60),
+    (820, 560, 74, 92, "bloom_gold", 66),
+    (700, 480, 6, 84, "counter_teal", 62),
+]
+
+
+def ground_css(mode="dark", dir_="rtl"):
     """الميش جراديينت الثابت. راديال جراديينتس فوق اللون الأساسي، من غير
     أنيميشن (low motion) — الحركة بتيجي من إن المحتوى بيسكرول فوق أرضية
-    واقفة، وده اللي بيخلي المادة تقرا كزجاج مش كشفافية."""
+    واقفة، وده اللي بيخلي المادة تقرا كزجاج مش كشفافية.
+
+    الأرضية بتتعكس مع اتجاه اللغة: الوهج الدهبي المفروض يقع في ناحية بداية
+    القراءة، فلو مقلبناهاش الإنجليزي بيطلع والثقل البصري في الناحية الغلط.
+    """
     p = MODES[mode]
-    return (
-        f"radial-gradient(1180px 780px at 18% 10%, {p['pool_indigo']}, transparent 62%),"
-        f"radial-gradient(940px 640px at 86% 26%, {p['pool_navy']}, transparent 60%),"
-        f"radial-gradient(820px 560px at 74% 92%, {p['bloom_gold']}, transparent 66%),"
-        f"radial-gradient(700px 480px at 6% 84%, {p['counter_teal']}, transparent 62%),"
-        f"{p['ground_base']}"
-    )
+    mirror = dir_ != "rtl"
+    layers = []
+    for w, h, x, y, key, stop in _POOLS:
+        gx = (100 - x) if mirror else x
+        layers.append(
+            f"radial-gradient({w}px {h}px at {gx}% {y}%, {p[key]}, transparent {stop}%)"
+        )
+    layers.append(p["ground_base"])
+    return ",".join(layers)
