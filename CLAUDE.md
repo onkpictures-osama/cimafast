@@ -43,7 +43,7 @@ This app is live at **https://cimafast.io** on this box.
 | Service | `cimafast.service` → Streamlit on `127.0.0.1:8501` |
 | Proxy | Caddy, auto-HTTPS via Let's Encrypt, config `/etc/caddy/Caddyfile` |
 | Live data | `/var/lib/cimafast/studio.db` — **outside this tree, never in git** |
-| Secret | `/etc/cimafast/secrets.toml` (`APP_PASSWORD`), symlinked to `.streamlit/secrets.toml` |
+| Secret | `/etc/cimafast/secrets.toml` (`[users]` login hashes), symlinked to `.streamlit/secrets.toml` |
 | Deploy | `cimafast-update` (pull, deps, restart, health-check, auto-rollback) |
 | Logs | `journalctl -u cimafast -f` |
 
@@ -62,15 +62,40 @@ you commit — committing is for history, not for making a change live. And
 `cimafast-update` runs `git pull --ff-only`, so it aborts on a tree with modified
 tracked files. Normal loop: edit → verify → commit → push → `cimafast-update`.
 
+## Tests
+
+Plain-assert scripts, no pytest, no extra dependency:
+
+```
+venv/bin/python tests/test_auth.py         # login logic (pure functions)
+venv/bin/python tests/test_login_flow.py   # login screen via Streamlit AppTest
+```
+
+`test_login_flow.py` runs the real `app.py` against a temp DB via
+`STUDIO_DB_PATH` — it must never be pointed at the live database. Fixtures use
+throwaway credentials on purpose; see the login hazard below.
+
 ## Hazards
 
-- **The password gate fails closed.** `_check_app_password()` in `app.py` locks
-  the app when `APP_PASSWORD` is missing, empty, or misnamed — a lost secret
-  takes the site down rather than making it public. Running with no password at
-  all requires setting `CIMAFAST_ALLOW_NO_PASSWORD=1` explicitly, which is for
-  local development only and must never be set on this box. The password is read
-  from the `APP_PASSWORD` env var first, then `st.secrets`. Keep this ordering
-  and the fail-closed default when touching secrets loading.
+- **The login gate fails closed.** Access is a username + password login:
+  `_check_login()` in `app.py` for the screen, `auth.py` for the logic
+  (PBKDF2-SHA256, per-user salt, constant-time compare). Accounts live in the
+  `[users]` table of `/etc/cimafast/secrets.toml` as `username = "<hash>"`, read
+  via `st.secrets`, with the `CIMAFAST_USERS` env var (JSON) taking precedence
+  for local development. **No plaintext password and no hash belongs in this
+  public repo** — not in code, not in tests, not in a commit message.
+  - Missing or unreadable accounts lock the app and log why, rather than opening
+    it: a lost secrets file takes the site down instead of making it public.
+    Running with no login at all requires `CIMAFAST_ALLOW_NO_PASSWORD=1`
+    explicitly, which is for local development only and must never be set on this
+    box. Keep that fail-closed default and the env-before-`st.secrets` ordering.
+  - Add or rotate an account with
+    `venv/bin/python auth.py hash`, then edit the `[users]` table. That is a
+    secrets-file change only — no deploy, no code change, but the running service
+    caches `st.secrets`, so a restart is needed before it takes effect.
+  - `APP_PASSWORD` in the secrets file is the superseded single shared password.
+    Nothing reads it any more; it is kept only so a rollback past the login
+    commit still serves.
 - **Never commit** `studio.db*`, `.streamlit/secrets.toml`, or `uploads/` — all
   gitignored. The live DB is real user work.
 - Cert renewal uses the HTTP-01 challenge, so **port 80 must stay open**.
