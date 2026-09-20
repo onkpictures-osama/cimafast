@@ -808,8 +808,7 @@ if not projects:
 
 selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
-project_row = fetch_all("SELECT * FROM projects WHERE id=?", (project_id,))[0]
-project = dict(project_row) if hasattr(project_row, 'keys') else project_row
+project = fetch_all("SELECT * FROM projects WHERE id=?", (project_id,))[0]
 
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير
 # تأكيد، عشان ميحصلش استيراد مشاهد بالغلط لمشروع تاني

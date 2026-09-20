@@ -83,7 +83,11 @@ def fetch_all(query, params=()):
     try:
         cur = conn.cursor()
         cur.execute(_adapt_query(query), params)
-        return cur.fetchall()
+        rows = cur.fetchall()
+        # Convert Row objects to dicts for consistent .get() access
+        if rows and hasattr(rows[0], 'keys'):
+            return [dict(row) for row in rows]
+        return rows
     finally:
         conn.close()
 

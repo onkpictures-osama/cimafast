@@ -30,6 +30,14 @@ def build(db_path):
     q = database.run_query
     one = database.fetch_all
 
+    # مشروع تاني عشان القايمة المنسدلة يبقى فيها أكتر من اختيار. بيتضاف
+    # الأول عشان المشروع اللي فيه بيانات يفضل هو المختار افتراضيًا —
+    # البرنامج بيرتب المشاريع ‎ORDER BY id DESC‎
+    q(
+        "INSERT INTO projects (name, project_type, default_resolution, default_orientation,"
+        " default_aspect_ratio) VALUES (?,?,?,?,?)",
+        ("إعلان الشاي - نسخة ٣٠ ثانية", "إعلان", "1080p", "رأسي", "9:16"),
+    )
     q(
         "INSERT INTO projects (name, project_type, default_resolution, default_orientation,"
         " default_aspect_ratio, owner_name, owner_role) VALUES (?,?,?,?,?,?,?)",
@@ -134,11 +142,6 @@ def build(db_path):
             (sid, num, size, move, angle, dur, action, confirmed),
         )
 
-    q(
-        "INSERT INTO projects (name, project_type, default_resolution, default_orientation,"
-        " default_aspect_ratio) VALUES (?,?,?,?,?)",
-        ("إعلان الشاي - نسخة ٣٠ ثانية", "إعلان", "1080p", "رأسي", "9:16"),
-    )
     return pid
 
 

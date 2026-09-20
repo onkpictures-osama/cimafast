@@ -649,6 +649,29 @@ def parse_json_script(file_bytes, known_characters=None):
     return {'scenes': _apply_silent_characters(scenes, known_characters), 'warnings': warnings}
 
 
+def extract_lines(filename, file_bytes):
+    """بترجّع سطور النص الخام من غير أي تحليل.
+
+    اتفصلت عن parse_script عشان التطبيق يقدر يطلّع النص وينضفه ويحوّله ماركداون
+    قبل ما يبعته للـ AI. مهم برضه لأمان: قراءة ملفات Word/PDF (اللي اليوزر رفعها)
+    بتفضل هنا في التطبيق بمستخدم cimafast، والـ worker اللي شغال root عمره ما
+    بيشوف غير نص عادي."""
+    lower = filename.lower()
+    if lower.endswith('.docx'):
+        if docx is None:
+            raise RuntimeError('مكتبة قراءة ملفات Word غير مثبتة (python-docx)')
+        document = docx.Document(BytesIO(file_bytes))
+        return [it['text'] for it in _iter_docx_items(document)
+                if it.get('type') == 'paragraph' and it.get('text')]
+    if lower.endswith('.txt'):
+        return _extract_txt_lines(file_bytes)
+    if lower.endswith('.pdf'):
+        return _extract_pdf_lines(file_bytes)
+    if lower.endswith('.json'):
+        raise RuntimeError('ملف JSON جاهز بالفعل — مش محتاج تحليل بالذكاء الاصطناعي.')
+    raise RuntimeError('صيغة الملف غير مدعومة. استخدم .docx أو .txt أو .pdf')
+
+
 def parse_script(filename, file_bytes, known_characters=None):
     lower = filename.lower()
     if lower.endswith('.docx'):
