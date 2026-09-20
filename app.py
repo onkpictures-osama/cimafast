@@ -18,7 +18,10 @@ from database import (
     INT_EXT_LABELS, DAY_NIGHT_OPTIONS, DAY_NIGHT_LABELS, bilingual_label,
 )
 from ai_prompt import AI_JSON_PROMPT
+import ai_jobs
+from script_md import to_markdown
 from script_parser import (
+    extract_lines, parse_json_script,
     parse_script, find_similar_name_groups, apply_character_merges,
     find_similar_location_groups, apply_location_merges,
 )
@@ -813,7 +816,12 @@ project = fetch_all("SELECT * FROM projects WHERE id=?", (project_id,))[0]
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير
 # تأكيد، عشان ميحصلش استيراد مشاهد بالغلط لمشروع تاني
 if st.session_state.get("parsed_script_project_id") != project_id:
-    st.session_state.pop("parsed_script", None)
+    # كل نتيجة تحليل مربوطة بمشروع واحد. لو اليوزر بدّل المشروع لازم نمسحها
+    # كلها — النتيجة السريعة ونتيجة الذكاء الاصطناعي ومتابعة الشغل الجاري —
+    # وإلا تحليل مشروع بيظهر في مشروع تاني ويتستورد فيه بالغلط.
+    for _k in ("parsed_script", "ai_parsed_script", "ai_job_id",
+               "last_analysis", "_ai_pending", "_which_analysis"):
+        st.session_state.pop(_k, None)
     st.session_state["parsed_script_project_id"] = project_id
 
 # Episodes section (للمسلسلات)
@@ -1013,6 +1021,53 @@ tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
 # ---------------- تبويب استيراد السكريبت ----------------
 
 
+def _render_source_picker(fast, ai):
+    """المقارنة بين التحليلين + اختيار اللي هيتستورد.
+
+    التحليل السريع بيشتغل بقواعد ثابتة والذكاء الاصطناعي بيفهم السياق، فبيختلفوا.
+    بنوري الفرق بدل ما نختار لليوزر، وبعدين اللي يختاره هو اللي بيكمل في نفس
+    خطوات المراجعة والاستيراد الموجودة تحت."""
+    fs = {s["scene_number"]: s for s in fast["scenes"]}
+    as_ = {s["scene_number"]: s for s in ai["scenes"]}
+    meta = ai.get("meta") or {}
+
+    st.markdown("---")
+    st.markdown(f"### ⚖️ {t('مقارنة التحليلين')}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric(t("مشاهد — تحليل سريع"), len(fs))
+    c2.metric(t("مشاهد — ذكاء اصطناعي"), len(as_),
+              delta=len(as_) - len(fs) if len(as_) != len(fs) else None)
+    if meta.get("cost_usd") is not None:
+        c3.metric(t("تكلفة التحليل"), f"${meta['cost_usd']}")
+
+    only_ai = sorted(set(as_) - set(fs))
+    only_fast = sorted(set(fs) - set(as_))
+    if only_ai:
+        st.caption(f"🤖 {t('مشاهد لقاها الذكاء الاصطناعي بس')}: "
+                   + "، ".join(str(n) for n in only_ai[:25]))
+    if only_fast:
+        st.caption(f"🔍 {t('مشاهد لقاها التحليل السريع بس')}: "
+                   + "، ".join(str(n) for n in only_fast[:25]))
+
+    rows = []
+    for n in sorted(set(fs) & set(as_)):
+        a, b = fs[n], as_[n]
+        for field, label in (("characters", t("الشخصيات")), ("props", t("الإكسسوارات"))):
+            extra = [x for x in b.get(field) or [] if x not in (a.get(field) or [])]
+            missing = [x for x in a.get(field) or [] if x not in (b.get(field) or [])]
+            if extra or missing:
+                rows.append({
+                    t("مشهد"): n, t("الحقل"): label,
+                    t("زوّده الذكاء الاصطناعي"): "، ".join(extra) or "—",
+                    t("موجود في السريع بس"): "، ".join(missing) or "—",
+                })
+    if rows:
+        with st.expander(f"{t('تفاصيل الفروق')} ({len(rows)})"):
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+    else:
+        st.caption(t("مفيش فروق في الشخصيات أو الإكسسوارات بين التحليلين."))
+
+
 def _render_analysis_dashboard(scenes):
     """لوحة تحليل السيناريو.
 
@@ -1112,16 +1167,122 @@ with tab_import:
 
     uploaded_file = st.file_uploader(t("اختر ملف السكريبت"), type=["docx", "txt", "pdf", "json"], key="script_upload")
 
-    if uploaded_file is not None and st.button(t("🔍 تحليل الملف")):
+    _known = [r["name"] for r in fetch_all(
+        "SELECT name FROM characters WHERE project_id=?", (project_id,))]
+    _ai_active = ai_jobs.active_job(project_id)
+
+    _c_fast, _c_ai = st.columns(2)
+    with _c_fast:
+        _run_fast = uploaded_file is not None and st.button(
+            t("🔍 تحليل الملف"), use_container_width=True,
+            help=t("تحليل سريع ومجاني على الجهاز، من غير ذكاء اصطناعي."))
+    with _c_ai:
+        _run_ai = uploaded_file is not None and st.button(
+            t("🤖 تحليل بالذكاء الاصطناعي"), use_container_width=True,
+            disabled=bool(_ai_active),
+            help=t("تحليل أعمق بـ Opus. بيستغرق دقايق وبيكلف فلوس."))
+
+    if _run_fast:
         try:
-            _known = [r["name"] for r in fetch_all(
-                "SELECT name FROM characters WHERE project_id=?", (project_id,))]
             st.session_state["parsed_script"] = parse_script(
                 uploaded_file.name, uploaded_file.getvalue(), known_characters=_known)
         except Exception as e:
             st.error(f"{t('حصل خطأ أثناء تحليل الملف:')} {e}")
 
-    parsed = st.session_state.get("parsed_script")
+    # --- تحليل الذكاء الاصطناعي: تقدير -> تأكيد -> طابور ------------------
+    if _run_ai:
+        try:
+            _lines = extract_lines(uploaded_file.name, uploaded_file.getvalue())
+            _md, _stats = to_markdown(_lines)
+            st.session_state["_ai_pending"] = {
+                "md": _md, "stats": _stats, "filename": uploaded_file.name}
+        except Exception as e:
+            st.error(f"{t('حصل خطأ أثناء قراءة الملف:')} {e}")
+
+    _pending = st.session_state.get("_ai_pending")
+    if _pending and not _ai_active:
+        _n, _cost, _ceiling = ai_jobs.estimate(_pending["md"])
+        _st = _pending["stats"]
+        st.info(
+            f"{t('عدد المشاهد المكتشفة')}: **{_n}** · "
+            f"{t('تكلفة تقديرية')}: **${_cost}** ({t('بحد أقصى')} ${_ceiling})\n\n"
+            f"{t('تم تنضيف الملف قبل الإرسال')}: {_st['raw_chars']:,} → "
+            f"{_st['md_chars']:,} {t('حرف')}"
+            + (f" ({_st['saved_pct']}% {t('أقل')})" if _st['saved_pct'] > 0 else ""))
+        _ok, _no = st.columns(2)
+        with _ok:
+            if st.button(t("✅ ابدأ التحليل"), use_container_width=True, key="_ai_go"):
+                try:
+                    st.session_state["ai_job_id"] = ai_jobs.start(
+                        _pending["md"], project_id, _pending["filename"],
+                        known_characters=_known, max_cost_usd=_ceiling)
+                    st.session_state.pop("_ai_pending", None)
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
+        with _no:
+            if st.button(t("إلغاء"), use_container_width=True, key="_ai_no"):
+                st.session_state.pop("_ai_pending", None)
+                st.rerun()
+
+    # لو التاب اتقفل والتحليل لسه شغال، نرجّع نتابعه بدل ما يضيع
+    if _ai_active and not st.session_state.get("ai_job_id"):
+        st.session_state["ai_job_id"] = _ai_active
+
+    _job = st.session_state.get("ai_job_id")
+    if _job:
+        _state = ai_jobs.status(_job).get("state")
+
+        @st.fragment(run_every=(3 if _state not in ai_jobs.TERMINAL else None))
+        def _ai_progress():
+            """بيحدّث حالة التحليل لوحده من غير ما يعمل rerun للصفحة كلها،
+            عشان اللي اليوزر ملاه فوق ما يضيعش منه."""
+            info = ai_jobs.status(_job)
+            state, detail = info.get("state"), info.get("detail", "")
+            spent = info.get("cost_usd")
+            extra = f" · ${spent}" if spent else ""
+            if state == "done":
+                st.success(f"[ ✅ ] {t('التحليل خلص')} — {detail}{extra}")
+            elif state == "failed":
+                st.error(f"[ ❌ ] {t('التحليل فشل')} — {detail}{extra}")
+            elif state == "running":
+                st.info(f"[ ⚙️ ] {t('بيحلل')} — {detail}{extra}")
+            else:
+                st.info(f"[ ⏳ ] {t('في الطابور')} — {detail}")
+
+        _ai_progress()
+
+        if _state == "done" and not st.session_state.get("ai_parsed_script"):
+            _res = ai_jobs.result(_job)
+            if _res:
+                try:
+                    _payload = json.dumps({"scenes": _res["scenes"]}, ensure_ascii=False)
+                    _parsed_ai = parse_json_script(_payload.encode("utf-8"),
+                                                   known_characters=_known)
+                    _parsed_ai["warnings"] = list(_res.get("warnings", [])) + \
+                        list(_parsed_ai.get("warnings", []))
+                    _parsed_ai["meta"] = _res.get("meta", {})
+                    st.session_state["ai_parsed_script"] = _parsed_ai
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{t('نتيجة الذكاء الاصطناعي مش مقروءة:')} {e}")
+        if _state in ai_jobs.TERMINAL:
+            if st.button(t("🧹 إخفاء نتيجة التحليل"), key="_ai_clear"):
+                for _k in ("ai_job_id", "ai_parsed_script"):
+                    st.session_state.pop(_k, None)
+                st.rerun()
+
+    _fast_parsed = st.session_state.get("parsed_script")
+    _ai_parsed = st.session_state.get("ai_parsed_script")
+    if _fast_parsed and _ai_parsed:
+        _render_source_picker(_fast_parsed, _ai_parsed)
+        _choice = st.radio(
+            t("اختار التحليل اللي هيتستورد:"),
+            [t("🤖 الذكاء الاصطناعي"), t("🔍 التحليل السريع")],
+            horizontal=True, key="_which_analysis")
+        parsed = _ai_parsed if _choice == t("🤖 الذكاء الاصطناعي") else _fast_parsed
+    else:
+        parsed = _ai_parsed or _fast_parsed
     if not parsed and st.session_state.get("last_analysis"):
         # بعد ما المشاهد تتضاف، التحليل يفضل متاح بدل ما يختفي
         _render_analysis_dashboard(st.session_state["last_analysis"])
