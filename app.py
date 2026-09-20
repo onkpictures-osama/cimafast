@@ -17,11 +17,13 @@ from database import (
     SPECIES_OPTIONS, GENDER_OPTIONS, PROJECT_ROLE_OPTIONS, INT_EXT_OPTIONS,
     INT_EXT_LABELS, DAY_NIGHT_OPTIONS, DAY_NIGHT_LABELS, bilingual_label,
 )
+from ai_prompt import AI_JSON_PROMPT
 from script_parser import (
     parse_script, find_similar_name_groups, apply_character_merges,
     find_similar_location_groups, apply_location_merges,
 )
 from importer import import_parsed_scenes
+import theme
 from export import (
     build_shot_list_excel, build_shot_list_word, build_shot_list_pdf,
     build_characters_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel,
@@ -30,35 +32,10 @@ from export import (
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
-# Global RTL/LTR CSS
-st.markdown("""
-<style>
-    /* Global RTL/LTR styling */
-    * { box-sizing: border-box; }
-    
-    /* Form labels: RTL for Arabic, LTR for English */
-    label { direction: auto; text-align: right; }
-    
-    /* Text areas and inputs: LTR by default */
-    textarea, input { direction: ltr !important; text-align: left; }
-    
-    /* Paragraphs with Arabic: RTL */
-    p[dir="rtl"], div[dir="rtl"] { direction: rtl; text-align: right; }
-    p[dir="ltr"], div[dir="ltr"] { direction: ltr; text-align: left; }
-    
-    /* Error messages: auto-direction */
-    .stError, .stWarning, .stSuccess, .stInfo { 
-        direction: auto; 
-        text-align: right;
-    }
-    
-    /* Buttons: center alignment */
-    button { text-align: center; }
-    
-    /* Sidebar: RTL */
-    .sidebar .sidebar-content { direction: rtl; }
-</style>
-""", unsafe_allow_html=True)
+# الشكل: النسخة الافتراضية classic، و‎?theme=glass‎ بيشغّل التصميم الجديد.
+# كل الـ CSS بقى في حزمة theme/ — مكان واحد بدل تلاتة.
+_theme_variant = theme.resolve_variant(st)
+theme.inject_base(st, _theme_variant)
 
 
 def _render_locked_screen():
@@ -103,14 +80,9 @@ def _render_login_screen():
     بتظهر قبل ما نعرف لغة الواجهة، فالتسميات مكتوبة بالعربي والإنجليزي مع
     بعض. الاتجاه RTL عشان العربي هو الأساس، بس خانات الإدخال نفسها LTR لأن
     اسم المستخدم وكلمة السر بالإنجليزي."""
+    theme.inject_login(st, _theme_variant)
     st.markdown(
         """
-        <style>
-        .cf-login h2 { text-align: center; margin-top: 12vh; }
-        .cf-login p { text-align: center; opacity: 0.75; margin-bottom: 0; }
-        div[data-testid="stForm"] label p { direction: rtl; text-align: right; }
-        div[data-testid="stForm"] input { direction: ltr; text-align: left; }
-        </style>
         <div class="cf-login" dir="rtl">
             <h2>🎬 CimaFast Studio</h2>
             <p>تسجيل الدخول / Sign in</p>
@@ -614,340 +586,12 @@ _APP_DESCRIPTION = (
     "دي خطوة مستقبلية محتاجة تطوير إضافي لربطها بأدوات التوليد."
 )
 
-_CSS_TEMPLATE = """
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-    /* اتجاه الواجهة: يمين-لشمال للعربي، شمال-ليمين للإنجليزي - بيتغير
-       تلقائيًا مع زرار EN/AR، وبيخلي النص يترتب صح جوه نفسه */
-    .stApp {
-        direction: __DIR__;
-    }
-    /* شريط Deploy/القائمة بتاع Streamlit - بيتقلب للناحية المقابلة وقت
-       العربي عشان ميتلخبطش مع الشريط الجانبي اللي بيبقى واقف في نفس الناحية */
-    header[data-testid="stHeader"] [data-testid="stToolbar"] {
-        flex-direction: __ROWDIR__;
-    }
-    .stApp .stTextInput input,
-    .stApp .stTextArea textarea,
-    .stApp .stNumberInput input {
-        text-align: __ALIGN__;
-    }
-    /* عناصر لازم تفضل شمال-ليمين زي هي (كود إنجليزي، أرقام قوائم منسدلة) */
-    .stApp code, .stApp pre {
-        direction: ltr;
-        text-align: left;
-    }
-    /* IBM Plex Sans Arabic for Arabic text */
-    .stApp {
-        font-family: "IBM Plex Sans Arabic", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    [dir="rtl"] {
-        font-family: "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    [dir="ltr"] {
-        font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    /* Streamlit نفسه بيحط text-align: left افتراضيًا على العناوين والنصوص
-       التوضيحية (caption) وفقرات الـ markdown، من غير ما يهتم باتجاه
-       الصفحة - فبنجبرها تتبع اتجاه اللغة الحالية (يمين للعربي، شمال
-       للإنجليزي) عشان النص التوضيحي/العناوين تقرأ صح من نفس جهة القراءة.
-       الحاجات اللي إحنا عايزينها في النص بالذات (زي اسم المشروع) ليها
-       تنسيق inline خاص بيها بيغلب القاعدة العامة دي */
-    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6,
-    .stApp [data-testid="stCaptionContainer"],
-    .stApp [data-testid="stMarkdownContainer"] p {
-        text-align: __ALIGN__;
-    }
-    /* اسم كل خانة يتحط فوق ومنتصف الخانة، باللون الأصفر (في المحتوى الرئيسي) */
-    [data-testid="stWidgetLabel"] {
-        width: 100%;
-    }
-    [data-testid="stWidgetLabel"] p,
-    [data-testid="stWidgetLabel"] label {
-        width: 100%;
-        text-align: center;
-        color: #E8B923 !important;
-        font-weight: 600;
-    }
-    /* الشريط الجانبي بالكامل أصفر - نفس اتجاه الواجهة، وبيقلب مكانه
-       (يمين للعربي، شمال للإنجليزي) */
-    section[data-testid="stSidebar"] {
-        direction: __DIR__;
-        background-color: #E8B923;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #12203D !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
-    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label {
-        color: #12203D !important;
-    }
-    /* لو الشريط الجانبي بيتقفل/بيتفتح (أنيميشن العرض بيتغير من صفر للكامل)،
-       لازم النص ميلفش رأسي حرف تحت حرف - يفضل مقصوص بالعرض بس (…) */
-    section[data-testid="stSidebar"] .cf-sidebar-header {
-        overflow: hidden;
-    }
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-title {
-        font-size: 22px;
-        font-weight: 800;
-        line-height: 1.3;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-subtitle {
-        font-size: 13px;
-        opacity: 0.85;
-        margin-top: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    section[data-testid="stSidebar"] {
-        overflow-x: hidden !important;
-    }
-    /* صندوق صغير حوالين وصف البرنامج - بيوضح إنه مجرد تنويه، مش اختيار قابل للضغط */
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-desc-box {
-        font-size: 11px;
-        line-height: 1.5;
-        opacity: 0.9;
-        margin-top: 10px;
-        padding: 8px 10px;
-        border: 1px solid rgba(18, 32, 61, 0.35);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.18);
-    }
-    /* صندوق صغير لعرض بيانات المستخدم الحالي (الاسم والوظيفة) فوق الإعدادات -
-       أبيض صريح، عشان يبقى مميز عن باقي عناصر الشريط الجانبي الأصفر */
-    section[data-testid="stSidebar"] .cf-owner-box {
-        font-size: 13px;
-        font-weight: 600;
-        line-height: 1.5;
-        margin: 4px 0 10px 0;
-        padding: 10px 12px;
-        border: 1px solid rgba(18, 32, 61, 0.25);
-        border-radius: 8px;
-        background: #FFFFFF;
-        color: #12203D;
-    }
-    /* نصوص جوه صناديق الإدخال والأزرار (خلفيتها غامقة من الثيم) لازم تفضل
-       فاتحة عشان تتقرا فوق الخلفية الغامقة بتاعتها هي (مش الأصفر اللي حواليها) */
-    section[data-testid="stSidebar"] input,
-    section[data-testid="stSidebar"] textarea,
-    section[data-testid="stSidebar"] [data-baseweb="select"] *,
-    section[data-testid="stSidebar"] .stButton button,
-    section[data-testid="stSidebar"] .stButton button p,
-    section[data-testid="stSidebar"] .stButton button span,
-    section[data-testid="stSidebar"] .stDownloadButton button {
-        color: #F5F1E6 !important;
-    }
-    /* خلفية غامقة صريحة لكل الأزرار في الشريط الجانبي، عشان النص الفاتح
-       يفضل واضح فوقها مهما كان لون الثيم الافتراضي للزرار */
-    section[data-testid="stSidebar"] .stButton button,
-    section[data-testid="stSidebar"] .stDownloadButton button {
-        background-color: #12203D !important;
-        border: 1px solid #12203D !important;
-    }
-    section[data-testid="stSidebar"] .stButton button:hover,
-    section[data-testid="stSidebar"] .stDownloadButton button:hover {
-        background-color: #1B2E52 !important;
-        border-color: #E8B923 !important;
-        color: #F5F1E6 !important;
-    }
-    section[data-testid="stSidebar"] .stButton button:disabled,
-    section[data-testid="stSidebar"] .stButton button:disabled p {
-        color: #8A93A6 !important;
-        background-color: #16233F !important;
-        opacity: 0.7;
-    }
-    /* زرار الإعدادات - مربع وأزرق ومختلف شكلًا ولونًا عن باقي أزرار
-       الشريط الجانبي (زي ما طلب المستخدم)، بترس أبيض في النص */
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
-        background-color: #2D9CDB !important;
-        border: 1px solid #2D9CDB !important;
-        color: #FFFFFF !important;
-        width: 44px !important;
-        height: 44px !important;
-        min-width: 44px !important;
-        padding: 0 !important;
-        font-size: 20px !important;
-        border-radius: 10px !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover {
-        background-color: #268BC4 !important;
-        border-color: #FFFFFF !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] p {
-        color: #FFFFFF !important;
-        font-size: 20px !important;
-    }
-    .cf-settings-label {
-        font-weight: 700;
-        padding-top: 10px;
-    }
-    /* علامة ميكروفون خفيفة على كل خانة كتابة - مجرد تنويه إننا فاكرين
-       ميزة الكتابة بالصوت وهنضيفها لاحقًا، مش شغالة فعليًا دلوقتي.
-       بنستخدم أيقونة Material Symbols (نفس خط الأيقونات اللي Streamlit
-       نفسه بيستخدمه) بدل الإيموجي، عشان تبقى شكلها بسيط وكلاسيكي وتقدر
-       تتلوّن أبيض بدل ما تيجي بألوان الإيموجي الثابتة. */
-    [data-testid="stTextInputRootElement"], [data-testid="stTextAreaRootElement"] {
-        position: relative;
-    }
-    [data-testid="stTextInputRootElement"]::after,
-    [data-testid="stTextAreaRootElement"]::after {
-        content: "mic";
-        font-family: "Material Symbols Rounded";
-        font-weight: normal;
-        font-style: normal;
-        position: absolute;
-        left: 10px;
-        font-size: 14px;
-        color: #F5F1E6;
-        opacity: 0.55;
-        pointer-events: none;
-        z-index: 1;
-    }
-    /* في خانة سطر واحد بتتوسط رأسيًا جوه الصندوق؛ في الخانة الطويلة (Textarea)
-       بتقف أعلى الصندوق من جوه عشان متتلخبطش مع النص وهو بيكبر لأسفل */
-    [data-testid="stTextInputRootElement"]::after { top: 50%; transform: translateY(-50%); }
-    [data-testid="stTextAreaRootElement"]::after { top: 8px; }
-    /* نص المثال (placeholder) يفضل شفاف أكتر عشان يبان إنه نص مؤقت للتوضيح
-       بس، ويختفي تمامًا وقت التركيز/الكتابة في الخانة عشان ميتزنقش مع أي
-       تلميح تاني زي "Press Enter to..." - وبيرجع يظهر تاني لو رجعت الخانة فاضية */
-    .stApp input::placeholder,
-    .stApp textarea::placeholder {
-        opacity: 0.4 !important;
-    }
-    .stApp input:focus::placeholder,
-    .stApp textarea:focus::placeholder {
-        opacity: 0 !important;
-    }
-    /* تلميح "Press Enter to apply/submit" بتاع Streamlit - نص إنجليزي قصير،
-       فبيفضل من الشمال ولاتجاه LTR، وبخط أصغر، وبمسافة تبعده عن حواف
-       الخانة عشان ميتداخلش مع أي نص جوه الخانة نفسها */
-    [data-testid="InputInstructions"] {
-        text-align: left !important;
-        direction: ltr !important;
-        font-size: 10px !important;
-        opacity: 0.55 !important;
-        top: auto !important;
-        bottom: -20px !important;
-        right: auto !important;
-        left: 4px !important;
-    }
-    /* عنوان أي قسم قابل للطي (expander) في الشريط الجانبي - خلفية وحدود
-       واضحة بشكل ثابت، عشان النص والسهم يفضلوا باينين في أي حالة (مقفول،
-       مفتوح، عليه الماوس) من غير ما يعتمدوا على خلفية شفافة ممكن تختفي فيها */
-    section[data-testid="stSidebar"] [data-testid="stExpander"] {
-        background-color: rgba(18, 32, 61, 0.07);
-        border: 1px solid rgba(18, 32, 61, 0.3);
-        border-radius: 10px;
-        margin-bottom: 6px;
-    }
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
-        color: #12203D !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary {
-        background-color: rgba(18, 32, 61, 0.14) !important;
-        border-radius: 8px;
-    }
-    /* علامة "تم الحفظ" - نص رفيع بسيط على أرضية التصميم، مش شكل زرار،
-       بتفضل ظاهرة بعد الحفظ لحد ما المستخدم يحفظ سجل تاني */
-    .cf-saved-badge {
-        font-size: 12px;
-        font-weight: 400;
-        color: #F5F1E6;
-        opacity: 0.75;
-        margin-top: -6px;
-        margin-bottom: 8px;
-    }
-    /* فاصل بصري خفيف بين كل اقتراح دمج (شخصيات/أماكن متشابهة) وبعضه،
-       عشان القايمة الطويلة متبقاش سايحة من غير حدود واضحة بين الأسئلة */
-    hr.cf-soft-sep {
-        border: none;
-        border-top: 1px solid rgba(245, 241, 230, 0.16);
-        margin: 18px 0;
-    }
-    /* بادج علامة الصح - أزرق فاتح دايمًا (مش أخضر) عشان يفضل متماشي مع
-       بالتة ألوان البراند (أصفر / أزرق فاتح / كحلي غامق / أبيض / رمادي) */
-    .cf-check-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 16px;
-        height: 16px;
-        border-radius: 4px;
-        background: #2D9CDB;
-        color: #FFFFFF;
-        font-size: 11px;
-        font-weight: 800;
-        line-height: 1;
-    }
-    textarea {
-        resize: vertical !important;
-        min-height: 90px !important;
-    }
-    textarea::-webkit-resizer {
-        background: repeating-linear-gradient(
-            135deg,
-            #E8B923, #E8B923 3px,
-            #12203D 3px, #12203D 6px
-        );
-    }
-    .cf-stepper {
-        display: flex;
-        gap: 10px;
-        margin: 10px 0 14px 0;
-    }
-    .cf-stage {
-        flex: 1;
-        text-align: center;
-        padding: 14px 6px;
-        border-radius: 14px;
-        background: #16233F;
-        border: 2px solid transparent;
-    }
-    .cf-stage-icon { font-size: 16px; margin-bottom: 5px; }
-    .cf-stage-icon .cf-check-badge { width: 20px; height: 20px; font-size: 13px; border-radius: 6px; }
-    .cf-stage-label { font-size: 12px; font-weight: 600; color: #F5F1E6; }
-    .cf-stage-done { background: rgba(45, 156, 219, 0.14); border-color: #2D9CDB; }
-    .cf-stage-current { border-color: #E8B923; box-shadow: 0 0 0 1px rgba(232, 185, 35, 0.35); }
-    .cf-stage-pending { opacity: 0.5; }
-    .cf-copy-hint {
-        font-weight: 700;
-        color: #E8B923;
-        margin-bottom: 6px;
-    }
-    div[data-testid="stCodeBlock"] button[title="Copy to clipboard"],
-    div[data-testid="stCodeBlock"] [data-testid="stCodeCopyButton"] {
-        opacity: 1 !important;
-        transform: scale(1.4);
-        background: #E8B923 !important;
-        border-radius: 6px !important;
-    }
-    /* زرار الحذف الجماعي - بيبقى أحمر تحذيري في أي مكان مستخدم فيه
-       (أي عنصر container بمفتاح بيبدأ بـ bulk_delete_) */
-    [class*="st-key-bulk_delete_"] button {
-        background-color: #DC2626 !important;
-        border-color: #DC2626 !important;
-    }
-    [class*="st-key-bulk_delete_"] button p {
-        color: #FFFFFF !important;
-    }
-    </style>
-    """
-
-st.markdown(
-    _CSS_TEMPLATE.replace("__DIR__", _dir).replace("__ALIGN__", _text_align).replace("__ROWDIR__", _toolbar_row_dir),
-    unsafe_allow_html=True,
+theme.inject_main(
+    st,
+    _theme_variant,
+    dir_=_dir,
+    align=_text_align,
+    rowdir=_toolbar_row_dir,
 )
 
 # ---------------- دوال مساعدة للتعامل مع قاعدة البيانات ----------------
@@ -1164,7 +808,8 @@ if not projects:
 
 selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
-project = fetch_all("SELECT * FROM projects WHERE id=?", (project_id,))[0]
+project_row = fetch_all("SELECT * FROM projects WHERE id=?", (project_id,))[0]
+project = dict(project_row) if hasattr(project_row, 'keys') else project_row
 
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير
 # تأكيد، عشان ميحصلش استيراد مشاهد بالغلط لمشروع تاني
@@ -1368,65 +1013,6 @@ tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
 
 # ---------------- تبويب استيراد السكريبت ----------------
 
-AI_JSON_PROMPT = """أنت مساعد إخراج ومدير إنتاج محترف بتحلل سيناريو فيلم/مسلسل تحليل شامل وعميق جدًا،
-عشان بياناته هتتحط في برنامج إدارة إنتاج بيبني منه تقارير رسمية (كشوفات تصوير، تفريغ لقطات...).
-الدقة هنا مهمة جدًا لأن أي غلطة هتتكرر في كل تقرير بعد كده.
-
-حلل السيناريو المرفق بالكامل، وطلعلي بياناته في صيغة JSON بالشكل ده بالظبط، من غير أي نص زيادة
-قبله أو بعده (من غير ```json ولا أي شرح):
-
-{
-  "scenes": [
-    {
-      "scene_number": 1,
-      "int_ext": "INT",
-      "day_night": "نهار",
-      "location_name": "اسم المكان",
-      "characters": ["اسم شخصية 1", "اسم شخصية 2"],
-      "props": ["اسم إكسسوار 1", "اسم إكسسوار 2"],
-      "notes": "وصف الحركة الكامل + الحوار الكامل"
-    }
-  ]
-}
-
-قواعد مهمة لازم تلتزم بيها بالظبط - اقرا كل واحدة كويس، لأن الهدف إنك تذاكر السكريبت زي مساعد إخراج محترف بيحلل كل تفصيلة، مش بس الحوار:
-
-## الشخصيات والإكسسوارات
-- "characters": **كل** الشخصيات الموجودة فعليًا في المشهد، سواء كانت شخصية رئيسية أو ثانوية أو حتى كومبارس بدور صغير - حتى لو الشخصية دي **ملهاش أي حوار وساكتة طول المشهد**. لو مشهد فيه شخصية واقفة في الخلفية أو بتعمل حركة من غير ما تتكلم، لازم اسمها يتسجل هنا برضو. استخدم نفس الاسم بالظبط لكل ظهور لنفس الشخصية من غير ما تنوّع في كتابة الاسم (مثلاً "أحمد" في كل مرة، مش "أحمد" وبعدين "الشاب").
-- "props": أي إكسسوار أو حاجة بتتلمس أو بتتستخدم أو مذكورة في وصف المشهد ولها دور في الحدث (زي: سكينة، تليفون، شنطة، مفاتيح عربية، سلاح، مجلة، فلوس...). لو مفيش حاجة واضحة سيبها [] فاضية. مش المفروض تسجل حاجات الديكور الثابتة (زي أثاث الغرفة) إلا لو لها دور في الحدث. اكتب في "notes" لو الإكسسوار مرتبط بشخصية معينة (مثلاً "طاسة أحمد" أو "شنطة سارة") عشان يبان واضح إنه ملكها.
-
-## المكان والديكور (مهم جدًا)
-كتير المشاهد بتحصل في "ديكور" فرعي جوه "مكان" عام أكبر - مثلاً المكان العام هو "شقة حسين"،
-والديكور الفرعي جواه هو "غرفة نوم حسين" أو "صالة شقة حسين". لما ده يحصل:
-- اكتب "location_name" بالصيغة: "المكان العام - الديكور الفرعي" بالظبط (مثال: "شقة حسين - غرفة نوم حسين").
-- لو المشهد بياخد المكان كله من غير ديكور فرعي محدد، اكتب اسم المكان لوحده من غير شرطة.
-- **دمج الأسماء المتكررة بصيغ مختلفة**: السيناريست أحيانًا بيوصف نفس المكان بصيغ مختلفة في أماكن
-  مختلفة من السكريبت (مثلاً "شقة صلاح" في مشهد، و"شقة صلاح والد مصطفى" في مشهد تاني - دول نفس
-  المكان). لازم تراجع كل أسماء الأماكن في السكريبت كله قبل ما تطلع النتيجة النهائية، وتوحّد كل
-  الإشارات لنفس المكان تحت **اسم واحد متسق بالظبط** في كل المشاهد اللي بتحصل فيه، بدل ما تسيبها
-  متنوعة زي ما السيناريست كتبها.
-
-## المشاهد اللي فيها أكتر من ديكور أو مكان (زي الفوتومونتاج)
-لو مشهد واحد في السكريبت (برقم واحد) فعليًا بيتنقل بين أكتر من مكان أو ديكور مختلف (زي مشهد
-فوتومونتاج قصير بيولّف بين عدة أماكن)، **متسيبوش مشهد واحد بمكان غامض** - قسّمه لعدة مشاهد
-منفصلة في الناتج، كل واحد برقم صحيح متتابع خاص بيه (يعني لو السكريبت مشهد رقم 35 فوتومونتاج
-فيه 4 أماكن، طلّعهم كأربع عناصر منفصلين في "scenes" بأرقام متتالية زي 35، 36، 37، 38 - **مش**
-حروف زي 35A/35B، البرنامج لسه ما بيدعمش ترقيم بالحروف). اكتب في "notes" بداية كل واحد منهم
-إشارة إنه جزء من مشهد الفوتومونتاج الأصلي (مثلاً "من مونتاج مشهد 35 الأصلي") عشان الترتيب يفضل
-مفهوم.
-
-## باقي الحقول
-- "int_ext": لازم يكون "INT" (داخلي) أو "EXT" (خارجي) بس - من غير أي قيمة تانية.
-- "day_night": لازم يكون واحد من القيم دي بالظبط: "نهار" أو "ليل" أو "غروب" أو "فجر". لو المشهد
-  متحدد إنه ليل، أي لقطة جواه هي ليل بالتبعية إلا لو السكريبت نفسه بيقول صراحة إن جزء منه في
-  وقت مختلف - في الحالة دي اكتب ده في "notes" بوضوح عشان اليوزر يعدّل اللقطة المعنية يدويًا.
-- "scene_number": رقم صحيح بترتيب ظهور المشهد في السكريبت.
-- "notes": لازم يشمل كل التفاصيل دي مرتبة ووصفها واضح، من غير ما تلخص أو تختصر أي جزء:
-  1. وصف الحركة والفعل الكامل (مين بيعمل إيه، فين، وأي تغيير في الملابس أو المظهر أو الحالة يحصل خلال المشهد).
-  2. الحوار الكامل، كل جملة حوار في سطر لوحدها بصيغة "اسم الشخصية: الجملة" بالظبط.
-  3. أي تفاصيل بصرية أو تغييرات مهمة في المكان أو الإضاءة أو الجو العام مذكورة في السكريبت.
-- رجّعلي كل مشاهد السكريبت كاملة من غير اختصار أو تلخيص لأي مشهد.
-- الناتج JSON صحيح وبس، جاهز إني أحفظه في ملف وأرفعه زي ما هو."""
 
 def _render_analysis_dashboard(scenes):
     """لوحة تحليل السيناريو.
