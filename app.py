@@ -4,8 +4,14 @@ import sys
 import time
 import uuid
 import json
+import datetime
 import streamlit as st
-from auth import authenticate, no_login_allowed, resolve_users, hash_password, normalize_username
+import extra_streamlit_components as stx
+from auth import (
+    authenticate, no_login_allowed, resolve_users, hash_password, normalize_username,
+    issue_session_token, verify_session_token, resolve_session_secret,
+    DEFAULT_SESSION_TTL,
+)
 from database import (
     init_db, FIELD_HELP,
     fetch_all, run_query, run_delete,
@@ -96,6 +102,80 @@ def _render_signup_screen():
 
 
 
+_COOKIE_NAME = "cimafast_session"
+_COOKIE_PROBE = "_cookie_probe_runs"
+
+
+def _cookie_manager():
+    """نسخة جديدة كل rerun — الـ __init__ نفسه هو اللي بيرسم الكومبوننت،
+    وهو ده اللي بيحدّث قيم الكوكيز. لو خزّناها في cache_resource الكومبوننت
+    مش هيترسم تاني والقيم هتفضل قديمة (وممكن تتسرّب بين المستخدمين)."""
+    return stx.CookieManager(key="cimafast_auth_cookies")
+
+
+def _restore_from_cookie(users):
+    """بيرجّع المستخدم لحالة الدخول من الكوكي الموقّع، لو التوقيع سليم."""
+    secret = resolve_session_secret()
+    if not secret:
+        return False
+    try:
+        token = (_COOKIES.cookies or {}).get(_COOKIE_NAME)
+    except Exception:
+        return False
+    name = verify_session_token(token, secret, users)
+    if not name:
+        return False
+    st.session_state["_authenticated"] = True
+    st.session_state["_auth_user"] = name
+    return True
+
+
+def _render_restoring_screen():
+    """الكومبوننت بيرجّع {} في أول تشغيل قبل ما يرد من المتصفح، فلو وريّنا
+    شاشة الدخول على طول المستخدم هيشوف ومضة تسجيل دخول قبل ما نرجّعه.
+    بنستنى دورة واحدة بس، وفيه زرار يكمّل يدوي لو الكومبوننت مردّش."""
+    st.markdown(
+        """
+        <div style="text-align:center; margin-top:14vh" dir="rtl">
+            <h3>🎬 CimaFast Studio</h3>
+            <p style="opacity:.75">بنرجّع الجلسة… / Restoring your session…</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    _, mid, _ = st.columns([1, 1.4, 1])
+    with mid:
+        if st.button("تسجيل الدخول / Sign in", use_container_width=True,
+                     key="_skip_restore"):
+            st.session_state[_COOKIE_PROBE] = 99
+            st.rerun()
+
+
+def _set_session_cookie(username):
+    """بنأجّل كتابة الكوكي لدورة بعد الدخول: لو كتبناها وعملنا rerun على طول
+    الكومبوننت ممكن ميكونش نفّذ الأمر والكوكي تضيع."""
+    secret = resolve_session_secret()
+    if not secret:
+        return
+    token = issue_session_token(username, secret, ttl=DEFAULT_SESSION_TTL)
+    if token:
+        st.session_state["_pending_cookie"] = token
+
+
+def _flush_pending_cookie():
+    token = st.session_state.pop("_pending_cookie", None)
+    if not token:
+        return
+    try:
+        _COOKIES.set(
+            _COOKIE_NAME, token, key="cimafast_set_cookie",
+            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=DEFAULT_SESSION_TTL),
+            secure=True, same_site="strict",
+        )
+    except Exception as exc:
+        print(f"[auth] could not persist session cookie: {exc}", file=sys.stderr, flush=True)
+
+
 def _render_login_screen():
     """شاشة تسجيل الدخول: اسم مستخدم + كلمة سر.
 
@@ -134,6 +214,7 @@ def _render_login_screen():
                 st.session_state["_authenticated"] = True
                 st.session_state["_auth_user"] = user
                 st.session_state.pop("_login_attempts", None)
+                _set_session_cookie(user)
                 st.rerun()
             # تأخير بسيط ومتزايد بعد كل محاولة فاشلة عشان نصعّب التخمين الآلي
             attempts = st.session_state.get("_login_attempts", 0) + 1
@@ -168,6 +249,14 @@ def _check_login():
         )
         _render_locked_screen()
         return False
+    if _restore_from_cookie(users):
+        return True
+    # أول تشغيل: الكومبوننت لسه مردّش، فمستنيين دورة واحدة قبل ما نقرر
+    runs = st.session_state.get(_COOKIE_PROBE, 0) + 1
+    st.session_state[_COOKIE_PROBE] = runs
+    if runs < 2:
+        _render_restoring_screen()
+        return False
     _render_login_screen()
     return False
 
@@ -175,12 +264,23 @@ def _check_login():
 def _logout():
     """خروج: بنمسح مفاتيح الدخول بس وسايبين باقي حالة الجلسة زي ما هي عشان
     المستخدم ميخسرش اختياراته لو رجع دخل تاني."""
-    for key in ("_authenticated", "_auth_user", "_login_attempts"):
+    for key in ("_authenticated", "_auth_user", "_login_attempts",
+                "_pending_cookie", _COOKIE_PROBE):
         st.session_state.pop(key, None)
+    try:
+        # delete() يرمي KeyError لو الكوكي مش موجودة أصلًا
+        if _COOKIE_NAME in (_COOKIES.cookies or {}):
+            _COOKIES.delete(_COOKIE_NAME, key="cimafast_del_cookie")
+    except Exception as exc:
+        print(f"[auth] could not clear session cookie: {exc}", file=sys.stderr, flush=True)
 
+
+_COOKIES = _cookie_manager()
 
 if not _check_login():
     st.stop()
+
+_flush_pending_cookie()
 
 init_db()
 
@@ -1362,6 +1462,69 @@ AI_JSON_PROMPT = """أنت مساعد إخراج ومدير إنتاج محتر�
 - رجّعلي كل مشاهد السكريبت كاملة من غير اختصار أو تلخيص لأي مشهد.
 - الناتج JSON صحيح وبس، جاهز إني أحفظه في ملف وأرفعه زي ما هو."""
 
+def _render_analysis_dashboard(scenes):
+    """لوحة تحليل السيناريو.
+
+    كانت متكتوبة جوه زرار "تأكيد وإضافة المشاهد"، وبعد ما بترسم على طول
+    بيتمسح parsed_script ويتعمل rerun — يعني كانت بتترسم في إطار بيتلغي
+    قبل ما المستخدم يشوفه أصلًا. دلوقتي بتتعرض عادي وبتفضل ظاهرة."""
+    st.markdown("---")
+    st.markdown(f"## 📊 {t('تحليل السيناريو')}")
+    tabs = st.tabs([t("📝 المشاهد"), t("👥 الشخصيات"), t("🏠 الأماكن"), t("🎬 الإكسسوارات"), t("📑 JSON")])
+
+    with tabs[0]:
+        for sc in scenes:
+            st.subheader(f"{t('مشهد')} {sc['scene_number']}")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.caption(f"**{t('النوع')}**: {fmt_int_ext(sc.get('int_ext', 'غير محدد'))}")
+            with col2:
+                st.caption(f"**{t('الوقت')}**: {fmt_day_night(sc.get('day_night', 'غير محدد'))}")
+            with col3:
+                st.caption(f"**{t('المكان')}**: {sc.get('location_name', t('مكان غير محدد'))}")
+            if sc.get('characters'):
+                st.caption(f"**{t('الشخصيات')}**: {', '.join(sc['characters'])}")
+            if sc.get('props'):
+                st.caption(f"**🎬 {t('الإكسسوارات')}**: {', '.join(sc['props'])}")
+
+    with tabs[1]:
+        all_chars = set()
+        for sc in scenes:
+            all_chars.update(sc.get('characters', []))
+        st.write(f"**{t('إجمالي الشخصيات')}**: {len(all_chars)}")
+        for char in sorted(all_chars):
+            appearances = sum(1 for sc in scenes if char in sc.get('characters', []))
+            st.caption(f"{char} ({appearances} {t('مشاهد')})")
+
+    with tabs[2]:
+        all_locs = set()
+        for sc in scenes:
+            if sc.get('location_name'):
+                all_locs.add(sc['location_name'])
+        st.write(f"**{t('إجمالي الأماكن')}**: {len(all_locs)}")
+        for loc in sorted(all_locs):
+            st.caption(loc)
+
+    with tabs[3]:
+        all_props = set()
+        for sc in scenes:
+            all_props.update(sc.get('props', []))
+        st.write(f"**{t('إجمالي الإكسسوارات')}**: {len(all_props)}")
+        for prop in sorted(all_props):
+            st.caption(prop)
+
+    with tabs[4]:
+        import json
+        json_output = json.dumps({'scenes': scenes}, ensure_ascii=False, indent=2)
+        st.code(json_output, language="json")
+        st.download_button(
+            label=t("📥 تحميل JSON"),
+            data=json_output,
+            file_name="analysis.json",
+            mime="application/json"
+        )
+
+
 with tab_import:
     st.subheader(tr("sub_import"))
     st.caption(t(
@@ -1400,11 +1563,17 @@ with tab_import:
 
     if uploaded_file is not None and st.button(t("🔍 تحليل الملف")):
         try:
-            st.session_state["parsed_script"] = parse_script(uploaded_file.name, uploaded_file.getvalue())
+            _known = [r["name"] for r in fetch_all(
+                "SELECT name FROM characters WHERE project_id=?", (project_id,))]
+            st.session_state["parsed_script"] = parse_script(
+                uploaded_file.name, uploaded_file.getvalue(), known_characters=_known)
         except Exception as e:
             st.error(f"{t('حصل خطأ أثناء تحليل الملف:')} {e}")
 
     parsed = st.session_state.get("parsed_script")
+    if not parsed and st.session_state.get("last_analysis"):
+        # بعد ما المشاهد تتضاف، التحليل يفضل متاح بدل ما يختفي
+        _render_analysis_dashboard(st.session_state["last_analysis"])
     if parsed:
         scenes = parsed["scenes"]
         for w in parsed["warnings"]:
@@ -1450,6 +1619,8 @@ with tab_import:
             preview_scenes.append(sc_view)
 
         merge_map = {}
+        _render_analysis_dashboard(preview_scenes)
+
         similar_groups = find_similar_name_groups(preview_scenes)
         if similar_groups:
             st.markdown("---")
@@ -1528,61 +1699,7 @@ with tab_import:
                     msg += f" {t('تم تخطي مشاهد أرقام')} ({skipped}) {t('لأنها موجودة بالفعل.')}"
                 st.success(msg)
 
-                st.markdown("---")
-                st.markdown(f"## 📊 {t('تحليل السيناريو')}")
-                tabs = st.tabs([t("📝 المشاهد"), t("👥 الشخصيات"), t("🏠 الأماكن"), t("🎬 الإكسسوارات"), t("📑 JSON")])
-
-                with tabs[0]:
-                    for sc in preview_scenes:
-                        st.subheader(f"{t('مشهد')} {sc['scene_number']}")
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.caption(f"**{t('النوع')}**: {fmt_int_ext(sc.get('int_ext', 'غير محدد'))}")
-                        with col2:
-                            st.caption(f"**{t('الوقت')}**: {fmt_day_night(sc.get('day_night', 'غير محدد'))}")
-                        with col3:
-                            st.caption(f"**{t('المكان')}**: {sc.get('location_name', t('مكان غير محدد'))}")
-                        if sc.get('characters'):
-                            st.caption(f"**{t('الشخصيات')}**: {', '.join(sc['characters'])}")
-                        if sc.get('props'):
-                            st.caption(f"**🎬 {t('الإكسسوارات')}**: {', '.join(sc['props'])}")
-
-                with tabs[1]:
-                    all_chars = set()
-                    for sc in preview_scenes:
-                        all_chars.update(sc.get('characters', []))
-                    st.write(f"**{t('إجمالي الشخصيات')}**: {len(all_chars)}")
-                    for char in sorted(all_chars):
-                        appearances = sum(1 for sc in preview_scenes if char in sc.get('characters', []))
-                        st.caption(f"{char} ({appearances} {t('مشاهد')})")
-
-                with tabs[2]:
-                    all_locs = set()
-                    for sc in preview_scenes:
-                        if sc.get('location_name'):
-                            all_locs.add(sc['location_name'])
-                    st.write(f"**{t('إجمالي الأماكن')}**: {len(all_locs)}")
-                    for loc in sorted(all_locs):
-                        st.caption(loc)
-
-                with tabs[3]:
-                    all_props = set()
-                    for sc in preview_scenes:
-                        all_props.update(sc.get('props', []))
-                    st.write(f"**{t('إجمالي الإكسسوارات')}**: {len(all_props)}")
-                    for prop in sorted(all_props):
-                        st.caption(prop)
-
-                with tabs[4]:
-                    import json
-                    json_output = json.dumps({'scenes': preview_scenes}, ensure_ascii=False, indent=2)
-                    st.code(json_output, language="json")
-                    st.download_button(
-                        label=t("📥 تحميل JSON"),
-                        data=json_output,
-                        file_name="analysis.json",
-                        mime="application/json"
-                    )
+                st.session_state["last_analysis"] = list(scenes_to_import)
 
                 del st.session_state["parsed_script"]
                 st.rerun()

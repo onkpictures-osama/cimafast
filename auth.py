@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 
 # الصيغة: pbkdf2_sha256$<iterations>$<salt_b64>$<hash_b64>
 ALGORITHM = "pbkdf2_sha256"
@@ -158,6 +159,92 @@ def authenticate(username, password, users):
 # hash وهمي لكلمة سر عشوائية، بيتحسب مرة واحدة وقت التحميل عشان المقارنة
 # الوهمية فوق تاخد نفس وقت المقارنة الحقيقية.
 _DUMMY_HASH = hash_password(base64.b64encode(os.urandom(18)).decode("ascii"))
+
+
+# ---------------------------------------------------------------------------
+# توكن الجلسة: عشان الريفريش ميطلّعش المستخدم برّه
+#
+# حالة الدخول كانت متخزنة في st.session_state بس، والـ session_state ده مربوط
+# بالـ websocket، يعني أي ريفريش بيفتح جلسة جديدة فاضية والمستخدم بيتقفل برّه.
+# الحل إننا نسيب مع المتصفح توكن موقّع (HMAC) في كوكي، ونتحقق منه لما الجلسة
+# تبتدي من أول وجديد. التوكن مفيهوش كلمة السر ولا الـ hash — بس اسم المستخدم
+# وتاريخ الانتهاء وتوقيع، فلو اتسرق بيبوظ لوحده بعد المدة.
+# ---------------------------------------------------------------------------
+
+SESSION_SECRET_ENV = "CIMAFAST_COOKIE_SECRET"
+SESSION_SECRET_KEY = "cookie_secret"
+SESSION_TOKEN_VERSION = "v1"
+DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60   # أسبوع
+
+
+def _b64url(raw):
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(text):
+    pad = "=" * (-len(text) % 4)
+    return base64.urlsafe_b64decode(text.encode("ascii") + pad.encode("ascii"))
+
+
+def resolve_session_secret():
+    """سر التوقيع: من متغير البيئة الأول وبعدين من secrets.toml.
+
+    لو مفيش سر بنرجّع "" والكوكي بيتقفل خالص (fail closed) — أحسن من إننا
+    نوقّع بسر متوقّع."""
+    env = (os.environ.get(SESSION_SECRET_ENV) or "").strip()
+    if env:
+        return env
+    try:
+        import streamlit as st
+
+        return str(st.secrets.get("auth", {}).get(SESSION_SECRET_KEY) or "").strip()
+    except Exception:
+        return ""
+
+
+def issue_session_token(username, secret, ttl=DEFAULT_SESSION_TTL, now=None):
+    """بيطلّع توكن موقّع للمستخدم ده، صالح لمدة ttl بالثواني."""
+    name = normalize_username(username)
+    if not name or not secret:
+        return ""
+    expires = int((time.time() if now is None else now) + ttl)
+    payload = f"{SESSION_TOKEN_VERSION}.{_b64url(name.encode('utf-8'))}.{expires}"
+    signature = hmac.new(
+        secret.encode("utf-8"), payload.encode("ascii"), hashlib.sha256
+    ).digest()
+    return f"{payload}.{_b64url(signature)}"
+
+
+def verify_session_token(token, secret, users=None, now=None):
+    """بيرجّع اسم المستخدم لو التوكن سليم ولسه صالح، وإلا None.
+
+    بنتأكد كمان إن الحساب لسه موجود، عشان مستخدم اتشال ميفضلش داخل بكوكي قديم."""
+    if not isinstance(token, str) or not token or not secret:
+        return None
+    parts = token.split(".")
+    if len(parts) != 4:
+        return None
+    version, name_text, expires_text, signature_text = parts
+    if version != SESSION_TOKEN_VERSION:
+        return None
+    payload = f"{version}.{name_text}.{expires_text}"
+    expected = hmac.new(
+        secret.encode("utf-8"), payload.encode("ascii"), hashlib.sha256
+    ).digest()
+    try:
+        given = _b64url_decode(signature_text)
+        expires = int(expires_text)
+        name = _b64url_decode(name_text).decode("utf-8")
+    except (ValueError, TypeError, base64.binascii.Error, UnicodeDecodeError):
+        return None
+    if not hmac.compare_digest(expected, given):
+        return None
+    if (time.time() if now is None else now) >= expires:
+        return None
+    name = normalize_username(name)
+    if users is not None and name not in (users or {}):
+        return None
+    return name or None
 
 
 def _cli():

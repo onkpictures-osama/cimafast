@@ -135,6 +135,21 @@ def _new_scene(number, default_int_ext=None, default_day_night=None):
     }
 
 
+# الحروف العربية، عشان نعرف نحدد حدود الكلمة. \b مش بتنفع هنا لأن كل
+# الحروف دي "حروف كلمة" فمش بتفرّق بين "الدرج" و"الدرجة".
+_AR_LETTERS = '\u0621-\u064A\u0640\u0671-\u06D3'
+# سوابق شائعة: ال التعريف، وحروف العطف والجر الملتصقة (و/ف/ب/ك/ل)
+_AR_PREFIX = r'(?:[وفبكل])?(?:ال)?'
+
+
+def _arabic_word_pattern(word):
+    """بيطابق الكلمة كوحدة كاملة مع السوابق الملتصقة، ومش بيطابقها كجزء من
+    كلمة أطول. من غير الـ lookarounds دي كان 'الدرجة' بيطلّع 'درج'،
+    و'الكوبري' بيطلّع 'كوب'."""
+    return (rf'(?<![{_AR_LETTERS}])' + _AR_PREFIX
+            + re.escape(word) + rf'(?![{_AR_LETTERS}])')
+
+
 def _extract_props_from_text(text, speaker_roster):
     props_lexicon = {
         'جهاز': 'جهاز', 'موبايل': 'موبايل', 'هاتف': 'هاتف', 'كتاب': 'كتاب',
@@ -144,21 +159,56 @@ def _extract_props_from_text(text, speaker_roster):
     }
     found_props = []
     for prop_key, prop_name in props_lexicon.items():
-        arabic_pattern = r'(?:ال|و|ب|ل|ك)?' + re.escape(prop_key)
-        if re.search(arabic_pattern, text):
+        if re.search(_arabic_word_pattern(prop_key), text):
             if prop_name not in found_props:
                 found_props.append(prop_name)
     return found_props
 
 
-def _detect_silent_characters(notes_text, speaker_roster):
+def _detect_silent_characters(action_text, scene_speakers, roster):
+    """الشخصيات الصامتة = اللي اتذكرت في سطور الوصف بس ملهاش حوار في المشهد ده.
+
+    النسخة القديمة كانت بتاخد قايمة المتكلمين نفسها وتدوّر عليهم، فكانت بتطلّع
+    شخصيات ليها حوار — عكس المطلوب تمامًا — ونتيجتها كانت بتتحط في قايمة
+    موجودين فيها أصلًا، يعني الكود كله كان بيلف على الفاضي.
+
+    بنستعمل قايمة كل المتكلمين في السيناريو كله (roster)، عشان شخصية بتتكلم في
+    مشهد وبتظهر ساكتة في مشهد تاني تتحسب صح — وده اللي بيهم الإنتاج فعلًا
+    (الشخصية لازم تتحجز وتتلبس حتى لو مش بتتكلم)."""
+    speakers = set(scene_speakers or [])
     silent = []
-    for speaker in speaker_roster:
-        arabic_pattern = r'(?:^|[\s([\-–—]|[؀-ۿ])' + re.escape(speaker) + r'(?:[\s,،..\-–—)\]]|$)'
-        if re.search(arabic_pattern, notes_text, re.MULTILINE):
-            if speaker not in silent:
-                silent.append(speaker)
+    for name in (roster or []):
+        if not name or name in speakers or name in silent:
+            continue
+        if re.search(_arabic_word_pattern(name), action_text or ''):
+            silent.append(name)
     return silent
+
+
+def _apply_silent_characters(scenes, known_characters=None):
+    """بنعملها بعد ما كل المشاهد تتقرا، عشان نبني قايمة المتكلمين الكاملة الأول.
+
+    known_characters هي شخصيات المشروع المسجلة قبل كده. من غيرها مش هنعرف
+    نكتشف شخصية عمرها ما بتتكلم في السيناريو كله، لأن مفيش مصدر تاني لاسمها."""
+    roster = []
+    for name in (known_characters or []):
+        if name and name not in roster:
+            roster.append(name)
+    for scene in scenes:
+        for name in (scene.get('characters') or []):
+            if name not in roster:
+                roster.append(name)
+    for scene in scenes:
+        speakers = list(scene.get('characters') or [])
+        action_text = scene.pop('_action_text', None)
+        if action_text is None:
+            action_text = scene.get('notes', '')
+        silent = _detect_silent_characters(action_text, speakers, roster)
+        scene['silent_characters'] = silent
+        for name in silent:
+            if name not in scene['characters']:
+                scene['characters'].append(name)
+    return scenes
 
 
 def _finalize_scene(scene):
@@ -171,11 +221,13 @@ def _finalize_scene(scene):
     notes_text = '\n'.join(scene['body_lines'])
     scene['notes'] = notes_text
 
-    silent_chars = _detect_silent_characters(notes_text, seen)
-    if silent_chars:
-        for char in silent_chars:
-            if char not in scene['characters']:
-                scene['characters'].append(char)
+    # سطور الحوار متخزنة بصيغة "اسم: كلام"، فبنشيلها عشان ندوّر على الشخصيات
+    # الصامتة في الوصف بس، مش في كلام حد تاني عنها.
+    dialogue_prefixes = tuple(f"{name}: " for name in seen)
+    scene['_action_text'] = '\n'.join(
+        line for line in scene['body_lines']
+        if not (dialogue_prefixes and line.startswith(dialogue_prefixes))
+    )
 
     scene['props'] = _extract_props_from_text(notes_text, seen)
 
@@ -520,7 +572,7 @@ def _normalize_day_night(value):
     return v if v in VALID_DAY_NIGHT else None
 
 
-def parse_json_script(file_bytes):
+def parse_json_script(file_bytes, known_characters=None):
     """بيقرا ملف JSON جاهز (مجهز بمعرفة أي AI حلل السكريبت) وبيحوله لنفس شكل
     المشاهد اللي بترجعه parse_script، عشان يعدي على نفس خطوات المراجعة والدمج
     والاستيراد. الصيغة المتوقعة موصوفة في app.py مع البرومبت الجاهز للمستخدم."""
@@ -594,10 +646,10 @@ def parse_json_script(file_bytes):
     if not scenes:
         warnings.append('لم يتم العثور على أي مشهد صالح في ملف الـ JSON.')
 
-    return {'scenes': scenes, 'warnings': warnings}
+    return {'scenes': _apply_silent_characters(scenes, known_characters), 'warnings': warnings}
 
 
-def parse_script(filename, file_bytes):
+def parse_script(filename, file_bytes, known_characters=None):
     lower = filename.lower()
     if lower.endswith('.docx'):
         if docx is None:
@@ -617,11 +669,11 @@ def parse_script(filename, file_bytes):
         lines = _extract_pdf_lines(file_bytes)
         scenes, warnings = _parse_line_based(lines)
     elif lower.endswith('.json'):
-        return parse_json_script(file_bytes)
+        return parse_json_script(file_bytes, known_characters)
     else:
         raise RuntimeError('صيغة الملف غير مدعومة. استخدم .docx أو .txt أو .pdf أو .json')
 
-    return {'scenes': scenes, 'warnings': warnings}
+    return {'scenes': _apply_silent_characters(scenes, known_characters), 'warnings': warnings}
 
 
 # ---------------- تجميع أسماء متشابهة (شخصيات زي "سويسي"/"السويسي"، أو أماكن زي "سطح اليخت"/"سطح اليخت بعد لحظات") ----------------
