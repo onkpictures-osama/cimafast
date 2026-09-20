@@ -150,9 +150,9 @@ UI_TEXT = {
     "tab_locations": {"ar": "📍 الأماكن", "en": "📍 Locations"},
     "tab_characters": {"ar": "🎭 الشخصيات", "en": "🎭 Characters"},
     "tab_props": {"ar": "🎒 الإكسسوارات", "en": "🎒 Props"},
-    "tab_scenes": {"ar": "📝 السكريبت (المشاهد)", "en": "📝 Script (Scenes)"},
-    "tab_breakdown": {"ar": "🎥 التفريغ (اللقطات)", "en": "🎥 Breakdown (Shots)"},
-    "tab_dashboard": {"ar": "📊 لوحة المتابعة", "en": "📊 Dashboard"},
+    "tab_scenes": {"ar": "📝 المشاهد", "en": "📝 Scenes"},
+    "tab_breakdown": {"ar": "🎥 اللقطات", "en": "🎥 Shots"},
+    "tab_dashboard": {"ar": "📊 التقارير النهائية", "en": "📊 Final Reports"},
     "sub_import": {"ar": "استيراد السكريبت من ملف Word أو نصي أو JSON", "en": "Import script from Word, text, or JSON"},
     "sub_locations": {"ar": "مكتبة الأماكن", "en": "Locations Library"},
     "sub_characters": {"ar": "مكتبة الشخصيات", "en": "Characters Library"},
@@ -350,6 +350,8 @@ TRANSLATIONS = {
     "رقم المشهد": "Scene Number", "التوقيت": "Time of Day", "المكان": "Location", "الطقس": "Weather",
     "ملاحظات المشهد العامة": "General Scene Notes", "إضافة مشهد": "Add Scene",
     "🗑️ حذف المشهد (وكل لقطاته)": "🗑️ Delete Scene (and all its shots)",
+    "حذف": "Delete", "مشهد مختار (وكل لقطاتهم)": "selected scene(s) (and all their shots)",
+    "تم حذف المشاهد المختارة": "Selected scenes deleted",
     "تم تعديل المشهد": "Scene updated", "تم حذف المشهد": "Scene deleted",
     # التفريغ
     "لازم تضيف مشهد واحد على الأقل من تبويب السكريبت أولًا": "You need to add at least one scene from the Script tab first",
@@ -698,17 +700,16 @@ _CSS_TEMPLATE = """
        بنستخدم أيقونة Material Symbols (نفس خط الأيقونات اللي Streamlit
        نفسه بيستخدمه) بدل الإيموجي، عشان تبقى شكلها بسيط وكلاسيكي وتقدر
        تتلوّن أبيض بدل ما تيجي بألوان الإيموجي الثابتة. */
-    [data-testid="stTextInput"], [data-testid="stTextArea"] {
+    [data-testid="stTextInputRootElement"], [data-testid="stTextAreaRootElement"] {
         position: relative;
     }
-    [data-testid="stTextInput"]::after,
-    [data-testid="stTextArea"]::after {
+    [data-testid="stTextInputRootElement"]::after,
+    [data-testid="stTextAreaRootElement"]::after {
         content: "mic";
         font-family: "Material Symbols Rounded";
         font-weight: normal;
         font-style: normal;
         position: absolute;
-        top: 8px;
         left: 10px;
         font-size: 14px;
         color: #F5F1E6;
@@ -716,6 +717,10 @@ _CSS_TEMPLATE = """
         pointer-events: none;
         z-index: 1;
     }
+    /* في خانة سطر واحد بتتوسط رأسيًا جوه الصندوق؛ في الخانة الطويلة (Textarea)
+       بتقف أعلى الصندوق من جوه عشان متتلخبطش مع النص وهو بيكبر لأسفل */
+    [data-testid="stTextInputRootElement"]::after { top: 50%; transform: translateY(-50%); }
+    [data-testid="stTextAreaRootElement"]::after { top: 8px; }
     /* نص المثال (placeholder) يفضل شفاف أكتر عشان يبان إنه نص مؤقت للتوضيح
        بس، ويختفي تمامًا وقت التركيز/الكتابة في الخانة عشان ميتزنقش مع أي
        تلميح تاني زي "Press Enter to..." - وبيرجع يظهر تاني لو رجعت الخانة فاضية */
@@ -832,6 +837,15 @@ _CSS_TEMPLATE = """
         transform: scale(1.4);
         background: #E8B923 !important;
         border-radius: 6px !important;
+    }
+    /* زرار الحذف الجماعي - بيبقى أحمر تحذيري في أي مكان مستخدم فيه
+       (أي عنصر container بمفتاح بيبدأ بـ bulk_delete_) */
+    [class*="st-key-bulk_delete_"] button {
+        background-color: #DC2626 !important;
+        border-color: #DC2626 !important;
+    }
+    [class*="st-key-bulk_delete_"] button p {
+        color: #FFFFFF !important;
     }
     </style>
     """
@@ -1934,12 +1948,18 @@ with tab_scenes:
     day_night_edit_options = ["غير محدد"] + DAY_NIGHT_OPTIONS
     loc_edit_options = ["بدون تحديد"] + list(loc_variant_map.keys())
 
+    selected_scene_ids_for_bulk_delete = []
     for sc in scenes:
         title = (
             f"{t('مشهد')} {sc['scene_number']} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
             f"{fmt_day_night(sc['day_night'] or 'غير محدد')}"
         )
-        with st.expander(title, key=f"exp_scene_{sc['id']}"):
+        cb_col, exp_col = st.columns([0.05, 0.95])
+        with cb_col:
+            st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
+            if st.checkbox("", key=f"bulk_sel_scene_{sc['id']}", label_visibility="collapsed"):
+                selected_scene_ids_for_bulk_delete.append(sc["id"])
+        with exp_col.expander(title, key=f"exp_scene_{sc['id']}"):
             with st.form(f"edit_scene_{sc['id']}"):
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -2026,6 +2046,17 @@ with tab_scenes:
                 st.success(t("تم حذف المشهد"))
                 st.rerun()
             show_saved_badge(f"scene_{sc['id']}")
+
+    if selected_scene_ids_for_bulk_delete:
+        with st.container(key=f"bulk_delete_scenes_{project_id}"):
+            if st.button(
+                f"🗑️ {t('حذف')} {len(selected_scene_ids_for_bulk_delete)} {t('مشهد مختار (وكل لقطاتهم)')}",
+            ):
+                for _sid in selected_scene_ids_for_bulk_delete:
+                    run_query("DELETE FROM scenes WHERE id=?", (_sid,))
+                bump_version(project_id)
+                st.success(t("تم حذف المشاهد المختارة"))
+                st.rerun()
 
 # ---------------- تبويب التفريغ (اللقطات) ----------------
 with tab_breakdown:
