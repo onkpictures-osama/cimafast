@@ -186,9 +186,20 @@ def init_db():
             reference_image_path TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS episodes (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            episode_number INTEGER NOT NULL,
+            title TEXT,
+            description TEXT,
+            air_date TEXT,
+            status TEXT DEFAULT 'planning'
+        );
+
         CREATE TABLE IF NOT EXISTS scenes (
             id SERIAL PRIMARY KEY,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            episode_id INTEGER REFERENCES episodes(id) ON DELETE SET NULL,
             scene_number INTEGER NOT NULL,
             int_ext TEXT,
             day_night TEXT,
@@ -338,9 +349,21 @@ def init_db():
             FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS episodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            episode_number INTEGER NOT NULL,
+            title TEXT,
+            description TEXT,
+            air_date TEXT,
+            status TEXT DEFAULT 'planning',
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS scenes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL,
+            episode_id INTEGER,
             scene_number INTEGER NOT NULL,
             int_ext TEXT,
             day_night TEXT,
@@ -350,6 +373,7 @@ def init_db():
             is_one_shot INTEGER DEFAULT 0,
             is_fully_storyboarded INTEGER DEFAULT 0,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE SET NULL,
             FOREIGN KEY (location_variant_id) REFERENCES location_variants(id)
         );
 

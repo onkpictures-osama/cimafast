@@ -1172,6 +1172,47 @@ if st.session_state.get("parsed_script_project_id") != project_id:
     st.session_state.pop("parsed_script", None)
     st.session_state["parsed_script_project_id"] = project_id
 
+# Episodes section (للمسلسلات)
+if project["project_type"] == "مسلسل":
+    with st.sidebar.expander("🎬 الحلقات | Episodes"):
+        episodes = fetch_all("SELECT * FROM episodes WHERE project_id=? ORDER BY episode_number", (project_id,))
+        
+        st.subheader(t("إنشاء حلقة جديدة"))
+        new_ep_num = st.number_input(t("رقم الحلقة"), min_value=1, value=len(episodes)+1, key=f"new_ep_num_{project_id}")
+        new_ep_title = st.text_input(t("عنوان الحلقة"), key=f"new_ep_title_{project_id}")
+        new_ep_desc = st.text_area(t("وصف الحلقة"), key=f"new_ep_desc_{project_id}")
+        
+        if st.button(t("إضافة حلقة"), key=f"add_ep_btn_{project_id}"):
+            if new_ep_title.strip():
+                run_query(
+                    "INSERT INTO episodes (project_id, episode_number, title, description) VALUES (?,?,?,?)",
+                    (project_id, int(new_ep_num), new_ep_title, new_ep_desc)
+                )
+                st.success(t("تم إضافة الحلقة"))
+                st.rerun()
+            else:
+                st.warning(t("أدخل عنوان الحلقة"))
+        
+        # List episodes
+        if episodes:
+            st.subheader(f"{t('الحلقات')} ({len(episodes)})")
+            for ep in episodes:
+                with st.expander(f"الحلقة {ep['episode_number']}: {ep['title'] or '(بدون عنوان)'}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**رقم:** {ep['episode_number']}")
+                    with col2:
+                        st.write(f"**الحالة:** {ep.get('status', 'planning')}")
+                    
+                    if ep['description']:
+                        st.write(f"**الوصف:** {ep['description']}")
+                    
+                    # Delete button
+                    if st.button(t("حذف الحلقة"), key=f"del_ep_{ep['id']}"):
+                        run_query("DELETE FROM episodes WHERE id=?", (ep['id'],))
+                        st.success(t("تم حذف الحلقة"))
+                        st.rerun()
+
 with st.sidebar.expander(tr("edit_delete_project")):
     # ملحوظة مهمة: كل الـ keys هنا لازم تتربط برقم المشروع (project_id) —
     # لو الـ key ثابت، Streamlit بيفتكر قيمة قديمة من مشروع تاني كان متفتح
@@ -2109,6 +2150,17 @@ with tab_scenes:
             sc_location = st.selectbox(t("المكان"), ["بدون تحديد"] + list(loc_variant_map.keys()), format_func=t)
         with col3:
             sc_weather = st.text_input(t("الطقس"), placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"))
+        
+        # Episode selection for series
+        sc_episode_id = None
+        if project["project_type"] == "مسلسل":
+            episodes = fetch_all("SELECT id, episode_number, title FROM episodes WHERE project_id=? ORDER BY episode_number", (project_id,))
+            if episodes:
+                ep_options = ["بدون حلقة"] + [f"الحلقة {ep['episode_number']}: {ep['title']}" for ep in episodes]
+                sc_episode_choice = st.selectbox(t("اختر الحلقة"), ep_options, key=f"scene_episode_{project_id}")
+                if sc_episode_choice != "بدون حلقة":
+                    ep_idx = ep_options.index(sc_episode_choice) - 1
+                    sc_episode_id = episodes[ep_idx]['id']
         sc_notes = st.text_area(t("ملاحظات المشهد العامة"), height=150)
         all_chars_for_scene = fetch_all("SELECT id, name FROM characters WHERE project_id=? ORDER BY id", (project_id,))
         char_map_for_scene = {c["name"]: c["id"] for c in all_chars_for_scene}
@@ -2128,8 +2180,8 @@ with tab_scenes:
                 shift_scene_numbers(project_id, sc_number)
                 st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
             new_scene_id = run_query(
-                "INSERT INTO scenes (project_id, scene_number, int_ext, day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?)",
-                (project_id, sc_number, sc_int_ext, sc_day_night, sc_weather, loc_id, sc_notes),
+                "INSERT INTO scenes (project_id, episode_id, scene_number, int_ext, day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?,?)",
+                (project_id, sc_episode_id, sc_number, sc_int_ext, sc_day_night, sc_weather, loc_id, sc_notes),
             )
             for _cname in sc_characters:
                 run_query("INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)",
