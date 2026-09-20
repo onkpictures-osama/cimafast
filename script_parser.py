@@ -632,8 +632,13 @@ def parse_json_script(file_bytes, known_characters=None):
             props = []
         props = [str(p).strip() for p in props if str(p).strip()]
 
+        # حرف المشهد المقسوم بيعدي زي ما هو لو الـ AI رجّعه، عشان يوصل
+        # للاستيراد. 35A غير 35، ولازم يفضلوا متفرقين.
+        suffix = raw.get('scene_suffix')
+        suffix = str(suffix).strip()[:2] if isinstance(suffix, str) and suffix.strip() else None
         scenes.append({
             'scene_number': scene_number,
+            'scene_suffix': suffix,
             'int_ext': int_ext,
             'day_night': day_night,
             'location_name': location_name,

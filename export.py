@@ -7,6 +7,7 @@ import textwrap
 from datetime import date
 from io import BytesIO
 
+from database import scene_label
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -72,7 +73,7 @@ def _fetch_breakdown_rows(project_id, fetch_all):
 
         if not shots:
             rows.append({
-                "scene_number": sc["scene_number"],
+                "scene_number": scene_label(sc),
                 "shot_number": "",
                 "int_ext": sc["int_ext"] or "",
                 "day_night": sc["day_night"] or "",
@@ -104,7 +105,7 @@ def _fetch_breakdown_rows(project_id, fetch_all):
                 emotion_label = f"{emotion_label} ({sh['emotion_intensity']}/5)".strip()
 
             rows.append({
-                "scene_number": sc["scene_number"],
+                "scene_number": scene_label(sc),
                 "shot_number": sh["shot_number"],
                 "int_ext": sc["int_ext"] or "",
                 "day_night": sh["day_night"] or sc["day_night"] or "",
@@ -361,7 +362,7 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
             "number": idx,
             "decor": "",
             "location": location_label,
-            "scene": sc["scene_number"],
+            "scene": scene_label(sc),
             "day_night": sc["day_night"] or "",
             "pages": "",
             "situation": sc["notes"] or "",

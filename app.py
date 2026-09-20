@@ -11,6 +11,7 @@ from auth import (
     make_session_token, verify_session_token, SESSION_COOKIE_NAME,
 )
 from database import (
+    scene_label,
     init_db, FIELD_HELP,
     fetch_all, run_query, run_delete,
     CAMERA_MOVEMENT_OPTIONS, SHOT_SIZE_OPTIONS, CAMERA_ANGLE_OPTIONS,
@@ -1080,7 +1081,7 @@ def _render_analysis_dashboard(scenes):
 
     with tabs[0]:
         for sc in scenes:
-            st.subheader(f"{t('مشهد')} {sc['scene_number']}")
+            st.subheader(f"{t('مشهد')} {scene_label(sc)}")
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.caption(f"**{t('النوع')}**: {fmt_int_ext(sc.get('int_ext', 'غير محدد'))}")
@@ -1228,6 +1229,12 @@ with tab_import:
     # لو التاب اتقفل والتحليل لسه شغال، نرجّع نتابعه بدل ما يضيع
     if _ai_active and not st.session_state.get("ai_job_id"):
         st.session_state["ai_job_id"] = _ai_active
+    # ولو كان خلص خلاص، نرجّع آخر نتيجة بدل ما تحليل اتدفع فيه فلوس يضيع
+    # بمجرد ريفريش أو إعادة تشغيل للبرنامج
+    if not st.session_state.get("ai_job_id"):
+        _recent = ai_jobs.latest_completed(project_id)
+        if _recent:
+            st.session_state["ai_job_id"] = _recent
 
     _job = st.session_state.get("ai_job_id")
     if _job:
@@ -1296,7 +1303,7 @@ with tab_import:
         kept_characters_by_scene = {}
         for idx, sc in enumerate(scenes):
             title = (
-                f"{t('مشهد')} {sc['scene_number']} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
+                f"{t('مشهد')} {scene_label(sc)} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
                 f"{fmt_day_night(sc['day_night'] or 'غير محدد')} — {sc['location_name'] or t('مكان غير محدد')}"
             )
             with st.expander(title):
@@ -1948,7 +1955,7 @@ with tab_scenes:
     selected_scene_ids_for_bulk_delete = []
     for sc in scenes:
         title = (
-            f"{t('مشهد')} {sc['scene_number']} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
+            f"{t('مشهد')} {scene_label(sc)} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
             f"{fmt_day_night(sc['day_night'] or 'غير محدد')}"
         )
         cb_col, exp_col = st.columns([0.05, 0.95])
@@ -2062,7 +2069,7 @@ with tab_breakdown:
     if not scenes:
         st.info(t("لازم تضيف مشهد واحد على الأقل من تبويب السكريبت أولًا"))
     else:
-        scene_map = {f"{t('مشهد')} {s['scene_number']}": s["id"] for s in scenes}
+        scene_map = {f"{t('مشهد')} {scene_label(s)}": s["id"] for s in scenes}
         sel_scene = st.selectbox(t("اختر المشهد"), list(scene_map.keys()))
         scene_id = scene_map[sel_scene]
         current_scene_row = fetch_all("SELECT notes, day_night FROM scenes WHERE id=?", (scene_id,))[0]
@@ -2467,4 +2474,4 @@ with tab_dashboard:
 
         for s in all_shots:
             icon = "🔵" if s["confirmed"] else f"🟡 {t('محتاجة مراجعة')}"
-            st.write(f"{t('مشهد')} {s['scene_number']} / {t('لقطة')} {s['shot_number']} — {ltr(t(s['shot_size']))} — {icon}")
+            st.write(f"{t('مشهد')} {scene_label(s)} / {t('لقطة')} {s['shot_number']} — {ltr(t(s['shot_size']))} — {icon}")
