@@ -1732,7 +1732,20 @@ with tab_locations:
                         existing_img = image_abs_path(v["reference_image_path"])
                         if existing_img:
                             st.image(existing_img, width=220)
-                    ev_image = st.file_uploader(t("تغيير الصورة المرجعية"), type=IMAGE_TYPES, key=f"variant_image_{v['id']}")
+                    
+                    # Generate or Upload menu
+                    image_action = st.radio(
+                        t("طريقة إضافة الصورة المرجعية"),
+                        [t("رفع من الجهاز"), t("توليد (قريباً)")],
+                        index=0,
+                        key=f"variant_image_action_{v['id']}"
+                    )
+                    
+                    ev_image = None
+                    if image_action == t("رفع من الجهاز"):
+                        ev_image = st.file_uploader(t("اختر صورة مرجعية"), type=IMAGE_TYPES, key=f"variant_image_{v['id']}")
+                    else:
+                        st.info("🔒 ميزة التوليد الذكي للصور قيد التطوير — قريباً ستتمكن من توليد صور بناءً على وصف المشهد")
                     vsave_col, vdel_col = st.columns(2)
                     with vsave_col:
                         save_var = st.form_submit_button(t("💾 حفظ"))
@@ -1848,9 +1861,22 @@ with tab_characters:
                     existing_ch_img = image_abs_path(ch["reference_image_path"])
                     if existing_ch_img:
                         st.image(existing_ch_img, width=220)
-                ech_image = st.file_uploader(
-                    t("تغيير صورة الشخصية المرجعية"), type=IMAGE_TYPES, key=f"character_image_{ch['id']}"
+                
+                # Generate or Upload menu
+                char_image_action = st.radio(
+                    t("طريقة إضافة صورة الشخصية"),
+                    [t("رفع من الجهاز"), t("توليد (قريباً)")],
+                    index=0,
+                    key=f"character_image_action_{ch['id']}"
                 )
+                
+                ech_image = None
+                if char_image_action == t("رفع من الجهاز"):
+                    ech_image = st.file_uploader(
+                        t("اختر صورة مرجعية للشخصية"), type=IMAGE_TYPES, key=f"character_image_{ch['id']}"
+                    )
+                else:
+                    st.info("🔒 ميزة توليد صور الشخصيات الذكية قيد التطوير — ستتمكن قريباً من توليد صور بناءً على الوصف والملابس والمكياج")
                 csave_col, cdel_col = st.columns(2)
                 with csave_col:
                     save_ch = st.form_submit_button(t("💾 حفظ التعديل"))

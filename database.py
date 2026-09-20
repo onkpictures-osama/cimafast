@@ -194,13 +194,38 @@ def init_db():
             day_night TEXT,
             weather TEXT,
             location_variant_id INTEGER REFERENCES location_variants(id),
+            notes TEXT,
+            is_one_shot INTEGER DEFAULT 0,
+            is_fully_storyboarded INTEGER DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS camera_setups (
+            id SERIAL PRIMARY KEY,
+            scene_id INTEGER NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+            setup_number INTEGER NOT NULL,
+            camera_name TEXT,
+            camera_type TEXT,
+            lens TEXT,
             notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS reference_images (
+            id SERIAL PRIMARY KEY,
+            location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+            character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+            image_type TEXT,
+            image_path TEXT,
+            is_generated INTEGER DEFAULT 0,
+            prompt_used TEXT
         );
 
         CREATE TABLE IF NOT EXISTS shots (
             id SERIAL PRIMARY KEY,
             scene_id INTEGER NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+            setup_id INTEGER REFERENCES camera_setups(id) ON DELETE SET NULL,
             shot_number INTEGER NOT NULL,
+            shot_variant TEXT,
+            camera_name TEXT,
             shot_size TEXT,
             camera_movement TEXT,
             camera_angle TEXT,
@@ -322,14 +347,42 @@ def init_db():
             weather TEXT,
             location_variant_id INTEGER,
             notes TEXT,
+            is_one_shot INTEGER DEFAULT 0,
+            is_fully_storyboarded INTEGER DEFAULT 0,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
             FOREIGN KEY (location_variant_id) REFERENCES location_variants(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS camera_setups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scene_id INTEGER NOT NULL,
+            setup_number INTEGER NOT NULL,
+            camera_name TEXT,
+            camera_type TEXT,
+            lens TEXT,
+            notes TEXT,
+            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS reference_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id INTEGER,
+            character_id INTEGER,
+            image_type TEXT,
+            image_path TEXT,
+            is_generated INTEGER DEFAULT 0,
+            prompt_used TEXT,
+            FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE,
+            FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS shots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             scene_id INTEGER NOT NULL,
+            setup_id INTEGER,
             shot_number INTEGER NOT NULL,
+            shot_variant TEXT,
+            camera_name TEXT,
             shot_size TEXT,
             camera_movement TEXT,
             camera_angle TEXT,
@@ -343,7 +396,8 @@ def init_db():
             include_music INTEGER DEFAULT 0,
             confirmed INTEGER DEFAULT 0,
             storyboard_image_path TEXT,
-            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
+            FOREIGN KEY (setup_id) REFERENCES camera_setups(id) ON DELETE SET NULL
         );
 
         CREATE TABLE IF NOT EXISTS shot_characters (
