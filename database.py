@@ -498,6 +498,7 @@ PROJECT_ROLE_OPTIONS = [
     "كاتب سيناريو (Screenwriter)",
     "مدير تصوير (Director of Photography)",
     "مهندس ديكور (Art Director)",
+    "مشرف المؤثرات البصرية (VFX Supervisor)",
     "مونتير (Editor)",
     "مصمم أزياء (Costume Designer)",
     "مسؤول اختيار الممثلين (Casting Director)",

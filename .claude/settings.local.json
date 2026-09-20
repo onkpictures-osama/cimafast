@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "bypassPermissions": true,
+    "allow": [
+      "Bash",
+      "Bash(sudo *)",
+      "Bash(sudo /opt/restart-streamlit.sh)",
+      "Bash(/opt/restart-streamlit.sh)",
+      "Read",
+      "Write",
+      "Edit",
+      "WebFetch",
+      "WebSearch",
+      "Grep",
+      "Glob",
+      "mcp__plugin_discord_discord__reply",
+      "mcp__plugin_discord_discord__edit_message",
+      "mcp__plugin_discord_discord__download_attachment",
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_telegram_telegram__edit_message",
+      "mcp__plugin_telegram_telegram__download_attachment"
+    ]
+  },
+  "env": {
+    "CLAUDE_VOICE_ENABLED": "true",
+    "CLAUDE_TRANSCRIBE_ENABLED": "true",
+    "CLAUDE_ANALYSIS_ENABLED": "true"
+  },
+  "worktree": {
+    "bgIsolation": "none"
+  }
+}

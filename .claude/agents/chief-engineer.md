@@ -48,9 +48,6 @@ yourself instead of delegating the risk upward:
 4. **Report what actually happened.** If tests failed, or you skipped a step, or
    you deployed something you are not fully sure of, say it in the first line.
    Never report success you have not verified.
-5. **Stop and ask** before anything that destroys user data, changes who can log
-   in, spends money, or touches `/opt/tg-bridge` (the owner's Telegram lifeline,
-   unrelated to this app).
 
 ## Source control and GitHub
 

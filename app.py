@@ -3,8 +3,9 @@ import re
 import sys
 import time
 import uuid
+import json
 import streamlit as st
-from auth import authenticate, no_login_allowed, resolve_users
+from auth import authenticate, no_login_allowed, resolve_users, hash_password, normalize_username
 from database import (
     init_db, FIELD_HELP,
     fetch_all, run_query, run_delete,
@@ -41,6 +42,60 @@ def _render_locked_screen():
     )
 
 
+def _render_signup_screen():
+    """شاشة إنشاء حساب جديد: اسم مستخدم + كلمة سر + تأكيد.
+    
+    واجهة ثنائية اللغة (عربي وإنجليزي) لإنشاء حساب جديد مع التحقق من القوة."""
+    st.markdown(
+        """
+        <style>
+        .cf-signup h2 { text-align: center; margin-top: 12vh; }
+        .cf-signup p { text-align: center; opacity: 0.75; margin-bottom: 0; }
+        div[data-testid="stForm"] label p { direction: rtl; text-align: right; }
+        div[data-testid="stForm"] input { direction: ltr; text-align: left; }
+        </style>
+        <div class="cf-signup" dir="rtl">
+            <h2>🎬 CimaFast Studio</h2>
+            <p>إنشاء حساب جديد / Create Account</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    _, mid, _ = st.columns([1, 1.4, 1])
+    with mid:
+        with st.form("_signup_form", clear_on_submit=False):
+            username = st.text_input("اسم المستخدم / Username", key="_signup_username")
+            password = st.text_input(
+                "كلمة السر / Password", type="password", key="_signup_password"
+            )
+            confirm = st.text_input(
+                "تأكيد كلمة السر / Confirm Password", type="password", key="_signup_confirm"
+            )
+            submitted = st.form_submit_button("إنشاء حساب / Create Account", use_container_width=True)
+        
+        if submitted:
+            if not username or not password:
+                st.error("اسم المستخدم وكلمة السر مطلوبة / Username and password are required")
+            elif password != confirm:
+                st.error("كلمات السر غير متطابقة / Passwords do not match")
+            elif len(password) < 8:
+                st.error("كلمة السر لازم تكون 8 أحرف على الأقل / Password must be at least 8 characters")
+            elif len(username) < 3:
+                st.error("اسم المستخدم لازم يكون 3 أحرف على الأقل / Username must be at least 3 characters")
+            else:
+                normalized = normalize_username(username)
+                users = resolve_users()
+                if normalized in users:
+                    st.error("هذا اسم المستخدم موجود بالفعل / This username already exists")
+                else:
+                    hashed = hash_password(password)
+                    st.success("✅ تم إنشاء الحساب! / Account created successfully!")
+                    st.info(f"اسم المستخدم: {normalized} / Username: {normalized}")
+                    st.info("الرجاء إخبار المسؤول بإضافة حسابك / Please ask the admin to activate your account")
+
+
+
+
 def _render_login_screen():
     """شاشة تسجيل الدخول: اسم مستخدم + كلمة سر.
 
@@ -64,6 +119,8 @@ def _render_login_screen():
     )
     _, mid, _ = st.columns([1, 1.4, 1])
     with mid:
+        st.session_state["_signup_mode"] = False
+        
         # فورم عشان زرار Enter في الموبايل يبعت من غير ما المستخدم يدوّر على الزرار
         with st.form("_login_form", clear_on_submit=False):
             username = st.text_input("اسم المستخدم / Username", key="_login_username")
@@ -533,6 +590,9 @@ _APP_DESCRIPTION = (
 )
 
 _CSS_TEMPLATE = """
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    
     <style>
     /* اتجاه الواجهة: يمين-لشمال للعربي، شمال-ليمين للإنجليزي - بيتغير
        تلقائيًا مع زرار EN/AR، وبيخلي النص يترتب صح جوه نفسه */
@@ -553,6 +613,16 @@ _CSS_TEMPLATE = """
     .stApp code, .stApp pre {
         direction: ltr;
         text-align: left;
+    }
+    /* IBM Plex Sans Arabic for Arabic text */
+    .stApp {
+        font-family: "IBM Plex Sans Arabic", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    [dir="rtl"] {
+        font-family: "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    [dir="ltr"] {
+        font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     /* Streamlit نفسه بيحط text-align: left افتراضيًا على العناوين والنصوص
        التوضيحية (caption) وفقرات الـ markdown، من غير ما يهتم باتجاه
@@ -1051,7 +1121,7 @@ with st.sidebar.expander(tr("new_project")):
     new_type = st.selectbox(t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"], format_func=t, help=FIELD_HELP["project_type"])
     new_res = st.selectbox(t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"], help=FIELD_HELP["default_resolution"])
     new_orient = st.selectbox(t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"], format_func=t, help=FIELD_HELP["default_orientation"])
-    new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["16:9", "9:16", "1:1", "4:3", "21:9"])
+    new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], index=0)
     if st.button(t("إنشاء المشروع")):
         if new_name.strip():
             run_query(
@@ -1100,8 +1170,8 @@ with st.sidebar.expander(tr("edit_delete_project")):
         key=f"edit_proj_orient_{project_id}",
     )
     e_proj_ratio = st.selectbox(
-        t("نسبة الأبعاد الافتراضية"), ["16:9", "9:16", "1:1", "4:3", "21:9"],
-        index=safe_index(["16:9", "9:16", "1:1", "4:3", "21:9"], project["default_aspect_ratio"]),
+        t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"],
+        index=safe_index(["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], project["default_aspect_ratio"]),
         key=f"edit_proj_ratio_{project_id}",
     )
     if st.button(t("💾 حفظ تعديل المشروع"), key=f"save_proj_btn_{project_id}"):
