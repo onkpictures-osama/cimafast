@@ -22,7 +22,7 @@ import auth  # noqa: E402
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP = os.path.join(ROOT, "app.py")
-PASSWORD = "selim2015"
+PASSWORD = "correct-horse-battery"
 CHECKS = []
 
 
@@ -33,7 +33,7 @@ def check(fn):
 
 def _with_users():
     os.environ[auth.USERS_ENV] = json.dumps(
-        {"osama": auth.hash_password(PASSWORD, iterations=1000)}
+        {"testuser": auth.hash_password(PASSWORD, iterations=1000)}
     )
 
 
@@ -79,7 +79,7 @@ def test_login_screen_blocks_the_app():
 @check
 def test_wrong_password_is_rejected():
     _with_users()
-    at = _login(_fresh_app(), "osama", "wrong")
+    at = _login(_fresh_app(), "testuser", "wrong")
     assert at.error, "no error shown for a wrong password"
     assert _widget(at, "text_input", "_login_username") is not None, "still on login screen"
 
@@ -95,10 +95,10 @@ def test_wrong_username_is_rejected():
 @check
 def test_correct_credentials_open_the_app():
     _with_users()
-    at = _login(_fresh_app(), "osama", PASSWORD)
+    at = _login(_fresh_app(), "testuser", PASSWORD)
     assert not at.exception, at.exception
     assert at.session_state["_authenticated"] is True
-    assert at.session_state["_auth_user"] == "osama"
+    assert at.session_state["_auth_user"] == "testuser"
     # شاشة الدخول اختفت والشريط الجانبي بتاع البرنامج ظهر
     assert _widget(at, "text_input", "_login_username") is None
     assert _widget(at, "button", "logout_btn", in_sidebar=True) is not None
@@ -107,14 +107,14 @@ def test_correct_credentials_open_the_app():
 @check
 def test_username_is_case_insensitive():
     _with_users()
-    at = _login(_fresh_app(), " Osama ", PASSWORD)
-    assert at.session_state.get("_auth_user") == "osama"
+    at = _login(_fresh_app(), " Testuser ", PASSWORD)
+    assert at.session_state.get("_auth_user") == "testuser"
 
 
 @check
 def test_logout_returns_to_login():
     _with_users()
-    at = _login(_fresh_app(), "osama", PASSWORD)
+    at = _login(_fresh_app(), "testuser", PASSWORD)
     _widget(at, "button", "logout_btn", in_sidebar=True).click().run()
     assert not at.exception, at.exception
     assert not at.session_state.get("_authenticated")
@@ -123,10 +123,17 @@ def test_logout_returns_to_login():
 
 @check
 def test_no_accounts_locks_the_app():
+    # بنستبدل resolve_users مؤقتًا بدل ما نعتمد على ملف الأسرار الحقيقي على
+    # الجهاز — الاختبار لازم يدي نفس النتيجة على أي سيرفر.
     os.environ.pop(auth.USERS_ENV, None)
-    at = _fresh_app()
-    assert not at.text_input, "login form shown although no accounts exist"
-    assert "الدخول مقفول" in _body_text(at)
+    original = auth.resolve_users
+    auth.resolve_users = lambda: {}
+    try:
+        at = _fresh_app()
+        assert not at.text_input, "login form shown although no accounts exist"
+        assert "الدخول مقفول" in _body_text(at)
+    finally:
+        auth.resolve_users = original
 
 
 def main():

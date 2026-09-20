@@ -21,11 +21,11 @@ def check(fn):
 
 @check
 def test_hash_roundtrip():
-    stored = auth.hash_password("selim2015")
-    assert auth.verify_password("selim2015", stored)
-    assert not auth.verify_password("selim2014", stored)
+    stored = auth.hash_password("correct-horse-battery")
+    assert auth.verify_password("correct-horse-battery", stored)
+    assert not auth.verify_password("correct-horse-batteru", stored)
     assert not auth.verify_password("", stored)
-    assert not auth.verify_password("SELIM2015", stored)
+    assert not auth.verify_password("CORRECT-HORSE-BATTERY", stored)
 
 
 @check
@@ -62,25 +62,25 @@ def test_unicode_password():
 
 @check
 def test_authenticate():
-    users = {"osama": auth.hash_password("selim2015")}
-    assert auth.authenticate("osama", "selim2015", users) == "osama"
+    users = {"testuser": auth.hash_password("correct-horse-battery")}
+    assert auth.authenticate("testuser", "correct-horse-battery", users) == "testuser"
     # الاسم مش حساس لحالة الحروف ولا للمسافات
-    assert auth.authenticate("  OSAMA ", "selim2015", users) == "osama"
-    assert auth.authenticate("osama", "wrong", users) is None
-    assert auth.authenticate("nobody", "selim2015", users) is None
+    assert auth.authenticate("  TESTUSER ", "correct-horse-battery", users) == "testuser"
+    assert auth.authenticate("testuser", "wrong", users) is None
+    assert auth.authenticate("nobody", "correct-horse-battery", users) is None
     assert auth.authenticate("", "", users) is None
-    assert auth.authenticate("osama", "selim2015", {}) is None
+    assert auth.authenticate("testuser", "correct-horse-battery", {}) is None
     assert auth.authenticate(None, None, users) is None
 
 
 @check
 def test_users_from_env():
-    stored = auth.hash_password("selim2015")
-    os.environ[auth.USERS_ENV] = json.dumps({"Osama": stored})
+    stored = auth.hash_password("correct-horse-battery")
+    os.environ[auth.USERS_ENV] = json.dumps({"Testuser": stored})
     try:
         users = auth.resolve_users()
-        assert users == {"osama": stored}, users
-        assert auth.authenticate("osama", "selim2015", users) == "osama"
+        assert users == {"testuser": stored}, users
+        assert auth.authenticate("testuser", "correct-horse-battery", users) == "testuser"
     finally:
         os.environ.pop(auth.USERS_ENV, None)
 
