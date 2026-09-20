@@ -25,6 +25,7 @@ from script_parser import (
     extract_lines, parse_json_script,
     parse_script, find_similar_name_groups, apply_character_merges,
     find_similar_location_groups, apply_location_merges,
+    find_location_matches_with_states,
 )
 from importer import import_parsed_scenes
 import theme
@@ -1367,6 +1368,25 @@ with tab_import:
                             merge_map[name] = canonical
 
         location_merge_map = {}
+
+        # كشف ذكي للأماكن مع الحالات الدرامية
+        smart_location_matches = find_location_matches_with_states(preview_scenes)
+        if smart_location_matches:
+            st.markdown("---")
+            st.markdown(f"**🎭 {t('كشف ذكي للحالات الدرامية')}**")
+            st.caption(t(
+                "البرنامج كشف أماكن تغيّرت بسبب الزمن أو أحداث درامية (حريق، تدمير، إلخ). "
+                "يمكن ربطها تلقائياً كحالات لنفس المكان."
+            ))
+            for match in smart_location_matches:
+                if match['state_changes']:
+                    with st.expander(f"📍 {match['location']} - {', '.join(match['state_changes'])}"):
+                        st.write(f"**الحالات المكتشفة:** {', '.join(match['state_changes'])}")
+                        if match['suggested_variant']:
+                            st.write(f"**الاسم المقترح للحالة:** {match['suggested_variant']}")
+                        if match['matching_locations']:
+                            st.write(f"**ربط مقترح:** {match['matching_locations'][0]['existing_location']['name']}")
+
         similar_location_groups = find_similar_location_groups(preview_scenes)
         if similar_location_groups:
             st.markdown("---")

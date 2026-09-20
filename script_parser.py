@@ -15,6 +15,12 @@
 import re
 import json
 from io import BytesIO
+from location_matcher import (
+    extract_base_location,
+    detect_state_change,
+    find_matching_locations,
+    suggest_variant_name
+)
 
 try:
     import docx
@@ -748,6 +754,44 @@ def find_similar_location_groups(scenes):
         if loc and loc not in all_names:
             all_names.append(loc)
     return _find_similar_groups(all_names)
+
+
+
+
+def find_location_matches_with_states(scenes, project_locations=None):
+    """
+    يجد تطابقات الأماكن مع كشف الحالات الدرامية
+    يرجع: [(similar_locations, state_changes, suggested_variant)]
+    """
+    all_locations = []
+    for sc in scenes:
+        loc = sc.get('location_name')
+        if loc and loc not in all_locations:
+            all_locations.append({'name': loc, 'scene_id': sc.get('id')})
+    
+    if not project_locations:
+        project_locations = []
+    
+    matches = []
+    for new_loc in all_locations:
+        # كشف التغيرات الدرامية
+        state_changes = detect_state_change(new_loc['name'])
+        
+        # البحث عن تطابقات
+        matching = find_matching_locations(new_loc, project_locations, threshold=0.75)
+        
+        if matching or state_changes:
+            matches.append({
+                'location': new_loc['name'],
+                'state_changes': state_changes,
+                'matching_locations': matching,
+                'suggested_variant': suggest_variant_name(
+                    extract_base_location(new_loc['name']),
+                    state_changes
+                )
+            })
+    
+    return matches
 
 
 def apply_location_merges(scenes, merge_map):
