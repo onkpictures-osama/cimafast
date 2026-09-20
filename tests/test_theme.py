@@ -180,6 +180,57 @@ def test_opaque_tier_never_declares_blur():
 
 
 @test
+def test_only_registered_surfaces_declare_blur():
+    """كل سيليكتور بيعلن ‎backdrop-filter‎ لازم يكون مسجّل في
+    ‎glass.blur_surfaces()‎.
+
+    ليه ده مهم: حارس التداخل بيتبني من نفس القايمة دي. لو حد ضاف بلور على
+    عنصر مش مسجّل، الحارس مش هيشوفه والعمق ممكن يعدّي الاتنين من غير ما
+    حد يلاحظ — الاختبار ده بيمنع الحالة دي قبل ما توصل للمتصفح.
+    """
+    css = "\n".join([glass.base_css(), glass.login_css(), glass.main_css("rtl")])
+    allowed = set(glass.blur_surfaces())
+    offenders = []
+    for selector, body in _css_blocks(css):
+        if "backdrop-filter" not in body:
+            continue
+        # القواعد اللي بتطفي البلور مش محتاجة تسجيل
+        values = [
+            line.split(":", 1)[1]
+            for line in body.split(";")
+            if "backdrop-filter" in line and ":" in line
+        ]
+        if all("none" in v for v in values):
+            continue
+        for part in selector.split(","):
+            part = part.strip()
+            if part.startswith(".stApp "):
+                part = part[len(".stApp "):].strip()
+            if part and part not in allowed:
+                offenders.append(part)
+    assert not offenders, "بلور على أسطح مش مسجّلة: " + ", ".join(sorted(set(offenders)))
+
+
+@test
+def test_blur_guard_caps_nesting_at_two():
+    """الحارس نفسه لازم يكون موجود ويغطي كل الأسطح المسجّلة.
+
+    ده الجزء اللي بيخلي الحد الأقصى مثبت بنيويًا: أي عنصر فوقه سطحين
+    بلور بيتقفل عليه البلور، فالعمق محصور في ٢ مهما اتداخل الـ DOM.
+    """
+    css = glass.base_css()
+    surfaces = glass.blur_surfaces()
+    guard = None
+    for selector, body in _css_blocks(css):
+        if selector.count(":is(") == 3 and "backdrop-filter" in body and "none" in body:
+            guard = selector
+            break
+    assert guard, "قاعدة حارس التداخل (ثلاث مستويات) مش موجودة"
+    for sel in surfaces:
+        assert sel in guard, f"سطح مسجّل مش داخل الحارس: {sel}"
+
+
+@test
 def test_glass_css_is_empty_without_flag():
     """الشكل الافتراضي لازم يفضل نضيف: مفيش CSS زجاج بيتحقن من غير الفلاج."""
     from theme import inject  # noqa: PLC0415
@@ -216,8 +267,23 @@ def test_no_google_font_cdn_anywhere():
         assert "fonts.gstatic.com" not in css, name
 
 
+def _strip_comments(css):
+    """شيل تعليقات ‎/* … */‎ — التعليقات بتلزق في نص السيليكتور وقت التقسيم."""
+    out = []
+    i = 0
+    while i < len(css):
+        if css[i:i + 2] == "/*":
+            end = css.find("*/", i + 2)
+            i = len(css) if end == -1 else end + 2
+            continue
+        out.append(css[i])
+        i += 1
+    return "".join(out)
+
+
 def _css_blocks(css):
     """تقسيم بسيط لبلوكات ‎selector { body }‎ — كفاية للتأكيدات البنيوية."""
+    css = _strip_comments(css)
     out = []
     depth = 0
     buf = []
