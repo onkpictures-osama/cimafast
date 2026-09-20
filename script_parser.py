@@ -135,13 +135,48 @@ def _new_scene(number, default_int_ext=None, default_day_night=None):
     }
 
 
+def _extract_props_from_text(text, speaker_roster):
+    props_lexicon = {
+        'جهاز': 'جهاز', 'موبايل': 'موبايل', 'هاتف': 'هاتف', 'كتاب': 'كتاب',
+        'سيجارة': 'سيجارة', 'فنجان': 'فنجان', 'كوب': 'كوب', 'سلاح': 'سلاح',
+        'مسدس': 'مسدس', 'سكين': 'سكين', 'سيف': 'سيف', 'مفتاح': 'مفتاح',
+    }
+    found_props = []
+    for prop_key, prop_name in props_lexicon.items():
+        if re.search(r'\b' + re.escape(prop_key) + r'\b', text):
+            if prop_name not in found_props:
+                found_props.append(prop_name)
+    return found_props
+
+
+def _detect_silent_characters(notes_text, speaker_roster):
+    silent = []
+    for speaker in speaker_roster:
+        arabic_pattern = r'(?:^|[\s([\-–—]|[؀-ۿ])' + re.escape(speaker) + r'(?:[\s,،..\-–—)\]]|$)'
+        if re.search(arabic_pattern, notes_text, re.MULTILINE):
+            if speaker not in silent:
+                silent.append(speaker)
+    return silent
+
+
 def _finalize_scene(scene):
     seen = []
     for name in scene['characters']:
         if name not in seen:
             seen.append(name)
     scene['characters'] = seen
-    scene['notes'] = '\n'.join(scene['body_lines'])
+
+    notes_text = '\n'.join(scene['body_lines'])
+    scene['notes'] = notes_text
+
+    silent_chars = _detect_silent_characters(notes_text, seen)
+    if silent_chars:
+        for char in silent_chars:
+            if char not in scene['characters']:
+                scene['characters'].append(char)
+
+    scene['props'] = _extract_props_from_text(notes_text, seen)
+
     del scene['body_lines']
     return scene
 

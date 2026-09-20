@@ -1433,6 +1433,10 @@ with tab_import:
                 else:
                     kept_characters_by_scene[idx] = []
                     st.caption(t("مفيش شخصيات اتكشفت في المشهد ده"))
+                if sc.get("props"):
+                    st.caption(f"🎬 {t('الإكسسوارات')}: {', '.join(sc['props'])}")
+                else:
+                    st.caption(t("🎬 مفيش إكسسوارات نشطة"))
                 st.text(sc["notes"] if sc["notes"] else "—")
 
         # نسخة معاينة من غير ما نلمس بيانات الجلسة الأصلية، عشان لو المستخدم شال
@@ -1523,6 +1527,63 @@ with tab_import:
                     skipped = "، ".join(str(n) for n in summary["scenes_skipped"])
                     msg += f" {t('تم تخطي مشاهد أرقام')} ({skipped}) {t('لأنها موجودة بالفعل.')}"
                 st.success(msg)
+
+                st.markdown("---")
+                st.markdown(f"## 📊 {t('تحليل السيناريو')}")
+                tabs = st.tabs([t("📝 المشاهد"), t("👥 الشخصيات"), t("🏠 الأماكن"), t("🎬 الإكسسوارات"), t("📑 JSON")])
+
+                with tabs[0]:
+                    for sc in preview_scenes:
+                        st.subheader(f"{t('مشهد')} {sc['scene_number']}")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.caption(f"**{t('النوع')}**: {fmt_int_ext(sc.get('int_ext', 'غير محدد'))}")
+                        with col2:
+                            st.caption(f"**{t('الوقت')}**: {fmt_day_night(sc.get('day_night', 'غير محدد'))}")
+                        with col3:
+                            st.caption(f"**{t('المكان')}**: {sc.get('location_name', t('مكان غير محدد'))}")
+                        if sc.get('characters'):
+                            st.caption(f"**{t('الشخصيات')}**: {', '.join(sc['characters'])}")
+                        if sc.get('props'):
+                            st.caption(f"**🎬 {t('الإكسسوارات')}**: {', '.join(sc['props'])}")
+
+                with tabs[1]:
+                    all_chars = set()
+                    for sc in preview_scenes:
+                        all_chars.update(sc.get('characters', []))
+                    st.write(f"**{t('إجمالي الشخصيات')}**: {len(all_chars)}")
+                    for char in sorted(all_chars):
+                        appearances = sum(1 for sc in preview_scenes if char in sc.get('characters', []))
+                        st.caption(f"{char} ({appearances} {t('مشاهد')})")
+
+                with tabs[2]:
+                    all_locs = set()
+                    for sc in preview_scenes:
+                        if sc.get('location_name'):
+                            all_locs.add(sc['location_name'])
+                    st.write(f"**{t('إجمالي الأماكن')}**: {len(all_locs)}")
+                    for loc in sorted(all_locs):
+                        st.caption(loc)
+
+                with tabs[3]:
+                    all_props = set()
+                    for sc in preview_scenes:
+                        all_props.update(sc.get('props', []))
+                    st.write(f"**{t('إجمالي الإكسسوارات')}**: {len(all_props)}")
+                    for prop in sorted(all_props):
+                        st.caption(prop)
+
+                with tabs[4]:
+                    import json
+                    json_output = json.dumps({'scenes': preview_scenes}, ensure_ascii=False, indent=2)
+                    st.code(json_output, language="json")
+                    st.download_button(
+                        label=t("📥 تحميل JSON"),
+                        data=json_output,
+                        file_name="analysis.json",
+                        mime="application/json"
+                    )
+
                 del st.session_state["parsed_script"]
                 st.rerun()
         with col_b:
