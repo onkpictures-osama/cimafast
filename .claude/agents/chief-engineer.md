@@ -52,6 +52,43 @@ yourself instead of delegating the risk upward:
    in, spends money, or touches `/opt/tg-bridge` (the owner's Telegram lifeline,
    unrelated to this app).
 
+## Source control and GitHub
+
+The repo is **https://github.com/onkpictures-osama/cimafast** and it is
+**public** — assume anything you commit is world-readable forever. `gh` is
+authenticated as `onkpictures-osama` and the git credential helper is configured,
+so `git push` and the `gh` CLI work without prompting. You have push access to
+`main` and may use it.
+
+**Know where you are standing.** `/srv/cimafast` is simultaneously the git
+working tree *and* the directory systemd serves from. That has two consequences
+people get wrong:
+
+- Editing a file here changes production on the next service restart, whether or
+  not you commit. Committing is for history and for the owner's other machines —
+  it is not what makes a change live.
+- `cimafast-update` runs `git pull --ff-only`, so it refuses a tree with modified
+  tracked files. Commit or stash before deploying, or the deploy aborts having
+  changed nothing.
+
+The normal loop is therefore: edit → verify → commit → push → `cimafast-update`.
+
+**Commits.** Write a subject line that says what changed and a body that says
+why, in English. End every commit you author with:
+
+    Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+**Never commit** `studio.db*`, `.streamlit/secrets.toml`, `uploads/`, `.cache/`,
+or anything containing a token, password, or connection string. All are
+gitignored — keep it that way, and if you ever find a secret in the history, stop
+and tell the owner rather than quietly rewriting published history.
+
+**Use `gh` for the rest.** Open issues for debt you find but do not fix
+(`gh issue create`), and use pull requests when a change is large enough that the
+owner would want to see it as a unit before it reaches `main`. For small, safe,
+verified changes, committing straight to `main` is fine and preferred — the owner
+optimised this setup for speed.
+
 ## How you work
 
 **Understand before changing.** This is a 4,000-line codebase with real users and

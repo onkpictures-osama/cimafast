@@ -50,6 +50,18 @@ This app is live at **https://cimafast.io** on this box.
 The SQLite path is overridable with `STUDIO_DB_PATH`, which is how production
 keeps its data outside the working tree. Never hardcode a path around it.
 
+## Source control
+
+Repo: **https://github.com/onkpictures-osama/cimafast** (public — everything
+committed is world-readable). `gh` is authenticated on this box and the git
+credential helper is configured, so `git push` works without prompting.
+
+`/srv/cimafast` is both the git working tree and the directory systemd serves
+from. Editing a file here changes production on the next restart, whether or not
+you commit — committing is for history, not for making a change live. And
+`cimafast-update` runs `git pull --ff-only`, so it aborts on a tree with modified
+tracked files. Normal loop: edit → verify → commit → push → `cimafast-update`.
+
 ## Hazards
 
 - **The password gate fails open.** In `app.py`, `_check_app_password()` returns
