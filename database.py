@@ -13,7 +13,9 @@ import os
 import re
 import sqlite3
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "studio.db")
+DB_PATH = os.environ.get("STUDIO_DB_PATH") or os.path.join(
+    os.path.dirname(__file__), "studio.db"
+)
 
 
 def _get_database_url():

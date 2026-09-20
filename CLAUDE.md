@@ -1,0 +1,69 @@
+# CimaFast Studio
+
+Arabic-first (RTL) film/TV pre-production manager built on Streamlit. Users are
+Egyptian film crew, not developers: the UI language is Arabic, English is a
+secondary toggle.
+
+## Stack
+
+| Layer | Choice |
+|---|---|
+| UI | Streamlit 1.64 (`app.py`, ~2.3k lines) |
+| Runtime | Python 3.14, venv at `/srv/cimafast/venv` |
+| Data | `database.py` — SQLite locally, Postgres/Supabase when `DATABASE_URL` is set |
+| Export | `export.py` — Excel / Word / PDF with Arabic reshaping + bidi |
+| Parsing | `script_parser.py` — screenplay parsing, fuzzy duplicate-name merging |
+
+`database.py` translates dialect differences (`?` placeholders, `RETURNING id`,
+`INSERT OR IGNORE` → `ON CONFLICT`) so nothing else in the app knows which
+backend it is on. **Keep that abstraction** — do not write backend-specific SQL
+in `app.py`, `export.py`, or `importer.py`.
+
+Core tables: `projects`, `locations`, `location_variants`, `characters`,
+`character_looks`, `scenes`, `shots`, `props`, and the `scene_*` / `shot_*` join
+tables.
+
+## Language and UI conventions
+
+- **Code comments are in Egyptian Arabic.** Match the surrounding style; do not
+  convert existing comments to English.
+- Translation is a direct dictionary in `app.py` where **the Arabic string is the
+  key** and the value is its English translation (`tr()` / `t()`). Adding a new
+  UI string means adding its Arabic key and English value together.
+- Layout direction flips with the language (`_dir`, `_text_align`). Anything new
+  that is visually positioned must work in RTL first.
+
+## Production
+
+This app is live at **https://cimafast.io** on this box.
+
+| | |
+|---|---|
+| Served from | `/srv/cimafast` (this directory) |
+| Service | `cimafast.service` → Streamlit on `127.0.0.1:8501` |
+| Proxy | Caddy, auto-HTTPS via Let's Encrypt, config `/etc/caddy/Caddyfile` |
+| Live data | `/var/lib/cimafast/studio.db` — **outside this tree, never in git** |
+| Secret | `/etc/cimafast/secrets.toml` (`APP_PASSWORD`), symlinked to `.streamlit/secrets.toml` |
+| Deploy | `cimafast-update` (pull, deps, restart, health-check, auto-rollback) |
+| Logs | `journalctl -u cimafast -f` |
+
+The SQLite path is overridable with `STUDIO_DB_PATH`, which is how production
+keeps its data outside the working tree. Never hardcode a path around it.
+
+## Hazards
+
+- **The password gate fails open.** In `app.py`, `_check_app_password()` returns
+  `True` when `APP_PASSWORD` is unset, so a missing or misnamed secret silently
+  makes the whole app public rather than locking it. Any change near secrets
+  loading must preserve, and ideally fix, this.
+- **Never commit** `studio.db*`, `.streamlit/secrets.toml`, or `uploads/` — all
+  gitignored. The live DB is real user work.
+- Cert renewal uses the HTTP-01 challenge, so **port 80 must stay open**.
+- Restarting `cimafast.service` drops every active Streamlit session; users lose
+  unsaved form state. Prefer deploying when idle.
+
+## Unrelated services on this box
+
+`/opt/tg-bridge` (`tg-receiver`, `tg-worker`, `tg-watchdog.timer`) is the Telegram
+bridge and has nothing to do with this app. Do not restart or reconfigure it as
+part of CimaFast work.
