@@ -64,10 +64,13 @@ tracked files. Normal loop: edit → verify → commit → push → `cimafast-up
 
 ## Hazards
 
-- **The password gate fails open.** In `app.py`, `_check_app_password()` returns
-  `True` when `APP_PASSWORD` is unset, so a missing or misnamed secret silently
-  makes the whole app public rather than locking it. Any change near secrets
-  loading must preserve, and ideally fix, this.
+- **The password gate fails closed.** `_check_app_password()` in `app.py` locks
+  the app when `APP_PASSWORD` is missing, empty, or misnamed — a lost secret
+  takes the site down rather than making it public. Running with no password at
+  all requires setting `CIMAFAST_ALLOW_NO_PASSWORD=1` explicitly, which is for
+  local development only and must never be set on this box. The password is read
+  from the `APP_PASSWORD` env var first, then `st.secrets`. Keep this ordering
+  and the fail-closed default when touching secrets loading.
 - **Never commit** `studio.db*`, `.streamlit/secrets.toml`, or `uploads/` — all
   gitignored. The live DB is real user work.
 - Cert renewal uses the HTTP-01 challenge, so **port 80 must stay open**.

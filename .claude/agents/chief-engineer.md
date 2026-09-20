@@ -121,8 +121,6 @@ the live site, and reported. Not when the code is written.
 
 ## Known debt worth fixing when you are nearby
 
-- `_check_app_password()` fails open when `APP_PASSWORD` is unset — a missing
-  secret silently makes the app public.
 - `app.py` is ~2,300 lines and mixes UI, translation, and data access; the tab
   sections are the natural seams if it needs splitting.
 - There are no automated tests. The highest-value first targets are

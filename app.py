@@ -1,5 +1,7 @@
+import hmac
 import os
 import re
+import sys
 import uuid
 import streamlit as st
 from database import (
@@ -22,10 +24,64 @@ from export import (
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
 
+def _resolve_app_password():
+    """بيجيب كلمة سر الدخول من متغيرات البيئة الأول (مفيد وقت التطوير المحلي)
+    وبعدين من st.secrets. لو ملف secrets.toml ناقص خالص، st.secrets بيرمي
+    استثناء، فبنمسكه هنا ونرجّع None بدل ما البرنامج يقع."""
+    password = os.environ.get("APP_PASSWORD")
+    if not password:
+        try:
+            password = st.secrets.get("APP_PASSWORD")
+        except Exception:
+            password = None
+    password = (password or "").strip()
+    return password or None
+
+
+def _no_password_allowed():
+    """الفتح من غير كلمة سر لازم يتطلب صراحةً بـ CIMAFAST_ALLOW_NO_PASSWORD=1.
+    السيرفر المنشور عمره ما هيبقى المتغير ده متظبط عنده، فلو السر ضاع لأي سبب
+    البرنامج بيتقفل بدل ما يفتح للناس من غير ما حد ياخد باله."""
+    return os.environ.get("CIMAFAST_ALLOW_NO_PASSWORD", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _render_locked_screen():
+    """شاشة القفل لما كلمة السر مش متظبطة — بنقفل الباب ونقول للمسؤول السبب."""
+    st.markdown(
+        "<h2 style='text-align:center; margin-top:15vh;'>🎬 CimaFast Studio</h2>"
+        "<p dir='auto' style='text-align:center; font-size:1.1rem;'>"
+        "🔒 الدخول مقفول: كلمة السر مش متظبطة على السيرفر."
+        "<br>Access locked: APP_PASSWORD is not configured.</p>"
+        "<p dir='auto' style='text-align:center; opacity:0.7;'>"
+        "المسؤول لازم يظبط APP_PASSWORD وبعدين يعيد تشغيل الخدمة."
+        "<br>An administrator must set APP_PASSWORD and restart the service.</p>",
+        unsafe_allow_html=True,
+    )
+
+
 def _check_app_password():
-    app_password = st.secrets.get("APP_PASSWORD") if hasattr(st, "secrets") else None
+    app_password = _resolve_app_password()
     if not app_password:
-        return True
+        # مفيش كلمة سر: بنقفل افتراضيًا (fail closed). الاستثناء الوحيد هو
+        # التطوير المحلي لما المطور يطلب كده صراحةً بالمتغير ده.
+        if _no_password_allowed():
+            st.warning(
+                "⚠️ البرنامج شغال من غير كلمة سر (وضع التطوير المحلي) — "
+                "متستخدمش الإعداد ده على سيرفر منشور.\n\n"
+                "Running without a password (local development mode) — "
+                "do not use this on a deployed server."
+            )
+            return True
+        print(
+            "[auth] APP_PASSWORD is not set — locking the app. "
+            "Set APP_PASSWORD, or CIMAFAST_ALLOW_NO_PASSWORD=1 for local dev.",
+            file=sys.stderr,
+            flush=True,
+        )
+        _render_locked_screen()
+        return False
     if st.session_state.get("_authenticated"):
         return True
     st.markdown(
@@ -36,7 +92,11 @@ def _check_app_password():
     with col2:
         entered = st.text_input("كلمة السر / Password", type="password", key="_password_input")
         if st.button("دخول / Enter", use_container_width=True):
-            if entered == app_password:
+            # بنقارن بالبايتس عشان hmac.compare_digest بيرفض النصوص اللي
+            # فيها حروف غير إنجليزية (يعني كلمة سر بالعربي كانت هتعمل خطأ)
+            if hmac.compare_digest(
+                (entered or "").encode("utf-8"), app_password.encode("utf-8")
+            ):
                 st.session_state["_authenticated"] = True
                 st.rerun()
             else:
