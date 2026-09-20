@@ -113,6 +113,66 @@ def test_no_login_flag():
     os.environ.pop(auth.ALLOW_NO_LOGIN_ENV, None)
 
 
+@check
+def test_session_token_roundtrip():
+    users = {"testuser": auth.hash_password("x")}
+    token = auth.make_session_token("TestUser", secret="s3cret")
+    assert token is not None
+    assert auth.verify_session_token(token, users, secret="s3cret") == "testuser"
+
+
+@check
+def test_session_token_without_secret_is_none():
+    # secret=None يعني "استعمل السر المظبوط" — ودلوقتي فيه سر فعلي في
+    # secrets.toml، فلازم نعطّل مصدر السر نفسه عشان نختبر الحالة الصح.
+    original = auth._session_secret
+    auth._session_secret = lambda: None
+    try:
+        assert auth.make_session_token("testuser", secret=None) is None
+        assert auth.verify_session_token("anything.123.abc", {"testuser": "h"}, secret=None) is None
+    finally:
+        auth._session_secret = original
+
+
+@check
+def test_session_token_wrong_secret_rejected():
+    token = auth.make_session_token("testuser", secret="s3cret")
+    users = {"testuser": auth.hash_password("x")}
+    assert auth.verify_session_token(token, users, secret="wrong") is None
+
+
+@check
+def test_session_token_tampering_rejected():
+    token = auth.make_session_token("testuser", secret="s3cret")
+    users = {"testuser": auth.hash_password("x")}
+    name, expiry, sig = token.split(".")
+    tampered = f"someoneelse.{expiry}.{sig}"
+    assert auth.verify_session_token(tampered, users, secret="s3cret") is None
+
+
+@check
+def test_session_token_expired_rejected():
+    import time
+    users = {"testuser": auth.hash_password("x")}
+    payload = f"testuser.{int(time.time()) - 10}"
+    sig = auth.hmac.new(b"s3cret", payload.encode("utf-8"), auth.hashlib.sha256).hexdigest()
+    expired_token = f"{payload}.{sig}"
+    assert auth.verify_session_token(expired_token, users, secret="s3cret") is None
+
+
+@check
+def test_session_token_deleted_user_rejected():
+    token = auth.make_session_token("testuser", secret="s3cret")
+    assert auth.verify_session_token(token, {}, secret="s3cret") is None
+
+
+@check
+def test_session_token_malformed_rejected():
+    users = {"testuser": auth.hash_password("x")}
+    for bad in ("", "a.b", "a.b.c.d", None, 123):
+        assert auth.verify_session_token(bad, users, secret="s3cret") is None, bad
+
+
 def main():
     failures = 0
     for fn in CHECKS:

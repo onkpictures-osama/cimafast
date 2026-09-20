@@ -6,11 +6,9 @@ import uuid
 import json
 import datetime
 import streamlit as st
-import extra_streamlit_components as stx
 from auth import (
-    authenticate, no_login_allowed, resolve_users, hash_password, normalize_username,
-    issue_session_token, verify_session_token, resolve_session_secret,
-    DEFAULT_SESSION_TTL,
+    authenticate, no_login_allowed, resolve_users,
+    make_session_token, verify_session_token, SESSION_COOKIE_NAME,
 )
 from database import (
     init_db, FIELD_HELP,
@@ -48,132 +46,25 @@ def _render_locked_screen():
     )
 
 
-def _render_signup_screen():
-    """شاشة إنشاء حساب جديد: اسم مستخدم + كلمة سر + تأكيد.
-    
-    واجهة ثنائية اللغة (عربي وإنجليزي) لإنشاء حساب جديد مع التحقق من القوة."""
-    st.markdown(
-        """
-        <style>
-        .cf-signup h2 { text-align: center; margin-top: 12vh; }
-        .cf-signup p { text-align: center; opacity: 0.75; margin-bottom: 0; }
-        div[data-testid="stForm"] label p { direction: rtl; text-align: right; }
-        div[data-testid="stForm"] input { direction: ltr; text-align: left; }
-        </style>
-        <div class="cf-signup" dir="rtl">
-            <h2>🎬 CimaFast Studio</h2>
-            <p>إنشاء حساب جديد / Create Account</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def _set_session_cookie(token):
+    """بيحط توكن الجلسة في كوكي بالمتصفح (30 يوم) عشان المستخدم يفضل داخل
+    حتى بعد ريفريش أو نشر تحديث جديد للبرنامج. مفيش API جاهزة في Streamlit
+    لكتابة كوكي، فبنعملها بسطر JS صغير."""
+    st.html(
+        f"<script>document.cookie="
+        f"'{SESSION_COOKIE_NAME}={token}; Max-Age={30*24*60*60}; Path=/; SameSite=Lax; Secure';"
+        f"</script>",
+        unsafe_allow_javascript=True,
     )
-    _, mid, _ = st.columns([1, 1.4, 1])
-    with mid:
-        with st.form("_signup_form", clear_on_submit=False):
-            username = st.text_input("اسم المستخدم / Username", key="_signup_username")
-            password = st.text_input(
-                "كلمة السر / Password", type="password", key="_signup_password"
-            )
-            confirm = st.text_input(
-                "تأكيد كلمة السر / Confirm Password", type="password", key="_signup_confirm"
-            )
-            submitted = st.form_submit_button("إنشاء حساب / Create Account", use_container_width=True)
-        
-        if submitted:
-            if not username or not password:
-                st.error("اسم المستخدم وكلمة السر مطلوبة / Username and password are required")
-            elif password != confirm:
-                st.error("كلمات السر غير متطابقة / Passwords do not match")
-            elif len(password) < 8:
-                st.error("كلمة السر لازم تكون 8 أحرف على الأقل / Password must be at least 8 characters")
-            elif len(username) < 3:
-                st.error("اسم المستخدم لازم يكون 3 أحرف على الأقل / Username must be at least 3 characters")
-            else:
-                normalized = normalize_username(username)
-                users = resolve_users()
-                if normalized in users:
-                    st.error("هذا اسم المستخدم موجود بالفعل / This username already exists")
-                else:
-                    hashed = hash_password(password)
-                    st.success("✅ تم إنشاء الحساب! / Account created successfully!")
-                    st.info(f"اسم المستخدم: {normalized} / Username: {normalized}")
-                    st.info("الرجاء إخبار المسؤول بإضافة حسابك / Please ask the admin to activate your account")
 
 
-
-
-_COOKIE_NAME = "cimafast_session"
-_COOKIE_PROBE = "_cookie_probe_runs"
-
-
-def _cookie_manager():
-    """نسخة جديدة كل rerun — الـ __init__ نفسه هو اللي بيرسم الكومبوننت،
-    وهو ده اللي بيحدّث قيم الكوكيز. لو خزّناها في cache_resource الكومبوننت
-    مش هيترسم تاني والقيم هتفضل قديمة (وممكن تتسرّب بين المستخدمين)."""
-    return stx.CookieManager(key="cimafast_auth_cookies")
-
-
-def _restore_from_cookie(users):
-    """بيرجّع المستخدم لحالة الدخول من الكوكي الموقّع، لو التوقيع سليم."""
-    secret = resolve_session_secret()
-    if not secret:
-        return False
-    try:
-        token = (_COOKIES.cookies or {}).get(_COOKIE_NAME)
-    except Exception:
-        return False
-    name = verify_session_token(token, secret, users)
-    if not name:
-        return False
-    st.session_state["_authenticated"] = True
-    st.session_state["_auth_user"] = name
-    return True
-
-
-def _render_restoring_screen():
-    """الكومبوننت بيرجّع {} في أول تشغيل قبل ما يرد من المتصفح، فلو وريّنا
-    شاشة الدخول على طول المستخدم هيشوف ومضة تسجيل دخول قبل ما نرجّعه.
-    بنستنى دورة واحدة بس، وفيه زرار يكمّل يدوي لو الكومبوننت مردّش."""
-    st.markdown(
-        """
-        <div style="text-align:center; margin-top:14vh" dir="rtl">
-            <h3>🎬 CimaFast Studio</h3>
-            <p style="opacity:.75">بنرجّع الجلسة… / Restoring your session…</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def _clear_session_cookie():
+    st.html(
+        f"<script>document.cookie="
+        f"'{SESSION_COOKIE_NAME}=; Max-Age=0; Path=/; SameSite=Lax; Secure';"
+        f"</script>",
+        unsafe_allow_javascript=True,
     )
-    _, mid, _ = st.columns([1, 1.4, 1])
-    with mid:
-        if st.button("تسجيل الدخول / Sign in", use_container_width=True,
-                     key="_skip_restore"):
-            st.session_state[_COOKIE_PROBE] = 99
-            st.rerun()
-
-
-def _set_session_cookie(username):
-    """بنأجّل كتابة الكوكي لدورة بعد الدخول: لو كتبناها وعملنا rerun على طول
-    الكومبوننت ممكن ميكونش نفّذ الأمر والكوكي تضيع."""
-    secret = resolve_session_secret()
-    if not secret:
-        return
-    token = issue_session_token(username, secret, ttl=DEFAULT_SESSION_TTL)
-    if token:
-        st.session_state["_pending_cookie"] = token
-
-
-def _flush_pending_cookie():
-    token = st.session_state.pop("_pending_cookie", None)
-    if not token:
-        return
-    try:
-        _COOKIES.set(
-            _COOKIE_NAME, token, key="cimafast_set_cookie",
-            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=DEFAULT_SESSION_TTL),
-            secure=True, same_site="strict",
-        )
-    except Exception as exc:
-        print(f"[auth] could not persist session cookie: {exc}", file=sys.stderr, flush=True)
 
 
 def _render_login_screen():
@@ -214,7 +105,10 @@ def _render_login_screen():
                 st.session_state["_authenticated"] = True
                 st.session_state["_auth_user"] = user
                 st.session_state.pop("_login_attempts", None)
-                _set_session_cookie(user)
+                # الكوكي بيتحط في الـ run الجاي (مش هنا) عشان لو حطيناها قبل
+                # st.rerun() مباشرة، الصفحة بتتغير قبل ما المتصفح ياخد فرصة
+                # ينفّذ السكريبت اللي بيحط الكوكي فعليًا
+                st.session_state["_pending_session_cookie"] = make_session_token(user)
                 st.rerun()
             # تأخير بسيط ومتزايد بعد كل محاولة فاشلة عشان نصعّب التخمين الآلي
             attempts = st.session_state.get("_login_attempts", 0) + 1
@@ -226,9 +120,24 @@ def _render_login_screen():
 
 def _check_login():
     """بوابة الدخول. بترجّع True بس لما يكون فيه مستخدم داخل فعلًا."""
+    # لو المستخدم لسه خارج (Log out) دلوقتي، لازم نمسح كوكي الجلسة فعليًا
+    # في المتصفح، ونتجاهل قيمتها القديمة في الـ run ده بالذات (لسه وصلت
+    # مع نفس الطلب اللي جبنا بيه الصفحة، قبل ما سكريبت المسح يتنفذ فعلًا)
+    just_logged_out = st.session_state.pop("_just_logged_out", False)
+    if just_logged_out:
+        _clear_session_cookie()
     if st.session_state.get("_authenticated") and st.session_state.get("_auth_user"):
         return True
     users = resolve_users()
+    # جلسة جديدة (ريفريش أو بعد نشر تحديث) - نشوف لو فيه كوكي دخول ساري
+    # قبل ما نعرض شاشة تسجيل الدخول من الأول
+    if users and not just_logged_out:
+        cookie_token = st.context.cookies.get(SESSION_COOKIE_NAME)
+        remembered_user = verify_session_token(cookie_token, users)
+        if remembered_user:
+            st.session_state["_authenticated"] = True
+            st.session_state["_auth_user"] = remembered_user
+            return True
     if not users:
         # مفيش حسابات: بنقفل افتراضيًا (fail closed). الاستثناء الوحيد هو
         # التطوير المحلي لما المطور يطلب كده صراحةً بالمتغير ده.
@@ -249,14 +158,6 @@ def _check_login():
         )
         _render_locked_screen()
         return False
-    if _restore_from_cookie(users):
-        return True
-    # أول تشغيل: الكومبوننت لسه مردّش، فمستنيين دورة واحدة قبل ما نقرر
-    runs = st.session_state.get(_COOKIE_PROBE, 0) + 1
-    st.session_state[_COOKIE_PROBE] = runs
-    if runs < 2:
-        _render_restoring_screen()
-        return False
     _render_login_screen()
     return False
 
@@ -264,23 +165,17 @@ def _check_login():
 def _logout():
     """خروج: بنمسح مفاتيح الدخول بس وسايبين باقي حالة الجلسة زي ما هي عشان
     المستخدم ميخسرش اختياراته لو رجع دخل تاني."""
-    for key in ("_authenticated", "_auth_user", "_login_attempts",
-                "_pending_cookie", _COOKIE_PROBE):
+    for key in ("_authenticated", "_auth_user", "_login_attempts"):
         st.session_state.pop(key, None)
-    try:
-        # delete() يرمي KeyError لو الكوكي مش موجودة أصلًا
-        if _COOKIE_NAME in (_COOKIES.cookies or {}):
-            _COOKIES.delete(_COOKIE_NAME, key="cimafast_del_cookie")
-    except Exception as exc:
-        print(f"[auth] could not clear session cookie: {exc}", file=sys.stderr, flush=True)
+    st.session_state["_just_logged_out"] = True
 
-
-_COOKIES = _cookie_manager()
 
 if not _check_login():
     st.stop()
 
-_flush_pending_cookie()
+_pending_cookie_token = st.session_state.pop("_pending_session_cookie", None)
+if _pending_cookie_token:
+    _set_session_cookie(_pending_cookie_token)
 
 init_db()
 
