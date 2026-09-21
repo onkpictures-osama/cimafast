@@ -16,7 +16,7 @@ import time
 sys.path.insert(0, "/opt/cimafast-ai")
 import spool  # noqa: E402
 
-SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*|م\s*/\s*)\d+',
+SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:مشهد|المشهد|سين|السين|SCENE|SC|م)\s*(?:رقم\s*)?[:\-–—/.]?\s*\d+',
                              re.IGNORECASE | re.MULTILINE)
 
 # التقدير بيتحسب من حجم النص مش من عدد العناوين.

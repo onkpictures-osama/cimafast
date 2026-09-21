@@ -208,14 +208,21 @@ def test_compact_scene_header_format():
     from script_md import to_markdown
 
     for line, expected in [("م /1 ل/د", "1"), ("م/12 ن/خ", "12"),
-                           ("م / 7 ل/د", "7"), ("مشهد 3 - داخلي", "3")]:
+                           ("م / 7 ل/د", "7"), ("م 5 ل/د", "5"), ("م1 ل/د", "1"),
+                           ("مشهد 3 - داخلي", "3"), ("المشهد 7", "7"),
+                           ("سين 9", "9"), ("مشهد رقم 8", "8"),
+                           ("SCENE 4 - INT - DAY", "4"), ("SC 6", "6"),
+                           ("م /\u0661 \u0644/\u062f", "\u0661")]:
         m = SCENE_HEADER_RE.match(line)
         check(f"matches {line!r} -> scene {expected}",
               m is not None and m.group(1) == expected,
               f"got {m.group(1) if m else None}")
 
-    for line in ("مصر القاهرة 2026", "من 5 سنين", "مدة الفيلم 12 دقيقة"):
+    for line in ("مصر القاهرة 2026", "من 5 سنين", "مدة الفيلم 12 دقيقة",
+                 "محمد 20 سنة", "ماشي 3 خطوات", "موسيقى"):
         check(f"does not false-match {line!r}", SCENE_HEADER_RE.match(line) is None)
+    # Arabic-Indic digits must survive int() all the way to the database
+    check("Arabic-Indic scene number converts", int("\u0661\u0662") == 12)
 
     script = ["م /1 ل/د", "غرفة نوم", ".. نرى رجلا", "الأب", "قوم بقى",
               "م /2 ن/خ", "الشارع", ".. يخرج مسرعا"]

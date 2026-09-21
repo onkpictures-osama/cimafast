@@ -14,7 +14,7 @@
 import re
 from collections import Counter
 
-SCENE_HEADER_RE = re.compile(r'^\s*(?:(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*|م\s*/\s*)(\d+)(.*)$', re.IGNORECASE)
+SCENE_HEADER_RE = re.compile(r'^\s*(?:مشهد|المشهد|سين|السين|SCENE|SC|م)\s*(?:رقم\s*)?[:\-–—/.]?\s*(\d+)(.*)$', re.IGNORECASE)
 DIALOGUE_RE = re.compile(r'^\s*([؀-ۿA-Za-z][؀-ۿ\sA-Za-z\.]{0,24}?)\s*[:：]\s*(.+)$')
 
 # أرقام صفحات بكل الأشكال الشائعة
