@@ -23,7 +23,15 @@ def test(fn):
 
 
 def _app():
-    return open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
+    """كل كود الواجهة: app.py + i18n + ui + views/*. اتقسم من app.py واحد."""
+    import glob
+    files = [os.path.join(ROOT, f) for f in ("app.py", "i18n.py", "ui.py")]
+    files += sorted(glob.glob(os.path.join(ROOT, "views", "*.py")))
+    return "\n".join(open(f, encoding="utf-8").read() for f in files)
+
+
+def _view(name):
+    return open(os.path.join(ROOT, "views", f"{name}.py"), encoding="utf-8").read()
 
 
 # --- الرقم الجاي --------------------------------------------------------------

@@ -72,8 +72,14 @@ def _adapt_query(query):
 def get_connection():
     if USE_POSTGRES:
         return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL: القراية مبتستناش الكتابة. في الوضع القديم (delete) أي حفظ من أي مستخدم
+    # كان بيقفل قاعدة البيانات كلها على الباقيين لحد ما يخلص. الإعداد ده بيتخزن
+    # في الملف نفسه، فالنداء بعد أول مرة مبيعملش حاجة.
+    # ‎busy_timeout‎: لو في كتابة تانية شغالة، استنى بدل ما ترمي "database is locked".
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")
     conn.row_factory = sqlite3.Row
     return conn
 

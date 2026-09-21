@@ -20,7 +20,15 @@ def test(fn):
 
 
 def _app():
-    return open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
+    """كل كود الواجهة: app.py + i18n + ui + views/*. اتقسم من app.py واحد."""
+    import glob
+    files = [os.path.join(ROOT, f) for f in ("app.py", "i18n.py", "ui.py")]
+    files += sorted(glob.glob(os.path.join(ROOT, "views", "*.py")))
+    return "\n".join(open(f, encoding="utf-8").read() for f in files)
+
+
+def _view(name):
+    return open(os.path.join(ROOT, "views", f"{name}.py"), encoding="utf-8").read()
 
 
 @test
@@ -54,22 +62,18 @@ def test_default_state_name_is_importable():
 
 @test
 def test_scene_edit_forms_are_not_all_rendered_by_default():
-    src = _app()
-    i = src.index("with tab_scenes:")
-    tab = src[i:src.index("with tab_breakdown:", i)]
+    tab = _view("scenes")
     assert 'selection_mode="multi-row"' in tab
     assert "_scenes_shown = []" in tab, "without a search or selection no edit forms should render"
 
 
 @test
 def test_each_library_has_search_before_its_add_row():
-    src = _app()
-    for tab, key in (("tab_locations", "loc_search_"), ("tab_characters", "char_search_"),
-                     ("tab_props", "prop_search_"), ("tab_scenes", "scene_search_")):
-        i = src.index(f"with {tab}:")
-        body = src[i:i + 6000]
-        assert key in body, f"{tab}: no library search"
-        assert body.index(key) < body.index("➕"), f"{tab}: search should sit above the add row"
+    for view, key in (("locations", "loc_search_"), ("characters", "char_search_"),
+                      ("props", "prop_search_"), ("scenes", "scene_search_")):
+        body = _view(view)
+        assert key in body, f"{view}: no library search"
+        assert body.index(key) < body.index("➕"), f"{view}: search should sit above the add row"
 
 
 @test
@@ -90,6 +94,17 @@ def test_library_editors_only_render_when_opened():
         assert 'on_change="rerun"' in line, f"{key} expander is not lazy"
         after = src[src.index("\n", i):src.index("\n", i) + 200]
         assert "if _lazy_exp.open:" in after, f"{key} body does not check .open"
+
+
+@test
+def test_app_is_split_into_views():
+    # app.py was 2,959 lines holding every tab; each tab now has its own module
+    # with one render(). If a tab creeps back into app.py this fails.
+    app = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
+    assert len(app.splitlines()) < 900, len(app.splitlines())
+    for view in ("import_tab", "locations", "characters", "props", "scenes", "shots", "reports"):
+        assert f"views.{view}.render(" in app, view
+        assert "def render(" in _view(view), view
 
 
 def main():
