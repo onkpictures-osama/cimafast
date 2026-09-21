@@ -72,14 +72,8 @@ def _adapt_query(query):
 def get_connection():
     if USE_POSTGRES:
         return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
-    # WAL: القراية مبتستناش الكتابة. في الوضع القديم (delete) أي حفظ من أي مستخدم
-    # كان بيقفل قاعدة البيانات كلها على الباقيين لحد ما يخلص. الإعداد ده بيتخزن
-    # في الملف نفسه، فالنداء بعد أول مرة مبيعملش حاجة.
-    # ‎busy_timeout‎: لو في كتابة تانية شغالة، استنى بدل ما ترمي "database is locked".
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA busy_timeout = 10000")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -297,22 +291,6 @@ def init_db():
             prop_id INTEGER NOT NULL REFERENCES props(id) ON DELETE CASCADE,
             UNIQUE(scene_id, prop_id)
         );
-
-        -- جدول التصوير (الـ stripboard): أيام تصوير، وكل مشهد في يوم واحد بالكتير.
-        CREATE TABLE IF NOT EXISTS shooting_days (
-            id SERIAL PRIMARY KEY,
-            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-            day_number INTEGER NOT NULL,
-            shoot_date TEXT,
-            notes TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS shooting_day_scenes (
-            id SERIAL PRIMARY KEY,
-            day_id INTEGER NOT NULL REFERENCES shooting_days(id) ON DELETE CASCADE,
-            scene_id INTEGER NOT NULL UNIQUE REFERENCES scenes(id) ON DELETE CASCADE,
-            position INTEGER NOT NULL DEFAULT 0
-        );
         """)
     else:
         c.executescript("""
@@ -494,25 +472,6 @@ def init_db():
             FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
             FOREIGN KEY (prop_id) REFERENCES props(id) ON DELETE CASCADE,
             UNIQUE(scene_id, prop_id)
-        );
-
-        -- جدول التصوير (الـ stripboard): أيام تصوير، وكل مشهد في يوم واحد بالكتير.
-        CREATE TABLE IF NOT EXISTS shooting_days (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_id INTEGER NOT NULL,
-            day_number INTEGER NOT NULL,
-            shoot_date TEXT,
-            notes TEXT,
-            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-        );
-
-        CREATE TABLE IF NOT EXISTS shooting_day_scenes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            day_id INTEGER NOT NULL,
-            scene_id INTEGER NOT NULL UNIQUE,
-            position INTEGER NOT NULL DEFAULT 0,
-            FOREIGN KEY (day_id) REFERENCES shooting_days(id) ON DELETE CASCADE,
-            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
         );
         """)
     conn.commit()

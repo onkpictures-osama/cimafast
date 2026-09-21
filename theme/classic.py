@@ -365,17 +365,6 @@ MAIN_CSS = r'''
     .cf-stage-done { background: rgba(45, 156, 219, 0.14); border-color: #2D9CDB; }
     .cf-stage-current { border-color: #E8B923; box-shadow: 0 0 0 1px rgba(232, 185, 35, 0.35); }
     .cf-stage-pending { opacity: 0.5; }
-    /* سطر التقدّم اللي حل محل كروت المراحل: شريط رفيع + جملة واحدة. */
-    .cf-progress { margin: 6px 0 14px 0; }
-    .cf-progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
-    .cf-progress-seg {
-        flex: 1; height: 4px; border-radius: 2px;
-        background: rgba(245, 241, 230, 0.14);
-    }
-    .cf-progress-seg--done { background: #2D9CDB; }
-    .cf-progress-seg--current { background: #E8B923; }
-    .cf-progress-text { font-size: 0.9rem; color: rgba(245, 241, 230, 0.78); }
-    .cf-progress-text strong { color: #F5F1E6; font-weight: 600; }
     .cf-copy-hint {
         font-weight: 700;
         color: #E8B923;
