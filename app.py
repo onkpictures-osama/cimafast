@@ -1,3 +1,6 @@
+import datetime
+import html
+import json
 import os
 import sys
 import time
@@ -160,6 +163,14 @@ def _logout():
     st.session_state["_just_logged_out"] = True
 
 
+def _nav_link(label, href):
+    """لينك في الـ sidebar بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا
+    بيفتح تاب جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب."""
+    st.sidebar.markdown(
+        f'<a class="cf-navlink" href="{html.escape(href, quote=True)}" target="_self">{html.escape(label)}</a>',
+        unsafe_allow_html=True)
+
+
 def _session_role():
     """F2: دور المستخدم في الشركة المختارة. Streamlit بيشغّل كل rerun في thread
     جديد، فالدور بيتقري من session_state مش من متغيّر في الـ thread."""
@@ -217,6 +228,17 @@ if _me_row and _me_row["must_change_password"]:
                 except (ValueError, accounts.AccessDenied) as _e:
                     st.error(str(_e))
     st.stop()
+
+# H1: الدخول بيوصّل على الصفحة الرئيسية (مش جوه آخر مشروع). مرة واحدة في الجلسة،
+# وبس لو مفيش رابط لشاشة معيّنة — "افتح" من الرئيسية بيجي بـ ?project= فبيعدّي.
+_home_url = os.environ.get("CIMAFAST_HOME_URL")
+if _home_url and not st.session_state.get("_landed"):
+    st.session_state["_landed"] = True
+    if links.parse(st.query_params) == (None, None):
+        # setTimeout: كوكي الدخول (st.html فوق) لازم يتكتب قبل ما نسيب الصفحة
+        st.html(f"<script>setTimeout(function(){{window.location.replace({json.dumps(_home_url)})}}, 150)</script>",
+                unsafe_allow_javascript=True)
+        st.stop()
 
 init_db()
 
@@ -379,11 +401,12 @@ st.session_state["_cf_role"] = _role
 _can_edit = permissions.can(_role, "edit")
 if not _can_edit:
     st.sidebar.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
+if os.environ.get("CIMAFAST_HOME_URL"):
+    _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
 # صفحة الفريق (الأعضاء والأدوار وكلمات السر) في الواجهة الجديدة جنب جدول التصوير
 if os.environ.get("CIMAFAST_BOARD_URL"):
     _team_label = t("إدارة الفريق") if _company["role"] in ("admin", "operator") else t("الفريق وحسابي")
-    st.sidebar.link_button(f"👥 {_team_label}", f"{os.environ['CIMAFAST_BOARD_URL']}team/",
-                           use_container_width=True)
+    _nav_link(f"👥 {_team_label}", f"{os.environ['CIMAFAST_BOARD_URL']}team/")
 projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
@@ -420,8 +443,7 @@ project = repo.project_by_id(project_id)[0]
 # CIMAFAST_BOARD_URL متظبط، ودلوقتي ده في خدمة /v1 بس — الإنتاج مالوش board.
 _board_url = os.environ.get("CIMAFAST_BOARD_URL")
 if _board_url:
-    st.sidebar.link_button(f"🗓️ {t('جدول التصوير')}", f"{_board_url}?project={project_id}",
-                           use_container_width=True)
+    _nav_link(f"🗓️ {t('جدول التصوير')}", f"{_board_url}?project={project_id}")
 
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير
 # تأكيد، عشان ميحصلش استيراد مشاهد بالغلط لمشروع تاني
@@ -640,6 +662,11 @@ _open_tab = next((slug for slug, tab in zip(links.TABS, _tabs) if tab.open), "im
 # شريط العنوان = الشاشة الحالية: يتحفظ bookmark أو يتبعت لزميل
 st.query_params.update(project=str(project_id), tab=_open_tab)
 st.session_state["_applied_link"] = (project_id, _open_tab)
+# "كمّل من مكان ما وقفت" في الرئيسية: بنكتب بس لما الشاشة تتغيّر، مش كل ضغطة
+if st.session_state.get("_remembered") != (project_id, _open_tab):
+    repo.remember_screen(_current_user, project_id, _open_tab,
+                         datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"))
+    st.session_state["_remembered"] = (project_id, _open_tab)
 
 # ---------------- تبويب استيراد السكريبت ----------------
 

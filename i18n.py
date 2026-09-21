@@ -53,6 +53,7 @@ TRANSLATIONS = {
     "الشركة": "Company",
     "إدارة الفريق": "Manage team",
     "الفريق وحسابي": "Team & my account",
+    "الرئيسية": "Home",
     "الرابط ده لمشروع مش متاح لحسابك.": "That link is for a project your account cannot open.",
     "مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.": "View only — you can browse and export, but not edit.",
     "مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع.": "This company has no projects yet. The company admin or a producer creates projects.",

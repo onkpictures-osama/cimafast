@@ -352,6 +352,13 @@ def init_db():
             created_at TEXT,
             UNIQUE(company_id, user_id)
         );
+
+        CREATE TABLE IF NOT EXISTS user_profile (
+            username TEXT PRIMARY KEY,
+            last_project_id INTEGER,
+            last_tab TEXT,
+            updated_at TEXT
+        );
         """)
     else:
         c.executescript("""
@@ -589,6 +596,14 @@ def init_db():
             FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             UNIQUE(company_id, user_id)
+        );
+
+        -- الصفحة الرئيسية: "كمّل من مكان ما وقفت" (آخر مشروع وتبويب لكل مستخدم)
+        CREATE TABLE IF NOT EXISTS user_profile (
+            username TEXT PRIMARY KEY,
+            last_project_id INTEGER,
+            last_tab TEXT,
+            updated_at TEXT
         );
         """)
     conn.commit()

@@ -367,6 +367,13 @@ MAIN_CSS = r'''
     .cf-stage-pending { opacity: 0.5; }
     /* سطر التقدّم اللي حل محل كروت المراحل: شريط رفيع + جملة واحدة. */
     .cf-progress { margin: 6px 0 14px 0; }
+    /* روابط التنقّل في الـ sidebar (الرئيسية، الفريق، الجدول): شكل زرار، نفس التاب */
+    a.cf-navlink {
+        display: block; text-align: center; text-decoration: none; color: #F5F1E6;
+        padding: 7px 12px; margin: 2px 0; border-radius: 8px;
+        border: 1px solid rgba(245, 241, 230, 0.18); background: rgba(245, 241, 230, 0.04);
+    }
+    a.cf-navlink:hover, a.cf-navlink:focus-visible { border-color: #E8B923; color: #F5F1E6; }
     .cf-progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
     .cf-progress-seg {
         flex: 1; height: 4px; border-radius: 2px;

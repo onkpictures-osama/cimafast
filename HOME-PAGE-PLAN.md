@@ -5,6 +5,27 @@ Written 2026-09-21. Replaces the chat draft from earlier that day, which used on
 user's project as its examples and put the team's internal Discord standup on a
 customer-facing page — both wrong for a product.*
 
+## Status — 2026-09-21: slices A–E built and live on /v1
+
+- **A** deep links + lazy tabs (commit 189c3f6): `?project=&tab=` works through
+  login; the address bar follows the screen; tab switch ~0.7 s.
+- **B** the home page at https://cimafast.io/v1/home/ (Starlette app, `home.py` +
+  `board/templates/home.html`): header with role, project cards with the 5-stage
+  progress and the next step, **+ new project** (by role), tools grouped by phase.
+- **C** landing: /v1 sends a user to home once per session unless the link names a
+  screen; "continue where you left off" from `user_profile`; 🏠 link in the sidebar.
+- **D** "Needs you": rules by company role *and* job title (§5), each a link to the
+  exact screen; viewers get none.
+- **E** search across all the user's projects (characters, locations, props,
+  scenes incl. look changes), Arabic-aware, company-isolated.
+- **F** was delivered by F1/F2 (membership-based projects, roles, company switcher,
+  team page).
+
+Not yet: the home page is Arabic only (the app's EN toggle does not reach it);
+"Needs you" rules for VFX and casting-per-actor wait on data-model items.
+Tests: tests/test_home.py (9), tests/test_links.py (5); browser journey verified
+as owner and as costume designer, desktop and phone.
+
 ## 1. The problem
 
 CimaFast is an ERP a production company uses for all its projects. Today, after
@@ -75,7 +96,7 @@ Gaps the rules expose in the **data model** (feed PRODUCT-PLAN, not this build):
 there is no actor-per-character field for casting, and no VFX fields for the VFX
 supervisor. Until those exist, those roles get the generic items only.
 
-## 6. Accounts, roles and access — now vs after F1
+## 6. Accounts, roles and access — now vs after F1 *(superseded: F1/F2 shipped first; roles come from memberships and job titles)*
 
 **Now (this build, on /v1):** accounts are 13 usernames in `secrets.toml`, and
 most of them are already job titles (`producer`, `director`, `dop`,

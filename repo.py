@@ -152,6 +152,55 @@ def board_scenes(project_id):
     return out
 
 
+# --- الصفحة الرئيسية (H1) -------------------------------------------------------------
+
+def project_overview(project_id):
+    """كل الأرقام اللي كارت المشروع و"محتاجك" بيحتاجوها، في استعلام واحد."""
+    rows = fetch_all("""
+        SELECT
+          (SELECT COUNT(*) FROM locations WHERE project_id=:p) AS locations,
+          (SELECT COUNT(*) FROM characters WHERE project_id=:p) AS characters,
+          (SELECT COUNT(*) FROM props WHERE project_id=:p) AS props,
+          (SELECT COUNT(*) FROM scenes WHERE project_id=:p) AS scenes,
+          (SELECT COUNT(*) FROM shots sh JOIN scenes s ON s.id=sh.scene_id WHERE s.project_id=:p) AS shots,
+          (SELECT COUNT(*) FROM shots sh JOIN scenes s ON s.id=sh.scene_id
+             WHERE s.project_id=:p AND COALESCE(sh.confirmed,0)=1) AS confirmed_shots,
+          (SELECT COUNT(*) FROM scenes s WHERE s.project_id=:p
+             AND EXISTS (SELECT 1 FROM shots sh WHERE sh.scene_id=s.id)) AS scenes_with_shots,
+          (SELECT COUNT(*) FROM scenes s WHERE s.project_id=:p
+             AND COALESCE(s.suggested_shot_size,'')<>'') AS scenes_with_ai_shot_hint,
+          (SELECT COUNT(*) FROM locations WHERE project_id=:p
+             AND COALESCE(reference_image_path,'')='') AS locations_without_image,
+          (SELECT COUNT(*) FROM characters WHERE project_id=:p
+             AND COALESCE(reference_image_path,'')='') AS characters_without_image,
+          (SELECT COUNT(*) FROM characters c WHERE c.project_id=:p
+             AND NOT EXISTS (SELECT 1 FROM character_looks l WHERE l.character_id=c.id)) AS characters_without_look,
+          (SELECT COUNT(*) FROM scenes WHERE project_id=:p
+             AND COALESCE(look_change_notes,'')<>'') AS scenes_with_look_change,
+          (SELECT COUNT(*) FROM shooting_days WHERE project_id=:p) AS days,
+          (SELECT COUNT(*) FROM shooting_days WHERE project_id=:p
+             AND COALESCE(shoot_date,'')='') AS days_without_date,
+          (SELECT COUNT(*) FROM shooting_day_scenes x JOIN shooting_days d ON d.id=x.day_id
+             WHERE d.project_id=:p) AS scheduled_scenes
+    """.replace(":p", "?"), (project_id,) * 15)
+    return dict(rows[0])
+
+
+def last_screen(username):
+    rows = fetch_all("SELECT last_project_id, last_tab, updated_at FROM user_profile WHERE username=?",
+                     (username,))
+    return dict(rows[0]) if rows else None
+
+
+def remember_screen(username, project_id, tab, when):
+    """آخر شاشة فتحها المستخدم. كتابة نظام مش تعديل بيانات — المشاهد كمان
+    ليه "كمّل من مكان ما وقفت"، فمش بتتقفل بصلاحية edit."""
+    with permissions.system(), _tx() as ex:
+        ex("DELETE FROM user_profile WHERE username=?", (username,))
+        ex("INSERT INTO user_profile (username, last_project_id, last_tab, updated_at) VALUES (?, ?, ?, ?)",
+           (username, project_id, tab, when))
+
+
 # --- أيام التصوير ------------------------------------------------------------------
 
 def shooting_days(project_id):

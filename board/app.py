@@ -37,6 +37,8 @@ sys.path.insert(0, str(ROOT))
 import accounts  # noqa: E402
 import auth  # noqa: E402
 import database  # noqa: E402
+import home  # noqa: E402
+import links  # noqa: E402
 import permissions  # noqa: E402
 import repo  # noqa: E402
 
@@ -332,6 +334,88 @@ async def api_my_password(request: Request):
     return err or JSONResponse({"ok": True})
 
 
+# --- الصفحة الرئيسية (H1) ----------------------------------------------------------
+# Caddy بيوصّل /v1/home/ هنا كـ /home/ (uri strip_prefix /v1). الروابط كلها نسبية
+# لـ /v1/home/: التطبيق "../"، جدول التصوير "../board/"، الفريق "../board/team/".
+HOME_APP, HOME_BOARD, HOME_STATIC = "../", "../board/", "../board/static/"
+
+TOOL_GROUPS = [
+    ("السيناريو", [("import", "📤", "إضافة سيناريو وتحليله", "ارفع الملف والذكاء الاصطناعي يطلّع المشاهد والأماكن والشخصيات")]),
+    ("التفريغ", [("locations", "📍", "الأماكن", "كل مكان وحالاته وصوره ولينك الخريطة"),
+                 ("characters", "🎭", "الشخصيات واللوكات", "الشخصيات وصورها وتغييرات اللوك"),
+                 ("props", "🎒", "الإكسسوارات", "الإكسسوارات والراكور"),
+                 ("scenes", "📝", "المشاهد", "جدول المشاهد: داخلي/خارجي، ليل/نهار، المكان والشخصيات")]),
+    ("اللقطات", [("shots", "🎥", "تفريغ اللقطات", "اللقطات لكل مشهد ومراجعتها")]),
+    ("الجدولة", [("board", "🗓️", "جدول التصوير", "سحب وإفلات المشاهد على أيام التصوير، واقتراح جدول"),
+                 ("dood", "👥", "أيام الممثلين (DOOD)", "كل ممثل بيشتغل أنهي أيام")]),
+    ("التقارير", [("reports", "📊", "التقارير والتصدير", "Excel وWord وPDF، واللي لسه ناقص")]),
+]
+
+
+async def home_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return templates.TemplateResponse(request, "signin.html", {"app_url": HOME_APP}, status_code=401)
+    me = accounts.user(user) or {}
+    companies = accounts.companies_for(user)
+    cards = home.cards(user, HOME_APP, HOME_BOARD)
+    cont = home.continue_link(user, HOME_APP)
+    # الدور اللي بيحكم "محتاجك": الأعلى بين شركات المستخدم (الأغلب شركة واحدة)
+    rank = {r: i for i, r in enumerate(("operator", "admin", "producer", "manager", "department", "viewer"))}
+    role = min((c["role"] for c in companies), key=lambda r: rank.get(r, 99), default="viewer")
+    focus = next((c for c in cards if cont and c["name"] == cont["project"]), cards[0] if cards else None)
+    tools = []
+    for group, items in TOOL_GROUPS:
+        row = []
+        for key, icon, title, desc in items:
+            if not focus:
+                href = None
+            elif key == "board":
+                href = focus["board_href"]
+            elif key == "dood":
+                href = focus["board_href"] + "#dood"
+            else:
+                href = links.screen(HOME_APP, focus["id"], key)
+            row.append({"icon": icon, "title": title, "desc": desc, "href": href})
+        tools.append((group, row))
+    creatable = [c for c in companies if permissions.can(c["role"], "create_project")]
+    return templates.TemplateResponse(request, "home.html", {
+        "user": user, "me": me, "role_label": accounts.ROLE_LABELS.get(role, role),
+        "companies": companies, "creatable": creatable, "cards": cards, "continue": cont,
+        "needs": home.needs_you(role, me.get("job_title"), cards)[:12], "tools": tools,
+        "focus": focus, "can_manage_team": any(permissions.can(c["role"], "manage_team") for c in companies),
+        "static": HOME_STATIC, "app": HOME_APP, "board": HOME_BOARD})
+
+
+async def api_search(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    return JSONResponse({"results": home.search(user, request.query_params.get("q", ""), HOME_APP)})
+
+
+async def api_create_project(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    try:
+        cid = int(b.get("company_id"))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "company_id required"}, status_code=400)
+    name = (b.get("name") or "").strip()
+    kind = b.get("project_type") or "فيلم"
+    if not name:
+        return JSONResponse({"error": "اسم المشروع مطلوب"}, status_code=400)
+    if kind not in ("فيلم", "مسلسل", "إعلان", "فيديو قصير"):
+        return JSONResponse({"error": "نوع مش معروف"}, status_code=400)
+    try:
+        pid = accounts.create_project(user, cid, name, kind, "1080p", "أفقي", "16:9")
+    except (accounts.AccessDenied, permissions.Denied) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=403)
+    return JSONResponse({"project_id": pid, "href": links.screen(HOME_APP, pid, "import")})
+
+
 async def healthz(request: Request):
     """بيلمس قاعدة البيانات فعلًا — 200 من غير ما يوصل للبيانات مايثبتش حاجة."""
     try:
@@ -358,6 +442,10 @@ app = Starlette(
         Route("/api/days/{day_id:int}", api_delete_day, methods=["DELETE"]),
         Route("/api/suggest", api_suggest, methods=["POST"]),
         Route("/api/dood", api_dood, methods=["GET"]),
+        Route("/home", lambda request: RedirectResponse("home/", status_code=308)),
+        Route("/home/", home_page),
+        Route("/api/search", api_search, methods=["GET"]),
+        Route("/api/projects", api_create_project, methods=["POST"]),
         # Location نسبي: Caddy شايل /v1/board، فـ "/team/" المطلق كان هيودّي على الإنتاج
         Route("/team", lambda request: RedirectResponse("team/", status_code=308)),
         Route("/team/", team_page),

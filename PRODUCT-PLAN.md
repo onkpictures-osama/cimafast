@@ -96,8 +96,10 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   off, search across my projects. *Done when* a new user reaches their first
   useful action from the home page without help. **Build plan:
   `HOME-PAGE-PLAN.md`** (covers H1 and H2).
+  ✅ **On /v1 2026-09-21** (owner: "home first", before F3): https://cimafast.io/v1/home/.
+  Arabic only for now.
 - **H2 Deep links** [chief-engineer] — `?project=` and `?tab=` so every card,
-  notification and agent post opens the exact screen (supported by `st.tabs(default=)`).
+  notification and agent post opens the exact screen (supported by `st.tabs(default=)`). ✅ **On /v1 2026-09-21**, with lazy tabs.
 - **H3 Onboarding** [production] — a sample project and a guided first import,
   so a new company sees the full pipeline before loading its own script.
 

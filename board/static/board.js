@@ -256,6 +256,8 @@
     localStorage.setItem("cf-board-project", picker.value);
     load().catch(e => status(e.message, true));
   });
+  // من الصفحة الرئيسية: "أيام الممثلين" بيفتح الجدول واللوحة دي مفتوحة
+  if (location.hash === "#dood") $("#dood-panel").open = true;
   if (projectId) load().catch(e => status(e.message, true));
   else status("مفيش مشاريع لسه", true);
 })();
