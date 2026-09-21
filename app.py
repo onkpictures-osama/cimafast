@@ -22,6 +22,7 @@ from database import (
 )
 from ai_prompt import AI_JSON_PROMPT
 import ai_jobs
+import image_gen
 from script_md import to_markdown
 from script_parser import (
     extract_lines, parse_json_script, looks_like_screenplay,
@@ -354,6 +355,26 @@ TRANSLATIONS = {
     "وصف عام ثابت للمكان": "General Fixed Description",
     "إضافة مكان": "Add Location",
     "اختر مكان لإضافة حالة (Variant) له": "Choose a location to add a Variant for",
+    "📁 رفع من الجهاز": "📁 Upload from device",
+    "📷 الكاميرا": "📷 Camera",
+    "✨ توليد بالذكاء الاصطناعي": "✨ Generate with AI",
+    "مصدر الصورة": "Image source",
+    "اختر صورة": "Choose an image",
+    "💾 حفظ الصورة": "💾 Save image",
+    "صوّر المكان": "Photograph the location",
+    "الصورة هتتولّد من اسم المكان ووصفه. ضيف أي تفاصيل تحب تشوفها فيها:": "The image is generated from the location's name and description. Add any details you want to see in it:",
+    "تفاصيل إضافية (اختياري)": "Extra details (optional)",
+    "✨ ولّد صورة": "✨ Generate image",
+    "بنولّد الصورة... ده بياخد حوالي 10 ثواني": "Generating the image... this takes about 10 seconds",
+    "🗑️ شيل الصورة": "🗑️ Remove image",
+    "🖼️ صورة المكان": "🖼️ Location image",
+    "الحالة هي شكل المكان نفسه في وقت معيّن من الأحداث (محروق، بعد التجديد، بعد سنين). داخلي/خارجي ونهار/ليل بيتحددوا في المشهد، مش هنا.": "A variant is how the location itself looks at a point in the story (burnt, renovated, years later). INT/EXT and Day/Night are set on the scene, not here.",
+    "صورة مرجعية للحالة": "Variant reference image",
+    "➕ إضافة حالة": "➕ Add Variant",
+    "➕ حالة جديدة لـ": "➕ New variant for",
+    "تقدر تضيف صورة للحالة بعد ما تتحفظ — رفع أو كاميرا أو توليد.": "You can add an image for the variant once it's saved — upload, camera, or generate.",
+    "إلغاء": "Cancel",
+    "اكتب اسم الحالة الأول": "Enter the variant name first",
     "اسم الحالة": "Variant Name", "داخلي/خارجي": "INT/EXT", "النهار/الليل": "Day/Night",
     "حالة الطقس": "Weather", "وصف التغييرات الخاصة بهذه الحالة": "Description of changes for this variant",
     "صورة مرجعية (اختياري)": "Reference image (optional)", "إضافة الحالة": "Add Variant",
@@ -753,6 +774,72 @@ def save_uploaded_image(uploaded_file, subfolder):
     with open(abs_path, "wb") as f:
         f.write(uploaded_file.getvalue())
     return os.path.join("uploads", subfolder, filename)
+
+
+def save_image_bytes(data, ext, subfolder):
+    """زي save_uploaded_image بس لصورة جاية كـ bytes (من التوليد مثلًا)."""
+    folder = os.path.join(UPLOADS_DIR, subfolder)
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}{ext or '.png'}"
+    with open(os.path.join(folder, filename), "wb") as f:
+        f.write(data)
+    return os.path.join("uploads", subfolder, filename)
+
+
+def _openrouter_key():
+    key = os.environ.get("OPENROUTER_API_KEY")
+    if key:
+        return key
+    try:
+        return st.secrets.get("image_gen", {}).get("openrouter_api_key")
+    except Exception:
+        return None
+
+
+IMG_SRC_UPLOAD = "📁 رفع من الجهاز"
+IMG_SRC_CAMERA = "📷 الكاميرا"
+IMG_SRC_GENERATE = "✨ توليد بالذكاء الاصطناعي"
+
+
+def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved):
+    """صورة مرجعية بتلات طرق: رفع، كاميرا، أو توليد.
+
+    برّه أي st.form عن قصد: جوه الفورم الاختيار مابيعملش rerun، فكان اختيار
+    "توليد" بيفضل عارض خانة الرفع. prompt_for(extra) بيرجّع برومبت التوليد،
+    وon_saved(rel_path أو None) بيكتب المسار في قاعدة البيانات."""
+    current_abs = image_abs_path(current_rel)
+    if current_abs:
+        st.image(current_abs, width=340)
+    source = st.radio(t("مصدر الصورة"), [IMG_SRC_UPLOAD, IMG_SRC_CAMERA, IMG_SRC_GENERATE],
+                      horizontal=True, key=f"{key}_src", format_func=t)
+    new_bytes, ext = None, ".png"
+    if source == IMG_SRC_UPLOAD:
+        f = st.file_uploader(t("اختر صورة"), type=IMAGE_TYPES, key=f"{key}_up")
+        if f is not None and st.button(t("💾 حفظ الصورة"), key=f"{key}_save_up"):
+            new_bytes, ext = f.getvalue(), os.path.splitext(f.name)[1] or ".png"
+    elif source == IMG_SRC_CAMERA:
+        # الكاميرا بتتفتح بس لما اليوزر يختارها — لو كانت الافتراضي كان
+        # المتصفح هيطلب إذن الكاميرا مع كل فتحة للمكان.
+        shot = st.camera_input(t("صوّر المكان"), key=f"{key}_cam")
+        if shot is not None and st.button(t("💾 حفظ الصورة"), key=f"{key}_save_cam"):
+            new_bytes, ext = shot.getvalue(), os.path.splitext(shot.name or "")[1] or ".jpg"
+    else:
+        st.caption(t("الصورة هتتولّد من اسم المكان ووصفه. ضيف أي تفاصيل تحب تشوفها فيها:"))
+        extra = st.text_input(t("تفاصيل إضافية (اختياري)"), key=f"{key}_extra")
+        if st.button(t("✨ ولّد صورة"), key=f"{key}_gen"):
+            with st.spinner(t("بنولّد الصورة... ده بياخد حوالي 10 ثواني")):
+                try:
+                    new_bytes, ext = image_gen.generate_image(prompt_for(extra), _openrouter_key())
+                except image_gen.ImageGenError as e:
+                    st.error(t(str(e)))
+    if new_bytes:
+        on_saved(save_image_bytes(new_bytes, ext, subfolder))
+        delete_image_file(current_rel)
+        st.rerun()
+    if current_abs and st.button(t("🗑️ شيل الصورة"), key=f"{key}_rm"):
+        on_saved(None)
+        delete_image_file(current_rel)
+        st.rerun()
 
 
 def image_abs_path(rel_path):
@@ -1628,7 +1715,7 @@ with tab_locations:
     locations = fetch_all("SELECT * FROM locations WHERE project_id=?", (project_id,))
     location_name_by_id = {l["id"]: l["name"] for l in locations}
 
-    col1, col2 = st.columns([1, 2])
+    col1, _ = st.columns([1, 2])
     with col1:
         with st.form(f"add_location_{project_id}"):
             loc_name = st.text_input(t("اسم المكان"), placeholder=t("مثال: شقة حسام"))
@@ -1648,32 +1735,8 @@ with tab_locations:
                         (project_id, loc_name, loc_desc, parent_id),
                     )
                     st.rerun()
-
-    with col2:
-        if locations:
-            loc_map = {l["name"]: l["id"] for l in locations}
-            sel_loc = st.selectbox(t("اختر مكان لإضافة حالة (Variant) له"), list(loc_map.keys()))
-            loc_id = loc_map[sel_loc]
-            with st.form(f"add_variant_{loc_id}"):
-                v_name = st.text_input(t("حالة المكان"), placeholder=t("مثال: الشكل الرئيسي للمكان، أو: المكان محروق، أو: المكان بعد التجديد"))
-                v_int_ext = st.selectbox(t("داخلي/خارجي"), INT_EXT_OPTIONS,
-                                          format_func=fmt_int_ext, help=FIELD_HELP["int_ext"])
-                v_desc = st.text_area(
-                    t("وصف التغييرات الخاصة بهذه الحالة"),
-                    placeholder=t("مثال: المكان اتحرق واتهد بعد حريق في نص الأحداث"),
-                )
-                v_image = st.file_uploader(t("صورة مرجعية (اختياري)"), type=IMAGE_TYPES, key="new_variant_image")
-                if st.form_submit_button(t("إضافة الحالة")):
-                    image_path = save_uploaded_image(v_image, f"locations/{loc_id}")
-                    run_query(
-                        """INSERT INTO location_variants
-                        (location_id, variant_name, int_ext, description, reference_image_path)
-                        VALUES (?,?,?,?,?)""",
-                        (loc_id, v_name, v_int_ext, v_desc, image_path),
-                    )
-                    st.rerun()
-        else:
-            st.caption(t("مفيش أماكن مضافة لسه"))
+    if not locations:
+        st.caption(t("مفيش أماكن مضافة لسه"))
 
     st.divider()
 
@@ -1684,6 +1747,19 @@ with tab_locations:
 
     def render_location(l, indent=""):
         with st.expander(f"{indent}📍 {l['name']}", key=f"exp_loc_{l['id']}"):
+            st.markdown(f"**{t('🖼️ صورة المكان')}**")
+
+            def _save_loc_image(rel, _id=l["id"]):
+                run_query("UPDATE locations SET reference_image_path=? WHERE id=?", (rel, _id))
+
+            render_image_picker(
+                f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
+                lambda extra, _l=l: image_gen.build_prompt(
+                    _l["name"], _l["base_description"] or "", extra=extra),
+                _save_loc_image,
+            )
+            st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
+
             with st.form(f"edit_location_{l['id']}"):
                 e_loc_name = st.text_input(t("اسم المكان"), value=l["name"])
                 edit_parent_options = ["بدون - مكان رئيسي"] + [
@@ -1722,72 +1798,99 @@ with tab_locations:
                     t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."),
                 )
                 if ok:
+                    delete_image_file(l["reference_image_path"])
                     st.success(t("تم حذف المكان"))
                     st.rerun()
 
             st.markdown(f"**{t('الحالات (Variants):')}**")
-            st.caption(t("لو نفس المكان بيتكرر في السكريبت بعد وقت (زي 'سطح اليخت' تاني بعد لحظات)، أضف حالة جديدة بدل ما تعمل مكان جديد مكرر."))
+            st.caption(t(
+                "الحالة هي شكل المكان نفسه في وقت معيّن من الأحداث (محروق، بعد التجديد، بعد سنين). "
+                "داخلي/خارجي ونهار/ليل بيتحددوا في المشهد، مش هنا."
+            ))
             variants = fetch_all("SELECT * FROM location_variants WHERE location_id=?", (l["id"],))
             if not variants:
                 st.caption(t("مفيش حالات مضافة لسه"))
             move_options = {other["name"]: other["id"] for other in locations}
             for v in variants:
-                with st.form(f"edit_variant_{v['id']}"):
-                    ev_name = st.text_input(t("حالة المكان"), value=v["variant_name"])
-                    ev_int_ext = st.selectbox(t("داخلي/خارجي"), INT_EXT_OPTIONS,
-                                               index=safe_index(INT_EXT_OPTIONS, v["int_ext"]),
-                                               format_func=fmt_int_ext)
-                    ev_desc = st.text_area(t("وصف التغييرات الخاصة بهذه الحالة"), value=v["description"] or "")
-                    ev_move_to = st.selectbox(
-                        t("المكان (غيّره لو عايز تنقل الحالة دي لمكان تاني — مفيد لدمج أماكن مكررة)"),
-                        list(move_options.keys()), index=safe_index(list(move_options.keys()), l["name"]),
-                    )
-                    if v["reference_image_path"]:
-                        existing_img = image_abs_path(v["reference_image_path"])
-                        if existing_img:
-                            st.image(existing_img, width=220)
-                    
-                    # Generate or Upload menu
-                    image_action = st.radio(
-                        t("طريقة إضافة الصورة المرجعية"),
-                        [t("رفع من الجهاز"), t("توليد (قريباً)")],
-                        index=0,
-                        key=f"variant_image_action_{v['id']}"
-                    )
-                    
-                    ev_image = None
-                    if image_action == t("رفع من الجهاز"):
-                        ev_image = st.file_uploader(t("اختر صورة مرجعية"), type=IMAGE_TYPES, key=f"variant_image_{v['id']}")
-                    else:
-                        st.info("🔒 ميزة التوليد الذكي للصور قيد التطوير — قريباً ستتمكن من توليد صور بناءً على وصف المشهد")
-                    vsave_col, vdel_col = st.columns(2)
-                    with vsave_col:
-                        save_var = st.form_submit_button(t("💾 حفظ"))
-                    with vdel_col:
-                        del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
-                if save_var:
-                    target_location_id = move_options[ev_move_to]
-                    new_image_path = v["reference_image_path"]
-                    if ev_image is not None:
-                        new_image_path = save_uploaded_image(ev_image, f"locations/{target_location_id}")
-                    run_query(
-                        """UPDATE location_variants SET variant_name=?, int_ext=?,
-                        description=?, location_id=?, reference_image_path=? WHERE id=?""",
-                        (ev_name, ev_int_ext, ev_desc,
-                         target_location_id, new_image_path, v["id"]),
-                    )
-                    mark_saved(f"variant_{v['id']}")
-                    st.rerun()
-                if del_var:
-                    ok = run_delete(
-                        "DELETE FROM location_variants WHERE id=?", (v["id"],),
-                        t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."),
-                    )
-                    if ok:
-                        delete_image_file(v["reference_image_path"])
-                        st.success(t("تم حذف الحالة"))
+                with st.container(border=True):
+                    with st.form(f"edit_variant_{v['id']}"):
+                        ev_name = st.text_input(t("حالة المكان"), value=v["variant_name"])
+                        ev_desc = st.text_area(t("وصف التغييرات الخاصة بهذه الحالة"), value=v["description"] or "")
+                        ev_move_to = st.selectbox(
+                            t("المكان (غيّره لو عايز تنقل الحالة دي لمكان تاني — مفيد لدمج أماكن مكررة)"),
+                            list(move_options.keys()), index=safe_index(list(move_options.keys()), l["name"]),
+                        )
+                        vsave_col, vdel_col = st.columns(2)
+                        with vsave_col:
+                            save_var = st.form_submit_button(t("💾 حفظ"))
+                        with vdel_col:
+                            del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
+                    if save_var:
+                        run_query(
+                            "UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=?",
+                            (ev_name, ev_desc, move_options[ev_move_to], v["id"]),
+                        )
+                        mark_saved(f"variant_{v['id']}")
                         st.rerun()
-                show_saved_badge(f"variant_{v['id']}")
+                    if del_var:
+                        ok = run_delete(
+                            "DELETE FROM location_variants WHERE id=?", (v["id"],),
+                            t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."),
+                        )
+                        if ok:
+                            delete_image_file(v["reference_image_path"])
+                            st.success(t("تم حذف الحالة"))
+                            st.rerun()
+                    show_saved_badge(f"variant_{v['id']}")
+
+                    st.caption(t("صورة مرجعية للحالة"))
+
+                    def _save_var_image(rel, _id=v["id"]):
+                        run_query("UPDATE location_variants SET reference_image_path=? WHERE id=?", (rel, _id))
+
+                    render_image_picker(
+                        f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",
+                        lambda extra, _l=l, _v=v: image_gen.build_prompt(
+                            _l["name"], _l["base_description"] or "",
+                            _v["variant_name"], _v["description"] or "", extra=extra),
+                        _save_var_image,
+                    )
+
+            # فورم إضافة الحالة مقفول لحد ما اليوزر يطلبه — لو مفتوح تحت كل
+            # مكان من الأول الصفحة بتبقى زحمة ومشتتة.
+            open_key = f"add_var_open_{l['id']}"
+            if not st.session_state.get(open_key):
+                if st.button(t("➕ إضافة حالة"), key=f"add_var_btn_{l['id']}"):
+                    st.session_state[open_key] = True
+                    st.rerun()
+            else:
+                with st.form(f"add_variant_{l['id']}", clear_on_submit=True):
+                    st.markdown(f"**{t('➕ حالة جديدة لـ')} {l['name']}**")
+                    v_name = st.text_input(
+                        t("حالة المكان"),
+                        placeholder=t("مثال: الشكل الرئيسي للمكان، أو: المكان محروق، أو: المكان بعد التجديد"))
+                    v_desc = st.text_area(
+                        t("وصف التغييرات الخاصة بهذه الحالة"),
+                        placeholder=t("مثال: المكان اتحرق واتهد بعد حريق في نص الأحداث"))
+                    st.caption(t("تقدر تضيف صورة للحالة بعد ما تتحفظ — رفع أو كاميرا أو توليد."))
+                    add_col, cancel_col = st.columns(2)
+                    with add_col:
+                        add_var = st.form_submit_button(t("إضافة الحالة"))
+                    with cancel_col:
+                        cancel_var = st.form_submit_button(t("إلغاء"))
+                if add_var:
+                    if v_name.strip():
+                        run_query(
+                            "INSERT INTO location_variants (location_id, variant_name, description) VALUES (?,?,?)",
+                            (l["id"], v_name.strip(), v_desc),
+                        )
+                        st.session_state[open_key] = False
+                        st.rerun()
+                    else:
+                        st.warning(t("اكتب اسم الحالة الأول"))
+                if cancel_var:
+                    st.session_state[open_key] = False
+                    st.rerun()
 
         for child in children_by_parent.get(l["id"], []):
             render_location(child, indent="↳ ")

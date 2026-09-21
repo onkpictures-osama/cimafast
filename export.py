@@ -68,7 +68,9 @@ def _fetch_breakdown_rows(project_id, fetch_all):
             "SELECT * FROM shots WHERE scene_id=? ORDER BY shot_number", (sc["scene_id"],)
         )
         location_label = sc["location_name"] or ""
-        if sc["variant_name"]:
+        # «الشكل الأساسي» هي الحالة الافتراضية اللي الاستيراد بيعملها — مش
+        # بتضيف أي معلومة للتقرير، فبنكتب اسم المكان لوحده.
+        if sc["variant_name"] and sc["variant_name"] != "الشكل الأساسي":
             location_label = f"{location_label} - {sc['variant_name']}" if location_label else sc["variant_name"]
 
         if not shots:
@@ -356,7 +358,9 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
         """, (sc["id"],))
         accessories = sorted({r["name"] for r in prop_rows})
         location_label = sc["location_name"] or ""
-        if sc["variant_name"]:
+        # «الشكل الأساسي» هي الحالة الافتراضية اللي الاستيراد بيعملها — مش
+        # بتضيف أي معلومة للتقرير، فبنكتب اسم المكان لوحده.
+        if sc["variant_name"] and sc["variant_name"] != "الشكل الأساسي":
             location_label = f"{location_label} - {sc['variant_name']}" if location_label else sc["variant_name"]
         rows.append({
             "number": idx,

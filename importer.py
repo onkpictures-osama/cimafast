@@ -65,33 +65,29 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
         summary['locations_added'].append(name)
         return new_id
 
-    def get_or_create_variant(location_id, int_ext, day_night, variant_hint=None):
-        key = (location_id, int_ext, day_night, variant_hint)
+    # الحالة (Variant) بتوصف المكان نفسه دراميًا — محروق، بعد التجديد، بعد
+    # سنين. داخلي/خارجي ونهار/ليل بتاعة المشهد مش المكان، ومتخزنة على المشهد
+    # نفسه. كنا بنعمل حالة لكل تركيبة منهم («داخلي - نهار»، «داخلي - ليل»...)
+    # فالمكان الواحد كان بيطلع بأربع حالات مالهاش أي معنى درامي.
+    DEFAULT_VARIANT = 'الشكل الأساسي'
+
+    def get_or_create_variant(location_id, variant_hint=None):
+        variant_name = variant_hint or DEFAULT_VARIANT
+        key = (location_id, variant_name)
         if key in variant_cache:
             return variant_cache[key]
-
-        if variant_hint:
-            # الاسم الأصلي قبل الدمج (زي "سطح اليخت بعد لحظات") بيتسجل كاسم
-            # الحالة نفسه، عشان يفضل واضح إيه اللي اختلف عن المكان الرئيسي
-            rows = fetch_all(
-                "SELECT id FROM location_variants WHERE location_id=? AND variant_name=?",
-                (location_id, variant_hint),
-            )
-        else:
-            rows = fetch_all(
-                "SELECT id FROM location_variants WHERE location_id=? AND int_ext IS ? AND day_night IS ?",
-                (location_id, int_ext, day_night),
-            )
-
+        # الاسم الأصلي قبل الدمج (زي "سطح اليخت بعد لحظات") بيتسجل كاسم
+        # الحالة نفسه، عشان يفضل واضح إيه اللي اختلف عن المكان الرئيسي
+        rows = fetch_all(
+            "SELECT id FROM location_variants WHERE location_id=? AND variant_name=?",
+            (location_id, variant_name),
+        )
         if rows:
             variant_id = rows[0]['id']
         else:
-            variant_name = variant_hint or f"{int_ext or 'غير محدد'} - {day_night or 'غير محدد'}"
             variant_id = run_query(
-                """INSERT INTO location_variants
-                (location_id, variant_name, int_ext, day_night, weather, description)
-                VALUES (?,?,?,?,?,?)""",
-                (location_id, variant_name, int_ext, day_night, None, ''),
+                "INSERT INTO location_variants (location_id, variant_name, description) VALUES (?,?,?)",
+                (location_id, variant_name, ''),
             )
         variant_cache[key] = variant_id
         return variant_id
@@ -123,9 +119,7 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
         location_variant_id = None
         if sc.get('location_name'):
             loc_id = get_or_create_location(sc['location_name'])
-            location_variant_id = get_or_create_variant(
-                loc_id, sc['int_ext'], sc['day_night'], sc.get('location_variant_hint')
-            )
+            location_variant_id = get_or_create_variant(loc_id, sc.get('location_variant_hint'))
 
         new_scene_id = run_query(
             """INSERT INTO scenes
