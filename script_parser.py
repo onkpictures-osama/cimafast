@@ -209,7 +209,13 @@ def _apply_silent_characters(scenes, known_characters=None):
         action_text = scene.pop('_action_text', None)
         if action_text is None:
             action_text = scene.get('notes', '')
-        silent = _detect_silent_characters(action_text, speakers, roster)
+        # لو الـ AI قال صراحة مين اللي بيتكلم في المشهد ده (characters_speaking)،
+        # الساكت هو الفرق بين الاتنين بالظبط — أدق بكتير من تخمينه من نص الحركة.
+        explicit = scene.pop('_speaking', None)
+        if explicit is not None:
+            silent = [n for n in scene.get('characters') or [] if n not in explicit]
+        else:
+            silent = _detect_silent_characters(action_text, speakers, roster)
         scene['silent_characters'] = silent
         for name in silent:
             if name not in scene['characters']:
@@ -603,6 +609,9 @@ def parse_json_script(file_bytes, known_characters=None):
         raise RuntimeError('شكل الملف غير متوقع - لازم يكون JSON فيه قايمة مشاهد.')
 
     scenes = []
+    # حقول البرومبت المطور اللي لسه مالهاش مسار استيراد — بنبلّغ عنها في الآخر
+    # بدل ما نبلعها في صمت واليوزر يفتكر إنها اتسجلت.
+    unsupported = set()
     for i, raw in enumerate(raw_scenes):
         if not isinstance(raw, dict):
             warnings.append(f'العنصر رقم {i + 1} اتجاهل لأنه مش عنصر بيانات صحيح.')
@@ -642,6 +651,37 @@ def parse_json_script(file_bytes, known_characters=None):
         # للاستيراد. 35A غير 35، ولازم يفضلوا متفرقين.
         suffix = raw.get('scene_suffix')
         suffix = str(suffix).strip()[:2] if isinstance(suffix, str) and suffix.strip() else None
+
+        # البرومبت المطور بيطلب قايمة المتكلمين صراحة. لو موجودة، الساكت هو
+        # الفرق بينها وبين كل الحاضرين — بدل ما نخمّنه من نص الحركة.
+        speaking = raw.get('characters_speaking')
+        if isinstance(speaking, list):
+            speaking = [str(c).strip() for c in speaking if str(c).strip()]
+        else:
+            speaking = None
+
+        notes = str(raw.get('notes') or '')
+        look_change = raw.get('look_change_notes')
+        look_change = str(look_change).strip() if look_change else ''
+        if look_change:
+            # مكانش ليه عمود في قاعدة البيانات، فبيتسجل في الملاحظات بعنوان
+            # واضح بدل ما يضيع — التغيير ده بيفرق في الماكياج والملابس.
+            notes = f"{notes}\n\n[تغيير في الشكل] {look_change}".strip()
+
+        try:
+            episode_number = int(raw.get('episode_number'))
+        except (TypeError, ValueError):
+            episode_number = None
+
+        shot_size = raw.get('suggested_shot_size')
+        shot_size = str(shot_size).strip() or None if shot_size else None
+        camera_movement = raw.get('suggested_camera_movement')
+        camera_movement = str(camera_movement).strip() or None if camera_movement else None
+        if episode_number is not None:
+            unsupported.add('episode_number')
+        if shot_size or camera_movement:
+            unsupported.add('shots')
+
         scenes.append({
             'scene_number': scene_number,
             'scene_suffix': suffix,
@@ -651,11 +691,26 @@ def parse_json_script(file_bytes, known_characters=None):
             'weather': weather,
             'characters': characters,
             'props': props,
-            'notes': str(raw.get('notes') or ''),
+            'notes': notes,
+            'episode_number': episode_number,
+            'suggested_shot_size': shot_size,
+            'suggested_camera_movement': camera_movement,
+            'look_change_notes': str(raw.get('look_change_notes') or '').strip(),
+            '_speaking': speaking,
         })
 
     if not scenes:
         warnings.append('لم يتم العثور على أي مشهد صالح في ملف الـ JSON.')
+    if 'episode_number' in unsupported:
+        warnings.append(
+            'الملف فيه أرقام حلقات (episode_number)، بس الاستيراد لسه مابيوزعش المشاهد '
+            'على الحلقات تلقائيًا — هتحتاج تظبط الحلقة لكل مشهد يدويًا بعد الاستيراد.'
+        )
+    if 'shots' in unsupported:
+        warnings.append(
+            'الملف فيه اقتراحات لحجم الكادر وحركة الكاميرا، بس دي بتتحط على اللقطات '
+            'مش المشاهد — مش هتتستورد دلوقتي، هتفضل اقتراح تقدر ترجعله من الملف.'
+        )
 
     return {'scenes': _apply_silent_characters(scenes, known_characters), 'warnings': warnings}
 

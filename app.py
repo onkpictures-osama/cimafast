@@ -6,6 +6,7 @@ import uuid
 import json
 import datetime
 import streamlit as st
+import streamlit.components.v1 as st_components
 from auth import (
     authenticate, no_login_allowed, resolve_users,
     make_session_token, verify_session_token, SESSION_COOKIE_NAME,
@@ -293,26 +294,28 @@ TRANSLATIONS = {
         "For best results, write each scene on a line like: "
         "\"Scene 1 - INT - Day - Living Room\", and dialogue on a separate line like "
         "\"Character Name: line\".",
-    "📋 السكريبت شكله معقد والبرنامج مبيحللوش كويس؟ استخدم أي AI بدله":
-        "📋 Script format too complex and the app can't parse it well? Use any AI instead",
-    "لو شكل سكريبتك غريب أو التحليل التلقائي مبيطلعش نتيجة كويسة، اتبع الخطوات البسيطة دي:":
-        "If your script's format is unusual or the automatic analysis isn't giving good results, follow these simple steps:",
-    "**1.** دوس على زرار \"📋 نسخ البرومبت\" تحت (هيتنسخ تلقائي).\n\n"
-    "**2.** روح لبرنامج الـ AI اللي بتستخدمه (Claude، ChatGPT، Gemini...) وافتح محادثة جديدة.\n\n"
-    "**3.** الصق البرومبت اللي نسخته، وارفق معاه ملف السكريبت (PDF أو نص) أو الصق نص "
-    "السكريبت كامل بعد البرومبت.\n\n"
-    "**4.** بعد ما الـ AI يرد عليك بالنتيجة، احفظها في ملف اسمه `script.json`.\n\n"
-    "**5.** ارفع ملف `script.json` ده من الزرار تحت في الصفحة دي زي أي ملف تاني، وهيتم "
-    "استيراده تلقائي.":
-        "**1.** Click the \"📋 Copy Prompt\" button below (it copies automatically).\n\n"
-        "**2.** Go to the AI app you use (Claude, ChatGPT, Gemini...) and open a new chat.\n\n"
-        "**3.** Paste the prompt you copied, and attach the script file (PDF or text) or paste the "
-        "full script text after the prompt.\n\n"
-        "**4.** Once the AI replies with the result, save it to a file named `script.json`.\n\n"
-        "**5.** Upload that `script.json` file from the button below on this page like any other file, "
-        "and it will be imported automatically.",
-    "اضغط على أيقونة النسخ 📋 اللي هتظهر فوق يمين الصندوق ده عشان تاخد البرومبت كامل دفعة واحدة":
-        "Click the 📋 copy icon that appears at the top of this box to copy the whole prompt at once",
+    "🤖 التحليل خارج البرنامج — حلّل السكريبت على أي AI وارجع بالنتيجة":
+        "🤖 Analysis outside the app — analyze the script on any AI and bring back the result",
+    "لو السكريبت شكله معقد والتحليل اللي جوه البرنامج مش طالع كويس، حلّله بره "
+    "على أي AI في أربع خطوات:":
+        "If the script's format is complex and the built-in analysis isn't coming out well, "
+        "analyze it outside on any AI in four steps:",
+    "**1.** دوس «📋 نسخ البرومبت» تحت.\n\n"
+    "**2.** افتح Claude أو ChatGPT أو Gemini، الصق البرومبت، وارفق معاه ملف "
+    "السكريبت (أو الصق نصه كامل بعد البرومبت).\n\n"
+    "**3.** احفظ الـ JSON اللي هيرجعلك في ملف اسمه `script.json`.\n\n"
+    "**4.** ارفع `script.json` من زرار رفع الملف تحت — هيتقري ويتستورد زي أي سكريبت.":
+        "**1.** Click \"📋 Copy Prompt\" below.\n\n"
+        "**2.** Open Claude, ChatGPT or Gemini, paste the prompt, and attach your script file "
+        "(or paste its full text after the prompt).\n\n"
+        "**3.** Save the JSON it returns to a file named `script.json`.\n\n"
+        "**4.** Upload `script.json` from the file uploader below — it is parsed and imported "
+        "like any other script.",
+    "📋 نسخ البرومبت": "📋 Copy Prompt",
+    "✅ اتنسخ": "✅ Copied",
+    "⬇️ أو نزّل البرومبت كملف": "⬇️ Or download the prompt as a file",
+    "ده نص البرومبت كامل، لو حبيت تراجعه أو تنسخه يدويًا":
+        "This is the full prompt text, if you want to review it or copy it manually",
     "اختر ملف السكريبت": "Choose script file", "🔍 تحليل الملف": "🔍 Analyze File",
     "🚫 استبعد المشهد ده من الاستيراد (مثلاً لو ده صفحة عنوان مش مشهد حقيقي)":
         "🚫 Exclude this scene from import (e.g. if it's a title page, not a real scene)",
@@ -1032,6 +1035,50 @@ def _clear_analysis_state():
         st.session_state.pop(key, None)
 
 
+def _render_copy_button(text, label, done_label):
+    """زرار نسخ حقيقي للبرومبت.
+
+    Streamlit مفيهاش API للكليبورد، وكمان الكومبوننت بيتحط في iframe من غير
+    صلاحية clipboard-write، فـ navigator.clipboard بيترفض هناك. فبنجرب الـ API
+    الحديثة الأول، ولو رفضت بنقع على execCommand بـ textarea مخفي — ده لسه
+    شغال جوه الـ iframe. زرار التنزيل و st.code تحته هما خط الرجعة الأخير لو
+    المتصفح رفض الاتنين.
+    """
+    payload = json.dumps(text)
+    st_components.html(
+        f"""
+        <button id="cf-copy" style="width:100%;padding:0.55rem 1rem;cursor:pointer;
+            border-radius:0.5rem;border:1px solid rgba(212,175,55,0.45);
+            background:rgba(212,175,55,0.12);color:#e8c860;font-weight:600;
+            font-family:'Readex Pro',system-ui,sans-serif;font-size:0.95rem;">
+          {label}
+        </button>
+        <script>
+        const txt = {payload};
+        const btn = document.getElementById("cf-copy");
+        function ok() {{ btn.textContent = {json.dumps(done_label)}; }}
+        btn.addEventListener("click", async () => {{
+          try {{
+            await navigator.clipboard.writeText(txt);
+            ok();
+          }} catch (e) {{
+            const ta = document.createElement("textarea");
+            ta.value = txt;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            try {{ document.execCommand("copy"); ok(); }}
+            catch (e2) {{ btn.textContent = "⚠️"; }}
+            document.body.removeChild(ta);
+          }}
+        }});
+        </script>
+        """,
+        height=56,
+    )
+
+
 def _render_source_picker(fast, ai):
     """المقارنة بين التحليلين + اختيار اللي هيتستورد.
 
@@ -1156,22 +1203,27 @@ with tab_import:
         "\"اسم الشخصية: الكلام\"."
     ))
 
-    with st.expander(t("📋 السكريبت شكله معقد والبرنامج مبيحللوش كويس؟ استخدم أي AI بدله")):
+    with st.expander(t("🤖 التحليل خارج البرنامج — حلّل السكريبت على أي AI وارجع بالنتيجة")):
         st.markdown(t(
-            "لو شكل سكريبتك غريب أو التحليل التلقائي مبيطلعش نتيجة كويسة، اتبع الخطوات البسيطة دي:"
+            "لو السكريبت شكله معقد والتحليل اللي جوه البرنامج مش طالع كويس، حلّله بره "
+            "على أي AI في أربع خطوات:"
         ))
         st.markdown(t(
-            "**1.** دوس على زرار \"📋 نسخ البرومبت\" تحت (هيتنسخ تلقائي).\n\n"
-            "**2.** روح لبرنامج الـ AI اللي بتستخدمه (Claude، ChatGPT، Gemini...) وافتح محادثة جديدة.\n\n"
-            "**3.** الصق البرومبت اللي نسخته، وارفق معاه ملف السكريبت (PDF أو نص) أو الصق نص "
-            "السكريبت كامل بعد البرومبت.\n\n"
-            "**4.** بعد ما الـ AI يرد عليك بالنتيجة، احفظها في ملف اسمه `script.json`.\n\n"
-            "**5.** ارفع ملف `script.json` ده من الزرار تحت في الصفحة دي زي أي ملف تاني، وهيتم "
-            "استيراده تلقائي."
+            "**1.** دوس «📋 نسخ البرومبت» تحت.\n\n"
+            "**2.** افتح Claude أو ChatGPT أو Gemini، الصق البرومبت، وارفق معاه ملف "
+            "السكريبت (أو الصق نصه كامل بعد البرومبت).\n\n"
+            "**3.** احفظ الـ JSON اللي هيرجعلك في ملف اسمه `script.json`.\n\n"
+            "**4.** ارفع `script.json` من زرار رفع الملف تحت — هيتقري ويتستورد زي أي سكريبت."
         ))
 
+        _render_copy_button(AI_JSON_PROMPT, t("📋 نسخ البرومبت"), t("✅ اتنسخ"))
+        st.download_button(
+            t("⬇️ أو نزّل البرومبت كملف"), AI_JSON_PROMPT,
+            file_name="cimafast_prompt.txt", mime="text/plain",
+            key="dl_prompt", use_container_width=True)
+
         st.markdown(
-            f'<div class="cf-copy-hint">👇 {t("اضغط على أيقونة النسخ 📋 اللي هتظهر فوق يمين الصندوق ده عشان تاخد البرومبت كامل دفعة واحدة")}</div>',
+            f'<div class="cf-copy-hint">👇 {t("ده نص البرومبت كامل، لو حبيت تراجعه أو تنسخه يدويًا")}</div>',
             unsafe_allow_html=True,
         )
         st.code(AI_JSON_PROMPT, language="text")
