@@ -660,6 +660,38 @@ def parse_json_script(file_bytes, known_characters=None):
     return {'scenes': _apply_silent_characters(scenes, known_characters), 'warnings': warnings}
 
 
+def looks_like_screenplay(lines):
+    """بيقيس لو النص ده سيناريو فعلًا ولا لأ، وبيرجّع (نسبة الثقة، الأدلة).
+
+    ليه ده مهم: البرومبت بيطلب من الـ AI تفريغ مشاهد، والـ schema بتفرض إنه
+    يرجّع قايمة مشاهد — يعني لو اتبعتله بيان صحفي أو أي مستند مش سيناريو،
+    مش قدامه غير إنه **يخترع** مشاهد وأرقام. ده حصل فعلًا: مستند دعائي طلع
+    منه 13 مشهد بترقيم متخترع بالكامل، والنظام قال "تم بنجاح".
+
+    فبنقيس الأدلة الأول ونقول للمستخدم قبل ما يصرف فلوس."""
+    text = "\n".join(lines)
+    total = max(1, len([l for l in lines if l.strip()]))
+    evidence = {
+        'scene_headers': sum(1 for l in lines if SCENE_HEADER_RE.match(l)),
+        'int_ext': len(INT_RE.findall(text)) + len(EXT_RE.findall(text)),
+        'day_night': len(re.findall(r'\b(?:نهار|ليل|غروب|فجر)\b', text)),
+        'dialogue_lines': sum(1 for l in lines if DIALOGUE_LINE_RE.match(l)),
+        'cut_markers': sum(1 for l in lines if CUT_RE.match(l)),
+    }
+    score = 0.0
+    if evidence['scene_headers']:
+        score += 0.5
+    if evidence['int_ext'] >= 2:
+        score += 0.2
+    if evidence['day_night'] >= 2:
+        score += 0.1
+    if evidence['dialogue_lines'] / total > 0.08:
+        score += 0.2
+    if evidence['cut_markers']:
+        score += 0.1
+    return min(1.0, round(score, 2)), evidence
+
+
 def extract_lines(filename, file_bytes):
     """بترجّع سطور النص الخام من غير أي تحليل.
 
@@ -672,8 +704,33 @@ def extract_lines(filename, file_bytes):
         if docx is None:
             raise RuntimeError('مكتبة قراءة ملفات Word غير مثبتة (python-docx)')
         document = docx.Document(BytesIO(file_bytes))
-        return [it['text'] for it in _iter_docx_items(document)
-                if it.get('type') == 'paragraph' and it.get('text')]
+        out = []
+        for it in _iter_docx_items(document):
+            if it.get('type') == 'scene_table':
+                # عناوين المشاهد في سكريبتات Word كتير بتكون جداول مش فقرات.
+                # النسخة الأولى كانت بتاخد الفقرات بس، فكل أرقام المشاهد
+                # والداخلي/خارجي والأماكن كانت بتضيع قبل ما توصل للـ AI —
+                # فالـ AI كان بيخترع ترقيم من عنده. بنرجّعهم هنا كسطر عنوان.
+                bits = [f"مشهد {it['scene_number']}"]
+                if it.get('int_ext'):
+                    bits.append({'INT': 'داخلي', 'EXT': 'خارجي',
+                                 'INT/EXT': 'داخلي/خارجي'}.get(it['int_ext'], it['int_ext']))
+                if it.get('day_night'):
+                    bits.append(it['day_night'])
+                if it.get('location_name'):
+                    bits.append(it['location_name'])
+                # نفس الكلمة ممكن تتقري من أكتر من عمود (المكان فيه "داخلي"
+                # والعمود التاني كمان) — منكررهاش في سطر العنوان
+                seen, uniq = set(), []
+                for b in bits:
+                    key = (b or '').strip()
+                    if key and key not in seen:
+                        seen.add(key)
+                        uniq.append(key)
+                out.append(' - '.join(uniq))
+            elif it.get('type') == 'paragraph' and it.get('text'):
+                out.append(it['text'])
+        return out
     if lower.endswith('.txt'):
         return _extract_txt_lines(file_bytes)
     if lower.endswith('.pdf'):

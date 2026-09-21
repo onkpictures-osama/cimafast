@@ -129,6 +129,70 @@ def test_cross_scene_roster():
               f"s1 silent={scenes[0].get('silent_characters')} s2 cast={scenes[1].get('characters')}")
 
 
+
+# ------------------------------------------- docx tables reach the AI path
+def test_docx_scene_tables_are_extracted():
+    """Scene headers in Word tables must survive extraction.
+
+    extract_lines originally kept only paragraphs, so every scene table -
+    number, INT/EXT, day/night, location - was discarded before the text
+    reached the AI. The model then had no numbers to copy and invented its own,
+    which is exactly what was reported: "numbering is wrong, scenes skipped".
+    """
+    try:
+        import docx as _docx
+    except ImportError:
+        check("python-docx available", False, "skipped")
+        return
+    from io import BytesIO
+    from script_parser import extract_lines
+
+    d = _docx.Document()
+    for num, loc in (("مشهد 12", "شقة أحمد"), ("مشهد 13", "الشارع")):
+        tbl = d.add_table(rows=1, cols=4)
+        for cell, txt in zip(tbl.rows[0].cells, [num, loc, "نهار", "داخلي"]):
+            cell.text = txt
+        d.add_paragraph(f"وصف عند {loc}.")
+    buf = BytesIO(); d.save(buf)
+
+    lines = extract_lines("s.docx", buf.getvalue())
+    joined = "\n".join(lines)
+    check("scene 12 header survives extraction", "مشهد 12" in joined, joined[:60])
+    check("scene 13 header survives extraction", "مشهد 13" in joined)
+    check("original numbering preserved, not renumbered from 1",
+          "مشهد 1 " not in joined and "مشهد 2 " not in joined)
+    check("locations survive", "شقة أحمد" in joined and "الشارع" in joined)
+    check("body paragraphs still present", "وصف عند" in joined)
+
+
+# ------------------------------------------- refuse to analyse a non-script
+def test_screenplay_detector():
+    """A document with no screenplay markers must score near zero.
+
+    The schema forces the model to return scenes, so it cannot answer "this is
+    not a script" - it fabricates one instead. A real press release produced 13
+    invented scenes and the system reported success. This is the gate that
+    warns before any money is spent.
+    """
+    from script_parser import looks_like_screenplay
+
+    press = ["شركة تطوير عقاري تطلق مشروعها الجديد في أكتوبر",
+             "ويمثل المشروع الثاني للشركة في السوق المصرية على مساحة 80 فدانًا.",
+             "وتبدأ أسعار الوحدات من 1.8 مليون جنيه بأنظمة سداد تصل إلى 10 سنوات."]
+    conf, ev = looks_like_screenplay(press)
+    check("press release scores ~0", conf < 0.3, f"score={conf} evidence={ev}")
+
+    script = ["مشهد 1 - داخلي - نهار - شقة", "أحمد يجلس.", "أحمد: أهلا.",
+              "فاطمة: أهلا بك.", "قطع",
+              "مشهد 2 - خارجي - ليل - شارع", "سعاد تمشي."]
+    conf2, ev2 = looks_like_screenplay(script)
+    check("a real screenplay scores high", conf2 >= 0.8, f"score={conf2}")
+    check("the two are clearly separated", conf2 - conf > 0.5, f"{conf} vs {conf2}")
+    check("evidence is reported for the user to see",
+          set(ev) == {"scene_headers", "int_ext", "day_night", "dialogue_lines", "cut_markers"})
+    check("empty input does not crash", looks_like_screenplay([])[0] == 0.0)
+
+
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Drama analyzer regression suite")
@@ -136,7 +200,8 @@ if __name__ == "__main__":
     for fn in [test_props_word_boundaries, test_props_still_found,
                test_silent_excludes_speakers, test_silent_finds_non_speaker,
                test_silent_ignores_absent, test_silent_name_boundaries,
-               test_end_to_end, test_cross_scene_roster]:
+               test_end_to_end, test_cross_scene_roster,
+               test_docx_scene_tables_are_extracted, test_screenplay_detector]:
         fn()
     passed, total = sum(results), len(results)
     print("\n" + "=" * 60)

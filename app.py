@@ -22,7 +22,7 @@ from ai_prompt import AI_JSON_PROMPT
 import ai_jobs
 from script_md import to_markdown
 from script_parser import (
-    extract_lines, parse_json_script,
+    extract_lines, parse_json_script, looks_like_screenplay,
     parse_script, find_similar_name_groups, apply_character_merges,
     find_similar_location_groups, apply_location_merges,
     find_location_matches_with_states,
@@ -1023,6 +1023,15 @@ tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
 # ---------------- تبويب استيراد السكريبت ----------------
 
 
+def _clear_analysis_state():
+    """بيمسح أي نتيجة تحليل من الجلسة — السريعة واللي من الذكاء الاصطناعي —
+    من غير ما يفترض إن مفتاح معيّن موجود."""
+    for key in ("parsed_script", "ai_parsed_script", "ai_job_id",
+                "_ai_pending", "_which_analysis", "_ai_last_seen_state",
+                "_ai_load_attempted"):
+        st.session_state.pop(key, None)
+
+
 def _render_source_picker(fast, ai):
     """المقارنة بين التحليلين + اختيار اللي هيتستورد.
 
@@ -1196,8 +1205,10 @@ with tab_import:
         try:
             _lines = extract_lines(uploaded_file.name, uploaded_file.getvalue())
             _md, _stats = to_markdown(_lines)
+            _conf, _ev = looks_like_screenplay(_lines)
             st.session_state["_ai_pending"] = {
-                "md": _md, "stats": _stats, "filename": uploaded_file.name}
+                "md": _md, "stats": _stats, "filename": uploaded_file.name,
+                "confidence": _conf, "evidence": _ev}
         except Exception as e:
             st.error(f"{t('حصل خطأ أثناء قراءة الملف:')} {e}")
 
@@ -1211,10 +1222,29 @@ with tab_import:
             f"{t('تم تنضيف الملف قبل الإرسال')}: {_st['raw_chars']:,} → "
             f"{_st['md_chars']:,} {t('حرف')}"
             + (f" ({_st['saved_pct']}% {t('أقل')})" if _st['saved_pct'] > 0 else ""))
+        # لو المستند مش شكله سيناريو، الـ AI مش هيقدر يقول "مش عارف" — الـ
+        # schema بتفرض عليه يرجّع مشاهد، فهيخترعها. بنحذّر قبل الصرف.
+        _conf = _pending.get("confidence", 1.0)
+        _ev = _pending.get("evidence", {})
+        if _conf < 0.3:
+            st.error(
+                f"⚠️ {t('الملف ده مش شكله سيناريو.')}\n\n"
+                f"{t('مفيش فيه عناوين مشاهد')} ({_ev.get('scene_headers', 0)}) "
+                f"{t('ولا داخلي/خارجي')} ({_ev.get('int_ext', 0)}) "
+                f"{t('ولا سطور حوار')} ({_ev.get('dialogue_lines', 0)}).\n\n"
+                f"{t('لو كملت، الذكاء الاصطناعي هيضطر يخترع مشاهد وأرقام مش موجودة في الملف.')}")
+        elif _conf < 0.6:
+            st.warning(
+                f"⚠️ {t('أدلة قليلة إن ده سيناريو')} "
+                f"({t('عناوين مشاهد')}: {_ev.get('scene_headers', 0)}, "
+                f"{t('حوار')}: {_ev.get('dialogue_lines', 0)}). "
+                f"{t('راجع النتيجة كويس قبل الاستيراد.')}")
         _ok, _no = st.columns(2)
         with _ok:
-            if st.button(t("✅ ابدأ التحليل"), use_container_width=True, key="_ai_go"):
+            _go_label = t("✅ ابدأ التحليل") if _conf >= 0.3 else t("⚠️ كمّل بالرغم من كده")
+            if st.button(_go_label, use_container_width=True, key="_ai_go"):
                 try:
+                    st.session_state.pop("_ai_load_attempted", None)
                     st.session_state["ai_job_id"] = ai_jobs.start(
                         _pending["md"], project_id, _pending["filename"],
                         known_characters=_known, max_cost_usd=_ceiling)
@@ -1251,8 +1281,21 @@ with tab_import:
             extra = f" · ${spent}" if spent else ""
             if state == "done":
                 st.success(f"[ ✅ ] {t('التحليل خلص')} — {detail}{extra}")
+                # الفراجمنت بيعيد تشغيل نفسه بس. الكود اللي بيحمّل النتيجة
+                # برّه، وبيقرا الحالة مرة واحدة كل تشغيل كامل للصفحة — فكان
+                # بيفضل شايف "شغال" للأبد، والمستخدم لازم يعمل ريفريش بإيده.
+                # rerun على مستوى التطبيق بيشغّل التحميل فورًا.
+                # مرة واحدة بس. لو ملف النتيجة مش مقروء، ai_parsed_script
+                # عمره ما هيتظبط، والـ rerun هيفضل يلف للأبد.
+                if (not st.session_state.get("ai_parsed_script")
+                        and not st.session_state.get("_ai_load_attempted")):
+                    st.session_state["_ai_load_attempted"] = True
+                    st.rerun(scope="app")
             elif state == "failed":
                 st.error(f"[ ❌ ] {t('التحليل فشل')} — {detail}{extra}")
+                if st.session_state.get("_ai_last_seen_state") != "failed":
+                    st.session_state["_ai_last_seen_state"] = "failed"
+                    st.rerun(scope="app")
             elif state == "running":
                 st.info(f"[ ⚙️ ] {t('بيحلل')} — {detail}{extra}")
             else:
@@ -1274,6 +1317,8 @@ with tab_import:
                     st.rerun()
                 except Exception as e:
                     st.error(f"{t('نتيجة الذكاء الاصطناعي مش مقروءة:')} {e}")
+            else:
+                st.error(t("التحليل خلص بس ملف النتيجة مش موجود. جرّب تاني."))
         if _state in ai_jobs.TERMINAL:
             if st.button(t("🧹 إخفاء نتيجة التحليل"), key="_ai_clear"):
                 for _k in ("ai_job_id", "ai_parsed_script"):
@@ -1440,11 +1485,16 @@ with tab_import:
 
                 st.session_state["last_analysis"] = list(scenes_to_import)
 
-                del st.session_state["parsed_script"]
+                # لازم نمسح النتيجتين. الاستيراد كان بيمسح parsed_script بس
+                # بـ del، ولو التحليل جاي من الذكاء الاصطناعي المفتاح ده مش
+                # موجود أصلًا — فكان بيرمي KeyError **بعد** ما البيانات
+                # تتسجل فعلًا، فالمستخدم يشوف خطأ والنتيجة لسه على الشاشة
+                # ويفتكر إن مفيش حاجة اتضافت.
+                _clear_analysis_state()
                 st.rerun()
         with col_b:
             if st.button(t("🗑️ إلغاء ومسح النتائج")):
-                del st.session_state["parsed_script"]
+                _clear_analysis_state()
                 st.rerun()
 
 # ---------------- تبويب الأماكن ----------------
