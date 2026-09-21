@@ -85,12 +85,28 @@ The loop is:
 2. `systemctl restart cimafast-v1`, then exercise the change on `/v1` in a real
    browser (`pw-python`, see `/root/.claude/skills/webapp-testing/LOCAL-NOTES.md`)
    — a 200 from `curl` proves nothing, Streamlit renders errors after load.
-3. Commit on `preview`, then `git push origin preview:main`. If the push is
-   rejected, someone else moved `main`: `git merge origin/main`, re-verify, retry.
-4. `cimafast-update` — it pulls `main` into `/srv/cimafast`, snapshots the live
-   DB, restarts, health-checks and rolls back on failure.
-5. Fast-forward is automatic next time; if `/v1` looks older than production,
-   `git merge --ff-only origin/main` in the preview checkout.
+3. Commit on `preview`. **Check what is on `preview` but not on `main` before
+   publishing anything:** `git diff --stat origin/main preview` (compare content —
+   `git log origin/main..preview` misses work that main contains but reverted).
+   The preview holds work the owner has not approved for production (see below).
+   - To ship **everything** on the preview (only when the owner has approved a
+     production deploy): `git push origin preview:main`.
+   - To ship **one change** (a doc, a hotfix): cherry-pick that commit onto
+     `origin/main` in a temporary worktree and push that — never `preview:main`.
+4. `cimafast-update` — the ONLY way `/srv/cimafast` changes. Never `git pull` or
+   `git reset` there by hand: `cimafast-update` runs the whole-app test before it
+   restarts, and would have blocked the outage below.
+5. If `/v1` lacks something that is on production: cherry-pick those commits
+   into `preview`. Do NOT `git merge origin/main` into the preview right now —
+   `main` contains 06fee08, which reverts the preview's own work, and merging it
+   would strip that work out of /v1.
+
+**Current state (2026-09-21):** the owner DECLINED deploying the preview work
+(UX round 2, the app.py split + WAL, the data layer + shooting-schedule board:
+4487f40, af1d12a, c0c49d6). A `preview:main` push that same evening carried them
+to production by mistake and broke it for a minute; `main` now reverts them in
+06fee08. So when the owner does approve that deploy, merging `preview` will NOT
+bring them back — revert 06fee08 on `main` instead.
 
 The preview's database (`/var/lib/cimafast-v1/studio.db`) is a copy. Refresh it
 from live with `python3 /opt/cimafast-backup/snapshot_db.py
