@@ -297,6 +297,22 @@ def init_db():
             prop_id INTEGER NOT NULL REFERENCES props(id) ON DELETE CASCADE,
             UNIQUE(scene_id, prop_id)
         );
+
+        -- جدول التصوير (الـ stripboard): أيام تصوير، وكل مشهد في يوم واحد بالكتير.
+        CREATE TABLE IF NOT EXISTS shooting_days (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            day_number INTEGER NOT NULL,
+            shoot_date TEXT,
+            notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS shooting_day_scenes (
+            id SERIAL PRIMARY KEY,
+            day_id INTEGER NOT NULL REFERENCES shooting_days(id) ON DELETE CASCADE,
+            scene_id INTEGER NOT NULL UNIQUE REFERENCES scenes(id) ON DELETE CASCADE,
+            position INTEGER NOT NULL DEFAULT 0
+        );
         """)
     else:
         c.executescript("""
@@ -478,6 +494,25 @@ def init_db():
             FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
             FOREIGN KEY (prop_id) REFERENCES props(id) ON DELETE CASCADE,
             UNIQUE(scene_id, prop_id)
+        );
+
+        -- جدول التصوير (الـ stripboard): أيام تصوير، وكل مشهد في يوم واحد بالكتير.
+        CREATE TABLE IF NOT EXISTS shooting_days (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            day_number INTEGER NOT NULL,
+            shoot_date TEXT,
+            notes TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS shooting_day_scenes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            day_id INTEGER NOT NULL,
+            scene_id INTEGER NOT NULL UNIQUE,
+            position INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (day_id) REFERENCES shooting_days(id) ON DELETE CASCADE,
+            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
         );
         """)
     conn.commit()

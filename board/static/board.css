@@ -1,0 +1,123 @@
+/* جدول التصوير.
+   الجرأة كلها في الشرائط نفسها: ألوان ورق الـ stripboard التقليدية (أبيض/أصفر/
+   أزرق/أخضر) على أرضية التطبيق الكحلي، وأرقام المشاهد مكتوبة زي الكلاكيت.
+   كل حاجة حوالين الشرائط هادية. */
+
+@font-face { font-family: "Readex Pro"; src: url("../fonts/readex-pro-arabic-var.woff2") format("woff2");
+             font-weight: 160 700; unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Readex Pro"; src: url("../fonts/readex-pro-latin-var.woff2") format("woff2");
+             font-weight: 160 700; unicode-range: U+0000-00FF, U+2000-206F; }
+
+:root {
+  color-scheme: dark;
+  --ground: #0B1220;
+  --surface: #16233F;
+  --surface-2: #1D2C4D;
+  --line: rgba(245, 241, 230, 0.12);
+  --text: #F5F1E6;
+  --muted: rgba(245, 241, 230, 0.66);
+  --gold: #E8B923;
+  --danger: #F87171;
+  /* ورق الشرائط */
+  --int-day: #F4F1E8;   --int-day-ink: #1C1A14;
+  --ext-day: #F2D64B;   --ext-day-ink: #2A2206;
+  --int-night: #7FA6E8; --int-night-ink: #0C1830;
+  --ext-night: #7CCB93; --ext-night-ink: #0B2414;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--text);
+             font: 15px/1.5 "Readex Pro", system-ui, sans-serif; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* --- الشريط العلوي --- */
+.bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px;
+       padding: 16px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0;
+       background: rgba(11, 18, 32, 0.94); z-index: 5; }
+.bar__title { display: flex; align-items: baseline; gap: 14px; margin-inline-end: auto; }
+.bar__title h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.back { color: var(--muted); text-decoration: none; font-size: 14px; }
+.back:hover { color: var(--text); }
+.bar__actions { display: flex; align-items: end; gap: 10px; }
+.field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.field--inline input { width: 64px; }
+select, input { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line);
+                border-radius: 8px; padding: 7px 10px; min-height: 38px; }
+.btn { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line);
+       border-radius: 8px; padding: 7px 14px; min-height: 38px; cursor: pointer; }
+.btn:hover { border-color: var(--gold); }
+.btn--primary { background: var(--gold); color: #1A1405; border-color: var(--gold); text-decoration: none;
+                display: inline-block; font-weight: 600; }
+.status { margin: 0; min-width: 9ch; font-size: 13px; color: var(--muted); }
+.status--error { color: var(--danger); }
+.user { font-size: 13px; color: var(--muted); }
+
+.summary { padding: 12px 24px 0; color: var(--muted); font-size: 14px; }
+.summary strong { color: var(--text); font-weight: 600; }
+
+.legend { display: flex; gap: 18px; list-style: none; margin: 0; padding: 10px 24px; font-size: 13px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.swatch { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* --- اللوحة: عمود لكل يوم، بتتسكرول بالعرض --- */
+.board { display: flex; gap: 14px; align-items: flex-start; overflow-x: auto; padding: 8px 24px 24px;
+         scroll-snap-type: x proximity; min-height: 60vh; }
+.day { flex: 0 0 248px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+       scroll-snap-align: start; display: flex; flex-direction: column; max-height: calc(100vh - 230px); }
+.day--pool { background: transparent; border-style: dashed; }
+.day__head { padding: 10px 12px 8px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.day__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.day__title { font-weight: 600; font-size: 15px; margin: 0; }
+.day__stats { font-size: 12px; color: var(--muted); }
+.day__warn { font-size: 12px; color: var(--gold); }
+.day__date { min-height: 32px; padding: 4px 8px; font-size: 13px; width: 100%; }
+.day__del { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1;
+            padding: 4px 6px; border-radius: 6px; }
+.day__del:hover { color: var(--danger); }
+.day__list { list-style: none; margin: 0; padding: 8px; display: grid; gap: 6px; overflow-y: auto;
+             min-height: 64px; flex: 1; }
+.day__empty { color: var(--muted); font-size: 13px; text-align: center; padding: 14px 6px; }
+
+/* --- الشريطة --- */
+.strip { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+         padding: 7px 10px; border-radius: 6px; cursor: grab; user-select: none;
+         box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.strip:active { cursor: grabbing; }
+.strip__no { font-weight: 700; font-size: 20px; letter-spacing: -0.01em; min-width: 2.2ch; text-align: center;
+             font-variant-numeric: tabular-nums; direction: ltr; }
+.strip__body { display: grid; min-width: 0; }
+.strip__place { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip__meta { font-size: 12px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip__cast { font-size: 12px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.strip--int-day   { background: var(--int-day);   color: var(--int-day-ink); }
+.strip--ext-day   { background: var(--ext-day);   color: var(--ext-day-ink); }
+.strip--int-night { background: var(--int-night); color: var(--int-night-ink); }
+.strip--ext-night { background: var(--ext-night); color: var(--ext-night-ink); }
+.sortable-ghost { opacity: 0.35; }
+.sortable-chosen { box-shadow: 0 0 0 2px var(--gold); }
+
+/* --- أيام شغل الممثلين --- */
+.dood { margin: 0 24px 40px; border-top: 1px solid var(--line); padding-top: 12px; }
+.dood summary { cursor: pointer; font-weight: 600; font-size: 16px; padding: 6px 0; }
+.dood .hint { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
+.dood__wrap { overflow-x: auto; }
+.dood table { border-collapse: collapse; font-size: 13px; }
+.dood th, .dood td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; white-space: nowrap; }
+.dood th:first-child, .dood td:first-child { text-align: start; position: sticky; inset-inline-start: 0;
+                                             background: var(--ground); }
+.dood td.c-W, .dood td.c-SW, .dood td.c-WF, .dood td.c-SWF { background: rgba(232, 185, 35, 0.18); }
+.dood td.c-H { color: var(--muted); }
+
+.signin main { max-width: 440px; margin: 18vh auto; padding: 0 24px; }
+.signin h1 { font-weight: 600; }
+
+@media (max-width: 700px) {
+  .bar { padding: 12px 14px; }
+  .board { padding: 8px 14px 20px; }
+  .day { flex-basis: 82vw; }
+  .legend { flex-wrap: wrap; padding: 8px 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

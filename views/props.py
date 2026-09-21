@@ -1,20 +1,20 @@
 """تبويب props."""
 
 import streamlit as st
-from database import fetch_all, run_query
 from i18n import t, tr
 from search import matches
 from ui import library_result_count, library_search, mark_saved, safe_index, show_saved_badge
+import repo
 
 
 def render(project_id):
     st.subheader(tr("sub_props"))
 
-    characters_for_props = fetch_all("SELECT * FROM characters WHERE project_id=? ORDER BY id", (project_id,))
+    characters_for_props = repo.characters_of_project_by_id(project_id)
     char_options_for_props = ["بدون - غير مرتبط بشخصية"] + [c["name"] for c in characters_for_props]
     char_id_by_name = {c["name"]: c["id"] for c in characters_for_props}
 
-    _props_before = fetch_all("SELECT id FROM props WHERE project_id=?", (project_id,))
+    _props_before = repo.prop_ids_of_project(project_id)
     _prop_q = (library_search(f"prop_search_{project_id}", len(_props_before), "إكسسوار")
                if _props_before else "")
     with st.expander(f"➕ {t('إضافة إكسسوار جديد')}", expanded=not _props_before):
@@ -30,16 +30,13 @@ def render(project_id):
             if st.form_submit_button(t("إضافة إكسسوار")):
                 if prop_name.strip():
                     linked_char_id = char_id_by_name.get(prop_character)
-                    run_query(
-                        "INSERT INTO props (project_id, name, continuity_sensitive, character_id) VALUES (?,?,?,?)",
-                        (project_id, prop_name, int(prop_continuity), linked_char_id),
-                    )
+                    repo.add_prop(project_id, prop_name, int(prop_continuity), linked_char_id)
                     st.rerun()
                 else:
                     st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
 
     st.divider()
-    props_list = fetch_all("SELECT * FROM props WHERE project_id=? ORDER BY id", (project_id,))
+    props_list = repo.props_of_project(project_id)
     if not props_list:
         st.caption(t("مفيش إكسسوارات مضافة لسه"))
     _char_name_by_id = {c["id"]: c["name"] for c in characters_for_props}
@@ -76,16 +73,13 @@ def render(project_id):
                 if save_pr:
                     if ep_name.strip():
                         new_linked_char_id = char_id_by_name.get(ep_character)
-                        run_query(
-                            "UPDATE props SET name=?, continuity_sensitive=?, character_id=? WHERE id=?",
-                            (ep_name, int(ep_continuity), new_linked_char_id, pr["id"]),
-                        )
+                        repo.update_prop(ep_name, int(ep_continuity), new_linked_char_id, pr["id"])
                         mark_saved(f"prop_{pr['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
                 if del_pr:
-                    run_query("DELETE FROM props WHERE id=?", (pr["id"],))
+                    repo.delete_prop(pr["id"])
                     st.success(t("تم حذف الإكسسوار"))
                     st.rerun()
                 show_saved_badge(f"prop_{pr['id']}")

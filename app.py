@@ -1,49 +1,18 @@
 import os
-import re
 import sys
 import time
-import uuid
-import json
-import datetime
 import streamlit as st
-import pandas as pd
-import streamlit.components.v1 as st_components
 from auth import (
     authenticate, no_login_allowed, resolve_users,
     make_session_token, verify_session_token, SESSION_COOKIE_NAME,
 )
-from search import matches
-from importer import DEFAULT_VARIANT
-from database import (
-    scene_label,
-    next_free_number,
-    init_db, FIELD_HELP,
-    fetch_all, run_query, run_delete,
-    CAMERA_MOVEMENT_OPTIONS, SHOT_SIZE_OPTIONS, CAMERA_ANGLE_OPTIONS,
-    SPECIES_OPTIONS, GENDER_OPTIONS, PROJECT_ROLE_OPTIONS, INT_EXT_OPTIONS,
-    INT_EXT_LABELS, DAY_NIGHT_OPTIONS, DAY_NIGHT_LABELS, bilingual_label,
-)
-from ai_prompt import AI_JSON_PROMPT
-import ai_jobs
-import image_gen
-from script_md import to_markdown
-from script_parser import (
-    extract_lines, parse_json_script, looks_like_screenplay,
-    parse_script, find_similar_name_groups, apply_character_merges,
-    find_similar_location_groups, apply_location_merges,
-    find_location_matches_with_states,
-)
-from importer import import_parsed_scenes
+from database import init_db, FIELD_HELP, PROJECT_ROLE_OPTIONS
 import theme
-from export import (
-    build_shot_list_excel, build_shot_list_word, build_shot_list_pdf,
-    build_characters_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel,
-    build_props_sheet_excel,
-)
 
 from i18n import t, tr
 from ui import ltr, mark_saved, safe_index, show_saved_badge
 import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
+import repo
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
@@ -319,7 +288,7 @@ st.sidebar.markdown(
 
 st.sidebar.caption(tr("sidebar_projects"))
 
-projects = fetch_all("SELECT * FROM projects ORDER BY id DESC")
+projects = repo.all_projects_newest_first()
 project_names = {p["name"]: p["id"] for p in projects}
 
 with st.sidebar.expander(tr("new_project")):
@@ -330,10 +299,7 @@ with st.sidebar.expander(tr("new_project")):
     new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], index=0)
     if st.button(t("إنشاء المشروع")):
         if new_name.strip():
-            run_query(
-                "INSERT INTO projects (name, project_type, default_resolution, default_orientation, default_aspect_ratio) VALUES (?,?,?,?,?)",
-                (new_name, new_type, new_res, new_orient, new_ratio),
-            )
+            repo.add_project(new_name, new_type, new_res, new_orient, new_ratio)
             st.success(t("تم إنشاء المشروع"))
             st.rerun()
         else:
@@ -345,7 +311,14 @@ if not projects:
 
 selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
-project = fetch_all("SELECT * FROM projects WHERE id=?", (project_id,))[0]
+project = repo.project_by_id(project_id)[0]
+
+# جدول التصوير — أول شاشة في الواجهة الجديدة (board/). اللينك بيظهر بس لما
+# CIMAFAST_BOARD_URL متظبط، ودلوقتي ده في خدمة /v1 بس — الإنتاج مالوش board.
+_board_url = os.environ.get("CIMAFAST_BOARD_URL")
+if _board_url:
+    st.sidebar.link_button(f"🗓️ {t('جدول التصوير')}", f"{_board_url}?project={project_id}",
+                           use_container_width=True)
 
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير
 # تأكيد، عشان ميحصلش استيراد مشاهد بالغلط لمشروع تاني
@@ -363,7 +336,7 @@ if project["project_type"] == "مسلسل":
     # العنوان كان نص ثنائي ثابت (عربي + إنجليزي) مبيعديش على t() — وفي الواجهة
     # الإنجليزي الكلمة العربية كانت بتترسم مكسّرة جوه سطر LTR.
     with st.sidebar.expander(f"🎬 {t('الحلقات')}"):
-        episodes = fetch_all("SELECT * FROM episodes WHERE project_id=? ORDER BY episode_number", (project_id,))
+        episodes = repo.episodes_of_project(project_id)
         
         st.subheader(t("إنشاء حلقة جديدة"))
         new_ep_num = st.number_input(t("رقم الحلقة"), min_value=1, value=len(episodes)+1, key=f"new_ep_num_{project_id}")
@@ -372,10 +345,7 @@ if project["project_type"] == "مسلسل":
         
         if st.button(t("إضافة حلقة"), key=f"add_ep_btn_{project_id}"):
             if new_ep_title.strip():
-                run_query(
-                    "INSERT INTO episodes (project_id, episode_number, title, description) VALUES (?,?,?,?)",
-                    (project_id, int(new_ep_num), new_ep_title, new_ep_desc)
-                )
+                repo.add_episode(project_id, int(new_ep_num), new_ep_title, new_ep_desc)
                 st.success(t("تم إضافة الحلقة"))
                 st.rerun()
             else:
@@ -397,7 +367,7 @@ if project["project_type"] == "مسلسل":
                     
                     # Delete button
                     if st.button(t("حذف الحلقة"), key=f"del_ep_{ep['id']}"):
-                        run_query("DELETE FROM episodes WHERE id=?", (ep['id'],))
+                        repo.delete_episode(ep['id'])
                         st.success(t("تم حذف الحلقة"))
                         st.rerun()
 
@@ -430,10 +400,7 @@ with st.sidebar.expander(tr("edit_delete_project")):
     )
     if st.button(t("💾 حفظ تعديل المشروع"), key=f"save_proj_btn_{project_id}"):
         if e_proj_name.strip():
-            run_query(
-                "UPDATE projects SET name=?, project_type=?, default_resolution=?, default_orientation=?, default_aspect_ratio=? WHERE id=?",
-                (e_proj_name, e_proj_type, e_proj_res, e_proj_orient, e_proj_ratio, project_id),
-            )
+            repo.update_project_settings(e_proj_name, e_proj_type, e_proj_res, e_proj_orient, e_proj_ratio, project_id)
             st.success(t("تم تعديل بيانات المشروع"))
             st.rerun()
         else:
@@ -446,7 +413,7 @@ with st.sidebar.expander(tr("edit_delete_project")):
         key=f"confirm_delete_project_{project_id}",
     )
     if st.button(t("🗑️ حذف المشروع نهائيًا"), disabled=not confirm_delete_project, key=f"delete_proj_btn_{project_id}"):
-        run_query("DELETE FROM projects WHERE id=?", (project_id,))
+        repo.delete_project(project_id)
         st.success(t("تم حذف المشروع"))
         st.rerun()
 
@@ -481,10 +448,7 @@ with st.sidebar:
             key=f"edit_owner_role_{project_id}",
         )
         if st.button(t("💾 حفظ الإعدادات"), key=f"save_settings_btn_{project_id}"):
-            run_query(
-                "UPDATE projects SET owner_name=?, owner_role=? WHERE id=?",
-                (e_owner_name, None if e_owner_role == "—" else e_owner_role, project_id),
-            )
+            repo.update_project_owner(e_owner_name, None if e_owner_role == "—" else e_owner_role, project_id)
             mark_saved(f"settings_{project_id}")
             st.rerun()
         show_saved_badge(f"settings_{project_id}")
@@ -504,16 +468,11 @@ st.markdown(
 )
 
 # ---------------- شريط مراحل العمل ----------------
-_loc_count = fetch_all("SELECT COUNT(*) c FROM locations WHERE project_id=?", (project_id,))[0]["c"]
-_char_count = fetch_all("SELECT COUNT(*) c FROM characters WHERE project_id=?", (project_id,))[0]["c"]
-_scene_count = fetch_all("SELECT COUNT(*) c FROM scenes WHERE project_id=?", (project_id,))[0]["c"]
-_shot_count = fetch_all(
-    "SELECT COUNT(*) c FROM shots sh JOIN scenes s ON sh.scene_id=s.id WHERE s.project_id=?", (project_id,)
-)[0]["c"]
-_confirmed_count = fetch_all(
-    "SELECT COUNT(*) c FROM shots sh JOIN scenes s ON sh.scene_id=s.id WHERE s.project_id=? AND sh.confirmed=1",
-    (project_id,),
-)[0]["c"]
+_loc_count = repo.count_locations(project_id)[0]["c"]
+_char_count = repo.count_characters(project_id)[0]["c"]
+_scene_count = repo.count_scenes(project_id)[0]["c"]
+_shot_count = repo.count_shots(project_id)[0]["c"]
+_confirmed_count = repo.count_confirmed_shots(project_id)[0]["c"]
 
 _stage_defs = [
     ("🎬", tr("stage_project")),
@@ -531,10 +490,7 @@ _done_flags = [
 ]
 _current_idx = next((i for i, d in enumerate(_done_flags) if not d), len(_done_flags) - 1)
 
-_scenes_with_shots = fetch_all(
-    "SELECT COUNT(DISTINCT s.id) c FROM scenes s JOIN shots sh ON sh.scene_id=s.id WHERE s.project_id=?",
-    (project_id,),
-)[0]["c"]
+_scenes_with_shots = repo.count_scenes_with_shots(project_id)[0]["c"]
 _all_done = all(_done_flags)
 
 # سطر تقدّم واحد بدل خمس كروت. الكروت كانت بتاخد ~90px فوق كل تبويب وبتكرر

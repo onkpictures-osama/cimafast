@@ -2,16 +2,17 @@
 
 import image_gen
 import streamlit as st
-from database import fetch_all, run_delete, run_query
 from i18n import t, tr
 from search import matches
 from ui import delete_image_file, library_result_count, library_search, mark_saved, render_image_picker, safe_index, show_saved_badge
+from ui import guarded_delete
+import repo
 
 
 def render(project_id):
     st.subheader(tr("sub_locations"))
 
-    locations = fetch_all("SELECT * FROM locations WHERE project_id=?", (project_id,))
+    locations = repo.locations_of_project(project_id)
     location_name_by_id = {l["id"]: l["name"] for l in locations}
 
     # المكتبة الأول، والإضافة سطر واحد مقفول. قبل كده فورم الإضافة الفاضي كان
@@ -36,10 +37,7 @@ def render(project_id):
                     parent_id = None
                     if loc_parent != "بدون - مكان رئيسي":
                         parent_id = {l["name"]: l["id"] for l in locations}.get(loc_parent)
-                    run_query(
-                        "INSERT INTO locations (project_id, name, base_description, parent_location_id) VALUES (?,?,?,?)",
-                        (project_id, loc_name, loc_desc, parent_id),
-                    )
+                    repo.add_location(project_id, loc_name, loc_desc, parent_id)
                     st.rerun()
     if not locations:
         st.caption(t("مفيش أماكن مضافة لسه"))
@@ -61,7 +59,7 @@ def render(project_id):
                 st.markdown(f"**{t('🖼️ صورة المكان')}**")
 
                 def _save_loc_image(rel, _id=l["id"]):
-                    run_query("UPDATE locations SET reference_image_path=? WHERE id=?", (rel, _id))
+                    repo.set_location_image(rel, _id)
 
                 render_image_picker(
                     f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
@@ -96,18 +94,14 @@ def render(project_id):
                         new_parent_id = None
                         if e_loc_parent != "بدون - مكان رئيسي":
                             new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
-                        run_query("UPDATE locations SET name=?, base_description=?, parent_location_id=? WHERE id=?",
-                                   (e_loc_name, e_loc_desc, new_parent_id, l["id"]))
+                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, l["id"])
                         mark_saved(f"loc_{l['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم المكان مينفعش يبقى فاضي"))
                 show_saved_badge(f"loc_{l['id']}")
                 if del_loc:
-                    ok = run_delete(
-                        "DELETE FROM locations WHERE id=?", (l["id"],),
-                        t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."),
-                    )
+                    ok = guarded_delete(repo.delete_location, (l["id"],), t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."))
                     if ok:
                         delete_image_file(l["reference_image_path"])
                         st.success(t("تم حذف المكان"))
@@ -118,7 +112,7 @@ def render(project_id):
                     "الحالة هي شكل المكان نفسه في وقت معيّن من الأحداث (محروق، بعد التجديد، بعد سنين). "
                     "داخلي/خارجي ونهار/ليل بيتحددوا في المشهد، مش هنا."
                 ))
-                variants = fetch_all("SELECT * FROM location_variants WHERE location_id=?", (l["id"],))
+                variants = repo.states_of_location(l["id"])
                 if not variants:
                     st.caption(t("مفيش حالات مضافة لسه"))
                 move_options = {other["name"]: other["id"] for other in locations}
@@ -137,17 +131,11 @@ def render(project_id):
                             with vdel_col:
                                 del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
                         if save_var:
-                            run_query(
-                                "UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=?",
-                                (ev_name, ev_desc, move_options[ev_move_to], v["id"]),
-                            )
+                            repo.update_location_state(ev_name, ev_desc, move_options[ev_move_to], v["id"])
                             mark_saved(f"variant_{v['id']}")
                             st.rerun()
                         if del_var:
-                            ok = run_delete(
-                                "DELETE FROM location_variants WHERE id=?", (v["id"],),
-                                t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."),
-                            )
+                            ok = guarded_delete(repo.delete_location_state, (v["id"],), t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."))
                             if ok:
                                 delete_image_file(v["reference_image_path"])
                                 st.success(t("تم حذف الحالة"))
@@ -157,7 +145,7 @@ def render(project_id):
                         st.caption(t("صورة مرجعية للحالة"))
 
                         def _save_var_image(rel, _id=v["id"]):
-                            run_query("UPDATE location_variants SET reference_image_path=? WHERE id=?", (rel, _id))
+                            repo.set_location_state_image(rel, _id)
 
                         render_image_picker(
                             f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",
@@ -191,10 +179,7 @@ def render(project_id):
                             cancel_var = st.form_submit_button(t("إلغاء"))
                     if add_var:
                         if v_name.strip():
-                            run_query(
-                                "INSERT INTO location_variants (location_id, variant_name, description) VALUES (?,?,?)",
-                                (l["id"], v_name.strip(), v_desc),
-                            )
+                            repo.add_location_state(l["id"], v_name.strip(), v_desc)
                             st.session_state[open_key] = False
                             st.rerun()
                         else:

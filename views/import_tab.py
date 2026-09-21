@@ -11,6 +11,7 @@ from importer import import_parsed_scenes
 from script_md import to_markdown
 from script_parser import apply_character_merges, apply_location_merges, extract_lines, find_location_matches_with_states, find_similar_location_groups, find_similar_name_groups, looks_like_screenplay, parse_json_script, parse_script
 from ui import fmt_day_night, fmt_int_ext, ltr, multiselect
+import repo
 
 
 _ANALYSIS_RTL_CSS = """
@@ -252,8 +253,7 @@ def render(project_id):
 
     uploaded_file = st.file_uploader(t("اختر ملف السكريبت"), type=["docx", "txt", "pdf", "json"], key="script_upload")
 
-    _known = [r["name"] for r in fetch_all(
-        "SELECT name FROM characters WHERE project_id=?", (project_id,))]
+    _known = [r["name"] for r in repo.character_names_of_project(project_id)]
     _ai_active = ai_jobs.active_job(project_id)
 
     _c_fast, _c_ai = st.columns(2)

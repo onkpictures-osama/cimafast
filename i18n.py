@@ -50,6 +50,7 @@ def tr(key):
 
 
 TRANSLATIONS = {
+    "جدول التصوير": "Shooting schedule",
     "مفيش حاجة ناقصة — كل المشاهد ليها لقطات وشخصيات، وكل حاجة ليها صورة ومتراجعة.": "Nothing missing — every scene has shots and characters, and everything has an image and is reviewed.",
     "إيه اللي لسه ناقص": "What's still missing",
     "لقطات لسه متراجعتش": "Shots not reviewed yet",

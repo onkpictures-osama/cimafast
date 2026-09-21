@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B1220">
+  <title>جدول التصوير — CimaFast Studio</title>
+  <link rel="stylesheet" href="static/board.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="bar__title">
+      <a class="back" href="../" title="الرجوع لـ CimaFast Studio">‹ CimaFast</a>
+      <h1>جدول التصوير</h1>
+    </div>
+
+    <label class="field">
+      <span>المشروع</span>
+      <select id="project">
+        {% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <div class="bar__actions">
+      <label class="field field--inline" title="أقصى عدد مشاهد في يوم التصوير الواحد">
+        <span>مشاهد في اليوم</span>
+        <input id="per-day" type="number" min="1" max="40" value="8" inputmode="numeric">
+      </label>
+      <label class="field field--inline" title="أقصى عدد مواقع يتنقّل بينها الفريق في اليوم (نفس المدينة بس)">
+        <span>مواقع في اليوم</span>
+        <input id="sites-per-day" type="number" min="1" max="6" value="2" inputmode="numeric">
+      </label>
+      <button id="suggest" class="btn">اقترح جدول</button>
+      <button id="add-day" class="btn">＋ يوم تصوير</button>
+    </div>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <span class="user">{{ user }}</span>
+  </header>
+
+  <section class="summary" id="summary" aria-live="polite"></section>
+
+  <ul class="legend" aria-label="ألوان الشرائط">
+    <li><span class="swatch strip--int-day"></span>داخلي نهار</li>
+    <li><span class="swatch strip--ext-day"></span>خارجي نهار</li>
+    <li><span class="swatch strip--int-night"></span>داخلي ليل</li>
+    <li><span class="swatch strip--ext-night"></span>خارجي ليل</li>
+  </ul>
+
+  <main id="board" class="board" aria-label="أيام التصوير"></main>
+
+  <details class="dood" id="dood-panel">
+    <summary>أيام شغل الممثلين</summary>
+    <p class="hint">SW أول يوم · W شغل · WF آخر يوم · SWF يوم واحد بس · H انتظار (مش مطلوب بس بين أول وآخر يوم ليه)</p>
+    <div id="dood" class="dood__wrap"></div>
+  </details>
+
+  <template id="tpl-strip">
+    <li class="strip" tabindex="0">
+      <span class="strip__no"></span>
+      <span class="strip__body">
+        <span class="strip__place"></span>
+        <span class="strip__meta"></span>
+      </span>
+      <span class="strip__cast"></span>
+    </li>
+  </template>
+
+  <script src="static/vendor/Sortable.min.js"></script>
+  <script src="static/board.js"></script>
+</body>
+</html>

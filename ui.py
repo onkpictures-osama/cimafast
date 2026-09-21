@@ -6,10 +6,12 @@ import image_gen
 import os
 import re
 import streamlit as st
+from database import IntegrityError
 import uuid
-from database import DAY_NIGHT_LABELS, INT_EXT_LABELS, bilingual_label, run_query
+from database import DAY_NIGHT_LABELS, INT_EXT_LABELS, bilingual_label
 from i18n import t
 from importer import DEFAULT_VARIANT
+import repo
 
 
 def multiselect(*args, **kwargs):
@@ -110,7 +112,7 @@ def bump_version(project_id):
     """بيزود رقم نسخة بيانات المشروع بواحد - بيتنفذ مع أي إضافة/تعديل/حذف
     لمشهد أو لقطة (خصوصًا إعادة الترقيم)، عشان يظهر في أول كل تقرير ويطلع
     للمستخدم إشارة واضحة إن بيانات المشروع اتغيرت من وقت آخر تقرير طلعه."""
-    run_query("UPDATE projects SET data_version = COALESCE(data_version, 1) + 1 WHERE id=?", (project_id,))
+    repo.bump_project_data_version(project_id)
 
 
 def shift_scene_numbers(project_id, from_number, exclude_scene_id=None):
@@ -119,29 +121,17 @@ def shift_scene_numbers(project_id, from_number, exclude_scene_id=None):
     بالمشهد عن طريق scene_id (مش رقم المشهد)، الدفع ده آمن ومبيأثرش على أي
     بيانات تانية، بس بيحدث رقم المشهد المعروض بس."""
     if exclude_scene_id is not None:
-        run_query(
-            "UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ? AND id != ?",
-            (project_id, from_number, exclude_scene_id),
-        )
+        repo.shift_scene_numbers_up_except(project_id, from_number, exclude_scene_id)
     else:
-        run_query(
-            "UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ?",
-            (project_id, from_number),
-        )
+        repo.shift_scene_numbers_up(project_id, from_number)
 
 
 def shift_shot_numbers(scene_id, from_number, exclude_shot_id=None):
     """نفس فكرة shift_scene_numbers بس على مستوى اللقطات جوه مشهد واحد."""
     if exclude_shot_id is not None:
-        run_query(
-            "UPDATE shots SET shot_number = shot_number + 1 WHERE scene_id=? AND shot_number >= ? AND id != ?",
-            (scene_id, from_number, exclude_shot_id),
-        )
+        repo.shift_shot_numbers_up_except(scene_id, from_number, exclude_shot_id)
     else:
-        run_query(
-            "UPDATE shots SET shot_number = shot_number + 1 WHERE scene_id=? AND shot_number >= ?",
-            (scene_id, from_number),
-        )
+        repo.shift_shot_numbers_up(scene_id, from_number)
 
 
 _DIALOGUE_LINE_RE = re.compile(r'^([^:：]{1,30})[:：]\s*(.+)$')
@@ -288,3 +278,18 @@ def delete_image_file(rel_path):
             os.remove(abs_path)
         except OSError:
             pass
+
+
+def guarded_delete(delete_fn, params, friendly_error):
+    """بيمسح عن طريق دالة من repo، ولو الصف مستخدم في حتة تانية (زي حالة مكان
+    مربوطة بمشهد، أو لوك مربوط بلقطة) بيوري رسالة واضحة بدل ما البرنامج يقع.
+
+    نفس سلوك database.run_delete بالظبط، بس الـ SQL بقى في repo.py ورسالة
+    الواجهة فضلت هنا — طبقة البيانات مابتكلمش Streamlit.
+    """
+    try:
+        delete_fn(*params)
+        return True
+    except IntegrityError:
+        st.error(friendly_error)
+        return False

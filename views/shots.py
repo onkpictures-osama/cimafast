@@ -1,21 +1,31 @@
 """تبويب breakdown."""
 
 import streamlit as st
-from database import CAMERA_ANGLE_OPTIONS, CAMERA_MOVEMENT_OPTIONS, DAY_NIGHT_OPTIONS, FIELD_HELP, SHOT_SIZE_OPTIONS, fetch_all, next_free_number, run_query, scene_label
+from database import (
+    CAMERA_ANGLE_OPTIONS,
+    CAMERA_MOVEMENT_OPTIONS,
+    DAY_NIGHT_OPTIONS,
+    FIELD_HELP,
+    SHOT_SIZE_OPTIONS,
+    fetch_all,
+    next_free_number,
+    scene_label,
+)
 from i18n import t, tr
 from ui import IMAGE_TYPES, bump_version, delete_image_file, fmt_day_night, image_abs_path, ltr, mark_saved, multiselect, safe_index, save_uploaded_image, shift_shot_numbers, show_saved_badge, unused_dialogue_lines
+import repo
 
 
 def render(project_id):
     st.subheader(tr("sub_breakdown"))
-    scenes = fetch_all("SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,))
+    scenes = repo.scenes_of_project(project_id)
     if not scenes:
         st.info(t("لازم تضيف مشهد واحد على الأقل من تبويب السكريبت أولًا"))
     else:
         scene_map = {f"{t('مشهد')} {ltr(scene_label(s))}": s["id"] for s in scenes}
         sel_scene = st.selectbox(t("اختر المشهد"), list(scene_map.keys()))
         scene_id = scene_map[sel_scene]
-        current_scene_row = fetch_all("SELECT notes, day_night FROM scenes WHERE id=?", (scene_id,))[0]
+        current_scene_row = repo.scene_notes_and_time(scene_id)[0]
         available_dialogue_lines = unused_dialogue_lines(current_scene_row["notes"], scene_id, fetch_all)
 
         with st.form(f"add_shot_{scene_id}"):
@@ -23,8 +33,7 @@ def render(project_id):
             with col1:
                 sh_number = st.number_input(
                     t("رقم اللقطة"), min_value=1, step=1,
-                    value=next_free_number(r["shot_number"] for r in fetch_all(
-                        "SELECT shot_number FROM shots WHERE scene_id=?", (scene_id,))))
+                    value=next_free_number(r["shot_number"] for r in repo.shot_numbers_of_scene(scene_id)))
                 sh_size = st.selectbox(t("حجم الكادر"), SHOT_SIZE_OPTIONS, format_func=t, help=FIELD_HELP["shot_size"])
             with col2:
                 sh_movement = st.selectbox(t("حركة الكاميرا"), CAMERA_MOVEMENT_OPTIONS, format_func=t, help=FIELD_HELP["camera_movement"])
@@ -75,11 +84,7 @@ def render(project_id):
             sh_music = st.checkbox(t("تضمين موسيقى في التوليد نفسه؟ (غير مستحسن)"), value=False, help=FIELD_HELP["include_music"])
 
             st.markdown(f"**{t('الشخصيات الموجودة في اللقطة')}**")
-            all_looks = fetch_all("""
-                SELECT cl.id, ch.name || ' - ' || cl.look_name AS label
-                FROM character_looks cl JOIN characters ch ON cl.character_id = ch.id
-                WHERE ch.project_id = ?
-            """, (project_id,))
+            all_looks = repo.look_labels_of_project(project_id)
             look_map = {r["label"]: r["id"] for r in all_looks}
             selected_looks = multiselect(t("اختر مظهر كل شخصية ظاهرة"), list(look_map.keys()))
             dialogue_flags = {}
@@ -91,7 +96,7 @@ def render(project_id):
                     )
 
             st.markdown(f"**{t('الإكسسوارات الموجودة في اللقطة')}**")
-            all_props = fetch_all("SELECT id, name FROM props WHERE project_id=? ORDER BY id", (project_id,))
+            all_props = repo.prop_names_by_id(project_id)
             prop_map = {r["name"]: r["id"] for r in all_props}
             selected_props = multiselect(t("اختر الإكسسوارات الظاهرة في اللقطة"), list(prop_map.keys()))
 
@@ -100,36 +105,25 @@ def render(project_id):
 
             if st.form_submit_button(t("حفظ اللقطة")):
                 existing_shot_numbers_now = {
-                    s["shot_number"] for s in fetch_all("SELECT shot_number FROM shots WHERE scene_id=?", (scene_id,))
+                    s["shot_number"] for s in repo.shot_numbers_of_scene(scene_id)
                 }
                 if sh_number in existing_shot_numbers_now:
                     shift_shot_numbers(scene_id, sh_number)
                     st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
-                shot_id = run_query(
-                    """INSERT INTO shots
-                    (scene_id, shot_number, shot_size, camera_movement, camera_angle, duration_seconds,
-                     day_night, weather, action_description,
-                     emotion_intensity, emotion_label, dialogue_text, visual_style_notes, include_music, confirmed)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (scene_id, sh_number, sh_size, sh_movement, sh_angle, sh_duration,
-                     sh_day_night, sh_weather, sh_action,
-                     sh_emotion, sh_emotion_label, sh_dialogue, sh_style, int(sh_music), int(sh_confirmed)),
-                )
+                shot_id = repo.add_shot(scene_id, sh_number, sh_size, sh_movement, sh_angle, sh_duration, sh_day_night, sh_weather, sh_action, sh_emotion, sh_emotion_label, sh_dialogue, sh_style, int(sh_music), int(sh_confirmed))
                 bump_version(project_id)
                 if sh_storyboard is not None:
                     storyboard_path = save_uploaded_image(sh_storyboard, f"shots/{shot_id}")
-                    run_query("UPDATE shots SET storyboard_image_path=? WHERE id=?", (storyboard_path, shot_id))
+                    repo.set_shot_storyboard(storyboard_path, shot_id)
                 for label in selected_looks:
-                    run_query("INSERT INTO shot_characters (shot_id, look_id, has_dialogue) VALUES (?,?,?)",
-                               (shot_id, look_map[label], int(dialogue_flags.get(label, True))))
+                    repo.add_shot_character(shot_id, look_map[label], int(dialogue_flags.get(label, True)))
                 for prop_label in selected_props:
-                    run_query("INSERT INTO shot_props (shot_id, prop_id) VALUES (?,?)",
-                               (shot_id, prop_map[prop_label]))
+                    repo.add_shot_prop(shot_id, prop_map[prop_label])
                 st.success(t("تم حفظ اللقطة"))
                 st.rerun()
 
         st.divider()
-        shots = fetch_all("SELECT * FROM shots WHERE scene_id=? ORDER BY shot_number", (scene_id,))
+        shots = repo.shots_of_scene(scene_id)
         for sh in shots:
             status_icon = "🔵" if sh["confirmed"] else "🟡"
             # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
@@ -138,14 +132,12 @@ def render(project_id):
             _lazy_exp = st.expander(f"{status_icon} {t('لقطة')} {sh['shot_number']} — {ltr(t(sh['shot_size']))} / {ltr(t(sh['camera_movement']))}", key=f"exp_shot_{sh['id']}", on_change="rerun")
             with _lazy_exp:
                 if _lazy_exp.open:
-                    current_looks = fetch_all(
-                        "SELECT look_id, has_dialogue FROM shot_characters WHERE shot_id=?", (sh["id"],)
-                    )
+                    current_looks = repo.characters_in_shot(sh["id"])
                     current_dialogue_by_look_id = {r["look_id"]: bool(r["has_dialogue"]) for r in current_looks}
                     current_look_ids = set(current_dialogue_by_look_id.keys())
                     current_labels = [label for label, lid in look_map.items() if lid in current_look_ids]
                     current_prop_ids = {
-                        r["prop_id"] for r in fetch_all("SELECT prop_id FROM shot_props WHERE shot_id=?", (sh["id"],))
+                        r["prop_id"] for r in repo.prop_ids_in_shot(sh["id"])
                     }
                     current_prop_labels = [name for name, pid in prop_map.items() if pid in current_prop_ids]
 
@@ -258,39 +250,25 @@ def render(project_id):
 
                     if save_sh:
                         if esh_number != sh["shot_number"]:
-                            colliding_shot = fetch_all(
-                                "SELECT id FROM shots WHERE scene_id=? AND shot_number=? AND id != ?",
-                                (sh["scene_id"], esh_number, sh["id"]),
-                            )
+                            colliding_shot = repo.other_shot_with_number(sh["scene_id"], esh_number, sh["id"])
                             if colliding_shot:
                                 shift_shot_numbers(sh["scene_id"], esh_number, exclude_shot_id=sh["id"])
                                 st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
                         new_storyboard_path = sh["storyboard_image_path"]
                         if esh_storyboard is not None:
                             new_storyboard_path = save_uploaded_image(esh_storyboard, f"shots/{sh['id']}")
-                        run_query(
-                            """UPDATE shots SET shot_number=?, shot_size=?, camera_movement=?, camera_angle=?,
-                            duration_seconds=?, day_night=?, weather=?, action_description=?,
-                            emotion_intensity=?, emotion_label=?, dialogue_text=?,
-                            visual_style_notes=?, include_music=?, confirmed=?, storyboard_image_path=? WHERE id=?""",
-                            (esh_number, esh_size, esh_movement, esh_angle, esh_duration,
-                             esh_day_night, esh_weather, esh_action, esh_emotion,
-                             esh_emotion_label, esh_dialogue, esh_style, int(esh_music), int(esh_confirmed),
-                             new_storyboard_path, sh["id"]),
-                        )
-                        run_query("DELETE FROM shot_characters WHERE shot_id=?", (sh["id"],))
+                        repo.update_shot(esh_number, esh_size, esh_movement, esh_angle, esh_duration, esh_day_night, esh_weather, esh_action, esh_emotion, esh_emotion_label, esh_dialogue, esh_style, int(esh_music), int(esh_confirmed), new_storyboard_path, sh["id"])
+                        repo.unlink_shot_characters(sh["id"])
                         for label in esh_selected_looks:
-                            run_query("INSERT INTO shot_characters (shot_id, look_id, has_dialogue) VALUES (?,?,?)",
-                                       (sh["id"], look_map[label], int(esh_dialogue_flags.get(label, True))))
-                        run_query("DELETE FROM shot_props WHERE shot_id=?", (sh["id"],))
+                            repo.add_shot_character(sh["id"], look_map[label], int(esh_dialogue_flags.get(label, True)))
+                        repo.unlink_shot_props(sh["id"])
                         for prop_label in esh_selected_props:
-                            run_query("INSERT INTO shot_props (shot_id, prop_id) VALUES (?,?)",
-                                       (sh["id"], prop_map[prop_label]))
+                            repo.add_shot_prop(sh["id"], prop_map[prop_label])
                         bump_version(project_id)
                         mark_saved(f"shot_{sh['id']}")
                         st.rerun()
                     if del_sh:
-                        run_query("DELETE FROM shots WHERE id=?", (sh["id"],))
+                        repo.delete_shot(sh["id"])
                         bump_version(project_id)
                         delete_image_file(sh["storyboard_image_path"])
                         st.success(t("تم حذف اللقطة"))

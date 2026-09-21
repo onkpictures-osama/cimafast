@@ -1,15 +1,17 @@
 """تبويب characters."""
 
 import streamlit as st
-from database import FIELD_HELP, GENDER_OPTIONS, SPECIES_OPTIONS, fetch_all, run_delete, run_query
+from database import FIELD_HELP, GENDER_OPTIONS, SPECIES_OPTIONS
 from i18n import t, tr
 from search import matches
 from ui import IMAGE_TYPES, delete_image_file, image_abs_path, library_result_count, library_search, mark_saved, safe_index, save_uploaded_image, show_saved_badge
+from ui import guarded_delete
+import repo
 
 
 def render(project_id):
     st.subheader(tr("sub_characters"))
-    _chars_before = fetch_all("SELECT id FROM characters WHERE project_id=?", (project_id,))
+    _chars_before = repo.character_ids_of_project(project_id)
     _char_q = (library_search(f"char_search_{project_id}", len(_chars_before), "شخصية")
                if _chars_before else "")
     with st.expander(f"➕ {t('إضافة شخصية جديدة')}", expanded=not _chars_before):
@@ -25,18 +27,13 @@ def render(project_id):
             ch_image = st.file_uploader(t("صورة الشخصية المرجعية (اختياري)"), type=IMAGE_TYPES, key="new_character_image")
             if st.form_submit_button(t("إضافة شخصية")):
                 if ch_name.strip():
-                    new_char_id = run_query(
-                        """INSERT INTO characters
-                        (project_id, name, role_type, species, gender, personality_notes)
-                        VALUES (?,?,?,?,?,?)""",
-                        (project_id, ch_name, ch_role, ch_species, ch_gender, ch_notes),
-                    )
+                    new_char_id = repo.add_character(project_id, ch_name, ch_role, ch_species, ch_gender, ch_notes)
                     if ch_image is not None:
                         image_path = save_uploaded_image(ch_image, f"characters/{new_char_id}")
-                        run_query("UPDATE characters SET reference_image_path=? WHERE id=?", (image_path, new_char_id))
+                        repo.set_character_image(image_path, new_char_id)
                     st.rerun()
 
-    characters = fetch_all("SELECT * FROM characters WHERE project_id=?", (project_id,))
+    characters = repo.characters_of_project(project_id)
     with st.expander(f"➕ {t('إضافة مظهر إضافي لشخصية')}", expanded=False):
         if characters:
             char_map = {c["name"]: c["id"] for c in characters}
@@ -56,12 +53,7 @@ def render(project_id):
                 look_image = st.file_uploader(t("صورة مرجعية (اختياري)"), type=IMAGE_TYPES, key="new_look_image")
                 if st.form_submit_button(t("➕ إضافة مظهر إضافي")):
                     image_path = save_uploaded_image(look_image, f"characters/{char_id}")
-                    run_query(
-                        """INSERT INTO character_looks
-                        (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, reference_image_path)
-                        VALUES (?,?,?,?,?,?,?,?)""",
-                        (char_id, look_name, look_age, look_makeup, look_hair, look_wardrobe, look_desc, image_path),
-                    )
+                    repo.add_character_look(char_id, look_name, look_age, look_makeup, look_hair, look_wardrobe, look_desc, image_path)
                     st.rerun()
         else:
             st.caption(t("مفيش شخصيات مضافة لسه"))
@@ -122,20 +114,13 @@ def render(project_id):
                         new_ch_image_path = ch["reference_image_path"]
                         if ech_image is not None:
                             new_ch_image_path = save_uploaded_image(ech_image, f"characters/{ch['id']}")
-                        run_query(
-                            """UPDATE characters SET name=?, role_type=?, species=?, gender=?,
-                            personality_notes=?, reference_image_path=? WHERE id=?""",
-                            (ech_name, ech_role, ech_species, ech_gender, ech_notes, new_ch_image_path, ch["id"]),
-                        )
+                        repo.update_character(ech_name, ech_role, ech_species, ech_gender, ech_notes, new_ch_image_path, ch["id"])
                         mark_saved(f"char_{ch['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم الشخصية مينفعش يبقى فاضي"))
                 if del_ch:
-                    ok = run_delete(
-                        "DELETE FROM characters WHERE id=?", (ch["id"],),
-                        t("معرفش أمسح الشخصية دي لأن مظهر بتاعها مستخدم في لقطة أو أكتر. شيلها من اللقطات دي الأول من تبويب التفريغ."),
-                    )
+                    ok = guarded_delete(repo.delete_character, (ch["id"],), t("معرفش أمسح الشخصية دي لأن مظهر بتاعها مستخدم في لقطة أو أكتر. شيلها من اللقطات دي الأول من تبويب التفريغ."))
                     if ok:
                         delete_image_file(ch["reference_image_path"])
                         st.success(t("تم حذف الشخصية"))
@@ -143,7 +128,7 @@ def render(project_id):
                 show_saved_badge(f"char_{ch['id']}")
 
                 st.markdown(f"**{t('المظاهر الإضافية:')}**")
-                looks = fetch_all("SELECT * FROM character_looks WHERE character_id=?", (ch["id"],))
+                looks = repo.looks_of_character(ch["id"])
                 if not looks:
                     st.caption(t("مفيش مظاهر إضافية متضافة لسه"))
                 for lk in looks:
@@ -175,18 +160,11 @@ def render(project_id):
                         new_look_image_path = lk["reference_image_path"]
                         if elk_image is not None:
                             new_look_image_path = save_uploaded_image(elk_image, f"characters/{ch['id']}")
-                        run_query(
-                            """UPDATE character_looks SET look_name=?, apparent_age=?, makeup_state=?,
-                            hair_state=?, wardrobe_description=?, description=?, reference_image_path=? WHERE id=?""",
-                            (elk_name, elk_age, elk_makeup, elk_hair, elk_wardrobe, elk_desc, new_look_image_path, lk["id"]),
-                        )
+                        repo.update_character_look(elk_name, elk_age, elk_makeup, elk_hair, elk_wardrobe, elk_desc, new_look_image_path, lk["id"])
                         mark_saved(f"look_{lk['id']}")
                         st.rerun()
                     if del_lk:
-                        ok = run_delete(
-                            "DELETE FROM character_looks WHERE id=?", (lk["id"],),
-                            t("معرفش أمسح المظهر ده لأنه مستخدم في لقطة أو أكتر. شيله من اللقطات دي الأول من تبويب التفريغ."),
-                        )
+                        ok = guarded_delete(repo.delete_character_look, (lk["id"],), t("معرفش أمسح المظهر ده لأنه مستخدم في لقطة أو أكتر. شيله من اللقطات دي الأول من تبويب التفريغ."))
                         if ok:
                             delete_image_file(lk["reference_image_path"])
                             st.success(t("تم حذف المظهر الإضافي"))

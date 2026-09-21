@@ -5,6 +5,7 @@ from database import fetch_all, scene_label
 from export import build_characters_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel, build_props_sheet_excel, build_shot_list_excel, build_shot_list_pdf, build_shot_list_word
 from i18n import t, tr
 from ui import ltr
+import repo
 
 
 def render(project, project_id, _char_count, _loc_count, _scene_count, _shot_count):
@@ -15,26 +16,15 @@ def render(project, project_id, _char_count, _loc_count, _scene_count, _shot_cou
     # لسه مش جاهز قبل ما يطبع الكشوفات.
     if _scene_count > 0:
         _gaps = [
-            (t("مشاهد من غير لقطات"), fetch_all(
-                "SELECT s.* FROM scenes s WHERE s.project_id=? AND NOT EXISTS "
-                "(SELECT 1 FROM shots sh WHERE sh.scene_id=s.id) ORDER BY s.scene_number", (project_id,)),
+            (t("مشاهد من غير لقطات"), repo.scenes_without_shots(project_id),
              lambda r: f"{t('مشهد')} {ltr(scene_label(r))}"),
-            (t("مشاهد من غير شخصيات"), fetch_all(
-                "SELECT s.* FROM scenes s WHERE s.project_id=? AND NOT EXISTS "
-                "(SELECT 1 FROM scene_characters x WHERE x.scene_id=s.id) ORDER BY s.scene_number", (project_id,)),
+            (t("مشاهد من غير شخصيات"), repo.scenes_without_characters(project_id),
              lambda r: f"{t('مشهد')} {ltr(scene_label(r))}"),
-            (t("أماكن من غير صورة مرجعية"), fetch_all(
-                "SELECT name FROM locations WHERE project_id=? AND COALESCE(reference_image_path,'')='' "
-                "ORDER BY name", (project_id,)),
+            (t("أماكن من غير صورة مرجعية"), repo.locations_without_image(project_id),
              lambda r: r["name"]),
-            (t("شخصيات من غير صورة مرجعية"), fetch_all(
-                "SELECT name FROM characters WHERE project_id=? AND COALESCE(reference_image_path,'')='' "
-                "ORDER BY name", (project_id,)),
+            (t("شخصيات من غير صورة مرجعية"), repo.characters_without_image(project_id),
              lambda r: r["name"]),
-            (t("لقطات لسه متراجعتش"), fetch_all(
-                "SELECT s.scene_number, s.scene_suffix, sh.shot_number FROM shots sh "
-                "JOIN scenes s ON s.id=sh.scene_id WHERE s.project_id=? AND COALESCE(sh.confirmed,0)=0 "
-                "ORDER BY s.scene_number, sh.shot_number", (project_id,)),
+            (t("لقطات لسه متراجعتش"), repo.unreviewed_shots(project_id),
              lambda r: f"{t('مشهد')} {ltr(scene_label(r))} / {t('لقطة')} {ltr(r['shot_number'])}"),
         ]
         st.markdown(f"#### {t('إيه اللي لسه ناقص')}")
@@ -136,11 +126,7 @@ def render(project, project_id, _char_count, _loc_count, _scene_count, _shot_cou
     elif _shot_count == 0:
         st.info(t("👉 الخطوة الجاية: روح تبويب **التفريغ (اللقطات)** وابدأ تفرّغ كل مشهد للقطات كاميرا تفصيلية."))
 
-    all_shots = fetch_all("""
-        SELECT s.scene_number, sh.shot_number, sh.shot_size, sh.camera_movement, sh.confirmed
-        FROM shots sh JOIN scenes s ON sh.scene_id = s.id
-        WHERE s.project_id = ? ORDER BY s.scene_number, sh.shot_number
-    """, (project_id,))
+    all_shots = repo.shot_summaries_of_project(project_id)
     if not all_shots:
         st.caption(t("لسه مفيش لقطات مضافة"))
     else:
