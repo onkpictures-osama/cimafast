@@ -48,6 +48,7 @@ else:
 _ON_CONFLICT_TARGETS = {
     "scene_characters": "(scene_id, character_id)",
     "scene_props": "(scene_id, prop_id)",
+    "memberships": "(company_id, user_id)",
 }
 _INSERT_IGNORE_RE = re.compile(r"INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)", re.IGNORECASE)
 
@@ -313,6 +314,40 @@ def init_db():
             scene_id INTEGER NOT NULL UNIQUE REFERENCES scenes(id) ON DELETE CASCADE,
             position INTEGER NOT NULL DEFAULT 0
         );
+
+        -- F1: الشركات والمستخدمين وعضوية كل مستخدم في كل شركة. CimaFast نظام ERP
+        -- بتستخدمه شركات إنتاج كتير؛ كل مشروع تبع شركة، وكل مستخدم بيشوف مشاريع
+        -- الشركات اللي هو عضو فيها بس.
+        CREATE TABLE IF NOT EXISTS companies (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name TEXT,
+            email TEXT,
+            job_title TEXT,
+            is_operator INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            must_change_password INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS memberships (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role TEXT NOT NULL DEFAULT 'department',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            UNIQUE(company_id, user_id)
+        );
         """)
     else:
         c.executescript("""
@@ -514,6 +549,42 @@ def init_db():
             FOREIGN KEY (day_id) REFERENCES shooting_days(id) ON DELETE CASCADE,
             FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
         );
+
+        -- F1: الشركات والمستخدمين وعضوية كل مستخدم في كل شركة. CimaFast نظام ERP
+        -- بتستخدمه شركات إنتاج كتير؛ كل مشروع تبع شركة، وكل مستخدم بيشوف مشاريع
+        -- الشركات اللي هو عضو فيها بس.
+        CREATE TABLE IF NOT EXISTS companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name TEXT,
+            email TEXT,
+            job_title TEXT,
+            is_operator INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            must_change_password INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS memberships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'department',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(company_id, user_id)
+        );
         """)
     conn.commit()
     _migrate_schema(conn)
@@ -524,6 +595,9 @@ def init_db():
 # قاعدة بيانات قديمة موجودة عند المستخدم من غير ما تأثر على بياناته
 _MIGRATIONS = {
     "projects": [
+        # F1: كل مشروع تبع شركة. المشاريع القديمة بتتربط بالشركة الافتراضية في
+        # accounts.migrate_accounts() أول ما البرنامج يشتغل.
+        ("company_id", "INTEGER"),
         ("owner_name", "TEXT"),
         ("owner_role", "TEXT"),
         ("data_version", "INTEGER DEFAULT 1"),

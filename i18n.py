@@ -50,6 +50,10 @@ def tr(key):
 
 
 TRANSLATIONS = {
+    "الشركة": "Company",
+    "إدارة الفريق": "Manage team",
+    "الفريق وحسابي": "Team & my account",
+    "حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك.": "Your account is not linked to any company. Contact your company admin.",
     "جدول التصوير": "Shooting schedule",
     "مفيش حاجة ناقصة — كل المشاهد ليها لقطات وشخصيات، وكل حاجة ليها صورة ومتراجعة.": "Nothing missing — every scene has shots and characters, and everything has an image and is reviewed.",
     "إيه اللي لسه ناقص": "What's still missing",

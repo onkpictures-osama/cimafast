@@ -126,14 +126,17 @@ def test_no_accounts_locks_the_app():
     # بنستبدل resolve_users مؤقتًا بدل ما نعتمد على ملف الأسرار الحقيقي على
     # الجهاز — الاختبار لازم يدي نفس النتيجة على أي سيرفر.
     os.environ.pop(auth.USERS_ENV, None)
-    original = auth.resolve_users
+    # من F1 الحسابات في جدول users كمان — لازم المصدرين يبقوا فاضيين.
+    import accounts
+    original, original_db = auth.resolve_users, accounts.auth_users
     auth.resolve_users = lambda: {}
+    accounts.auth_users = lambda: {}
     try:
         at = _fresh_app()
         assert not at.text_input, "login form shown although no accounts exist"
         assert "الدخول مقفول" in _body_text(at)
     finally:
-        auth.resolve_users = original
+        auth.resolve_users, accounts.auth_users = original, original_db
 
 
 def main():

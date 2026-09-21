@@ -1,0 +1,307 @@
+"""الشركات والمستخدمين ومين يشوف إيه — PRODUCT-PLAN بند F1.
+
+CimaFast نظام ERP بتستخدمه شركات إنتاج كتير. قبل الموديول ده الحسابات كانت
+١٣ اسم في secrets.toml، ومفيش شركات، وكل مستخدم بيشوف كل مشروع. هنا:
+
+- كل مستخدم صف في جدول users (نفس hash كلمة السر اللي كان في secrets.toml —
+  محدش كلمة سره بتتغير في النقل).
+- كل مشروع تبع شركة (projects.company_id).
+- العضوية (memberships) بتقول المستخدم في أنهي شركة وبأي دور.
+- المستخدم بيشوف مشاريع الشركات اللي هو عضو فيها وبس. المشغّل (operator —
+  صاحب المنصة) بيشوف كل الشركات.
+
+الموديول ده مابيستوردش Streamlit: التطبيقين (Streamlit والـ board) والاختبارات
+بيستعملوه هو نفسه.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import secrets as _secrets
+import string
+
+import auth
+from database import fetch_all
+from repo import _tx
+
+# الأدوار، من الأوسع للأضيق. الفرض (مين يقدر يمسح إيه) بند F2؛ هنا بنسجلها بس.
+ROLES = ("admin", "producer", "manager", "department", "viewer")
+ROLE_LABELS = {
+    "admin": "مدير الشركة", "producer": "منتج", "manager": "مدير إنتاج / مساعد مخرج أول",
+    "department": "رئيس قسم", "viewer": "مشاهدة فقط", "operator": "مشغّل المنصة",
+}
+DEFAULT_COMPANY = "الشركة الافتراضية"
+
+# الحسابات القديمة أغلبها أسماء وظايف؛ ده أول تخمين للدور والمسمى، والأدمن
+# يقدر يغيّره من صفحة الفريق.
+_LEGACY_ROLES = {
+    "producer": ("producer", "منتج"), "filmmaker": ("producer", "صانع أفلام"),
+    "assistant_director": ("manager", "مساعد مخرج أول"),
+    "director": ("department", "مخرج"), "dop": ("department", "مدير تصوير"),
+    "art_director": ("department", "مدير فني"), "costume_designer": ("department", "مصمم أزياء"),
+    "casting_director": ("department", "مدير كاستينج"), "editor": ("department", "مونتير"),
+    "screenwriter": ("department", "سيناريست"), "vfx_supervisor": ("department", "مشرف مؤثرات بصرية"),
+}
+# حسابات صاحب المنصة: melzayat حسابه الشخصي، وosama اسم حساب GitHub بتاعه.
+_LEGACY_OPERATORS = {"melzayat", "osama"}
+
+
+class AccessDenied(PermissionError):
+    pass
+
+
+def _now():
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def _one(sql, params=()):
+    rows = fetch_all(sql, params)
+    return rows[0] if rows else None
+
+
+def temp_password(length=12):
+    """كلمة سر مؤقتة سهلة تتقري وتتكتب: من غير حروف بتتلخبط (0/O، 1/l/I)."""
+    alphabet = "".join(c for c in string.ascii_letters + string.digits if c not in "0O1lI")
+    return "".join(_secrets.choice(alphabet) for _ in range(length))
+
+
+# --- النقل من secrets.toml (مرة واحدة، وبيتعاد من غير ضرر) -----------------------------
+
+def migrate_accounts(legacy_users: dict, company_name: str = DEFAULT_COMPANY):
+    """بينقل حسابات secrets.toml للقاعدة، ويربط كل مشروع مالوش شركة بالشركة الافتراضية.
+
+    آمن إنه يتنده في كل تشغيل: مابيضيفش مستخدم موجود، ومابيعملش شركة تانية لو
+    فيه واحدة. بيرجّع ملخص باللي اتعمل.
+    """
+    done = {"users_added": 0, "company_created": False, "projects_linked": 0, "memberships_added": 0}
+    have_users = _one("SELECT COUNT(*) AS n FROM users")["n"]
+    company = _one("SELECT id FROM companies ORDER BY id LIMIT 1")
+    with _tx() as ex:
+        if not company:
+            ex("INSERT INTO companies (name, active, created_at) VALUES (?, 1, ?)", (company_name, _now()))
+            done["company_created"] = True
+    company_id = _one("SELECT id FROM companies ORDER BY id LIMIT 1")["id"]
+    if not have_users and legacy_users:
+        with _tx() as ex:
+            for raw_name, pw_hash in legacy_users.items():
+                name = auth.normalize_username(raw_name)
+                if not name or not pw_hash:
+                    continue
+                role, title = _LEGACY_ROLES.get(name, ("admin" if name in _LEGACY_OPERATORS else "department",
+                                                       None))
+                ex("INSERT INTO users (username, password_hash, display_name, job_title, is_operator, "
+                   "active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)",
+                   (name, pw_hash, name, title, 1 if name in _LEGACY_OPERATORS else 0, _now()))
+                done["users_added"] += 1
+        for u in fetch_all("SELECT id, username FROM users"):
+            role = _LEGACY_ROLES.get(u["username"], ("admin" if u["username"] in _LEGACY_OPERATORS
+                                                     else "department", None))[0]
+            with _tx() as ex:
+                ex("INSERT OR IGNORE INTO memberships (company_id, user_id, role, active, created_at) "
+                   "VALUES (?, ?, ?, 1, ?)", (company_id, u["id"], role, _now()))
+            done["memberships_added"] += 1
+    orphans = _one("SELECT COUNT(*) AS n FROM projects WHERE company_id IS NULL")["n"]
+    if orphans:
+        with _tx() as ex:
+            ex("UPDATE projects SET company_id=? WHERE company_id IS NULL", (company_id,))
+        done["projects_linked"] = orphans
+    return done
+
+
+# --- الدخول -------------------------------------------------------------------------
+
+def auth_users():
+    """{username: password_hash} للمستخدمين الفعّالين — نفس الشكل اللي auth متعوّد عليه،
+    فتسجيل الدخول وكوكي الجلسة شغالين من غير أي تغيير."""
+    return {r["username"]: r["password_hash"]
+            for r in fetch_all("SELECT username, password_hash FROM users WHERE active=1")}
+
+
+def user(username):
+    return _one("SELECT id, username, display_name, email, job_title, is_operator, active, "
+                "must_change_password, last_login_at FROM users WHERE username=?",
+                (auth.normalize_username(username),))
+
+
+def touch_login(username):
+    with _tx() as ex:
+        ex("UPDATE users SET last_login_at=? WHERE username=?", (_now(), auth.normalize_username(username)))
+
+
+# --- مين يشوف إيه ---------------------------------------------------------------------
+
+def companies_for(username):
+    """الشركات اللي المستخدم يقدر يدخلها، ودوره في كل واحدة."""
+    u = user(username)
+    if not u or not u["active"]:
+        return []
+    if u["is_operator"]:
+        return [dict(r, role="operator") for r in
+                fetch_all("SELECT id, name, active FROM companies ORDER BY name")]
+    return fetch_all("""
+        SELECT c.id, c.name, c.active, m.role FROM memberships m JOIN companies c ON c.id = m.company_id
+        WHERE m.user_id = ? AND m.active = 1 AND c.active = 1 ORDER BY c.name""", (u["id"],))
+
+
+def role_in(username, company_id):
+    for c in companies_for(username):
+        if c["id"] == company_id:
+            return c["role"]
+    return None
+
+
+def projects_for(username, company_id=None):
+    """المشاريع اللي المستخدم يقدر يشوفها — كلها، أو شركة واحدة منهم."""
+    allowed = [c["id"] for c in companies_for(username)]
+    if company_id is not None:
+        allowed = [c for c in allowed if c == company_id]
+    if not allowed:
+        return []
+    marks = ",".join("?" * len(allowed))
+    return fetch_all(f"SELECT * FROM projects WHERE company_id IN ({marks}) ORDER BY id DESC", tuple(allowed))
+
+
+def can_access_project(username, project_id):
+    p = _one("SELECT company_id FROM projects WHERE id=?", (project_id,))
+    return bool(p) and role_in(username, p["company_id"]) is not None
+
+
+def create_project(actor, company_id, name, project_type, resolution, orientation, aspect_ratio):
+    """مشروع جديد في شركة معيّنة. قبل F1 المشروع كان بيتعمل من غير شركة وكل الناس
+    تشوفه؛ دلوقتي بيتسجّل تبع الشركة اللي المستخدم شغال فيها."""
+    if role_in(actor, company_id) is None:
+        raise AccessDenied("مش عضو في الشركة دي")
+    from database import run_query
+    return run_query(
+        "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
+        "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (name, project_type, resolution, orientation, aspect_ratio, company_id))
+
+
+# --- إدارة الفريق (مدير الشركة أو المشغّل) -------------------------------------------------
+
+def _require_admin(actor, company_id):
+    if role_in(actor, company_id) not in ("admin", "operator"):
+        raise AccessDenied("مدير الشركة بس يقدر يعمل ده")
+
+
+def _require_manageable(actor, company_id, username):
+    """الأدمن يدير أعضاء شركته بس — وعمره ما يلمس حساب مشغّل المنصة.
+
+    المشغّل عضو في شركة (الافتراضية مثلًا)؛ لو أدمن الشركة دي قدر يغيّر كلمة سره
+    يبقى خد المنصة كلها. عشان كده حساب المشغّل مايديروش غير مشغّل.
+    """
+    _require_admin(actor, company_id)
+    target = user(username)
+    if not target or not _one("SELECT 1 AS ok FROM memberships WHERE company_id=? AND user_id=?",
+                              (company_id, target["id"])):
+        raise AccessDenied("المستخدم ده مش عضو في الشركة دي")
+    if target["is_operator"] and not user(actor)["is_operator"]:
+        raise AccessDenied("حساب مشغّل المنصة مايتعدّلش من هنا")
+    return target
+
+
+def rename_company(actor, company_id, name):
+    _require_admin(actor, company_id)
+    if not (name or "").strip():
+        raise ValueError("اسم الشركة مطلوب")
+    with _tx() as ex:
+        ex("UPDATE companies SET name=? WHERE id=?", (name.strip(), company_id))
+
+
+def members(actor, company_id):
+    if role_in(actor, company_id) is None:
+        raise AccessDenied("مش عضو في الشركة دي")
+    return fetch_all("""
+        SELECT u.username, u.display_name, u.email, u.job_title, u.active AS user_active,
+               u.last_login_at, m.role, m.active FROM memberships m JOIN users u ON u.id = m.user_id
+        WHERE m.company_id = ? ORDER BY m.active DESC, u.display_name""", (company_id,))
+
+
+def add_member(actor, company_id, username, display_name=None, role="department",
+               job_title=None, email=None):
+    """بيضيف مستخدم جديد للشركة (أو مستخدم موجود من شركة تانية). بيرجّع كلمة سر
+    مؤقتة لو المستخدم جديد — بتتعرض مرة واحدة للأدمن عشان يبعتها، والمستخدم لازم
+    يغيّرها أول ما يدخل."""
+    _require_admin(actor, company_id)
+    if role not in ROLES:
+        raise ValueError(f"دور غير معروف: {role}")
+    name = auth.normalize_username(username)
+    if not name or not all(ch.isalnum() or ch in "._-" for ch in name):
+        raise ValueError("اسم المستخدم لازم يكون حروف إنجليزي وأرقام و . _ - بس")
+    existing = user(name)
+    password = None
+    with _tx() as ex:
+        if not existing:
+            password = temp_password()
+            ex("INSERT INTO users (username, password_hash, display_name, email, job_title, "
+               "is_operator, active, must_change_password, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, 1, ?)",
+               (name, auth.hash_password(password), display_name or name, email, job_title, _now()))
+    uid = user(name)["id"]
+    with _tx() as ex:
+        # حساب اتقفل لما اتشال من آخر شركة ليه بيتفتح تاني لما يرجع
+        ex("UPDATE users SET active=1 WHERE id=?", (uid,))
+        ex("INSERT OR IGNORE INTO memberships (company_id, user_id, role, active, created_at) "
+           "VALUES (?, ?, ?, 1, ?)", (company_id, uid, role, _now()))
+        ex("UPDATE memberships SET role=?, active=1 WHERE company_id=? AND user_id=?", (role, company_id, uid))
+    return password
+
+
+def set_role(actor, company_id, username, role):
+    _require_manageable(actor, company_id, username)
+    if role not in ROLES:
+        raise ValueError(f"دور غير معروف: {role}")
+    if auth.normalize_username(username) == auth.normalize_username(actor) and role != "admin":
+        raise AccessDenied("مينفعش تشيل صلاحية الأدمن من نفسك — خلّي أدمن تاني يعملها")
+    with _tx() as ex:
+        ex("UPDATE memberships SET role=? WHERE company_id=? AND user_id=(SELECT id FROM users WHERE username=?)",
+           (role, company_id, auth.normalize_username(username)))
+
+
+def deactivate_member(actor, company_id, username):
+    """بيشيل المستخدم من الشركة. لو ملوش شركة تانية، حسابه كله بيتقفل ومايقدرش يدخل."""
+    name = auth.normalize_username(username)
+    if name == auth.normalize_username(actor):
+        raise AccessDenied("مينفعش تقفل حسابك انت")
+    uid = _require_manageable(actor, company_id, name)["id"]
+    with _tx() as ex:
+        ex("UPDATE memberships SET active=0 WHERE company_id=? AND user_id=?", (company_id, uid))
+    left = _one("SELECT COUNT(*) AS n FROM memberships WHERE user_id=? AND active=1", (uid,))["n"]
+    if not left and not user(name)["is_operator"]:
+        with _tx() as ex:
+            ex("UPDATE users SET active=0 WHERE id=?", (uid,))
+
+
+def reset_password(actor, company_id, username):
+    """كلمة سر مؤقتة جديدة لعضو في الشركة؛ لازم يغيّرها أول ما يدخل."""
+    _require_manageable(actor, company_id, username)
+    password = temp_password()
+    with _tx() as ex:
+        ex("UPDATE users SET password_hash=?, must_change_password=1 WHERE username=?",
+           (auth.hash_password(password), auth.normalize_username(username)))
+    return password
+
+
+def change_own_password(username, old_password, new_password):
+    if len(new_password or "") < 10:
+        raise ValueError("كلمة السر لازم تكون ١٠ حروف على الأقل")
+    name = auth.authenticate(username, old_password, auth_users())
+    if not name:
+        raise AccessDenied("كلمة السر الحالية غلط")
+    with _tx() as ex:
+        ex("UPDATE users SET password_hash=?, must_change_password=0 WHERE username=?",
+           (auth.hash_password(new_password), name))
+
+
+def create_company(actor, name, admin_username, admin_display_name=None, admin_email=None):
+    """شركة جديدة على المنصة وأول أدمن ليها — للمشغّل بس. بيرجّع كلمة سر الأدمن المؤقتة."""
+    u = user(actor)
+    if not u or not u["is_operator"]:
+        raise AccessDenied("المشغّل بس يقدر يضيف شركة")
+    if not (name or "").strip():
+        raise ValueError("اسم الشركة مطلوب")
+    with _tx() as ex:
+        ex("INSERT INTO companies (name, active, created_at) VALUES (?, 1, ?)", (name.strip(), _now()))
+    company_id = _one("SELECT MAX(id) AS id FROM companies")["id"]
+    return company_id, add_member(actor, company_id, admin_username, admin_display_name, "admin",
+                                  "مدير الشركة", admin_email)

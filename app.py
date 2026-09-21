@@ -13,6 +13,7 @@ from i18n import t, tr
 from ui import ltr, mark_saved, safe_index, show_saved_badge
 import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
 import repo
+import accounts
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
@@ -86,8 +87,9 @@ def _render_login_screen():
             )
             submitted = st.form_submit_button("دخول / Log in", use_container_width=True)
         if submitted:
-            user = authenticate(username, password, resolve_users())
+            user = authenticate(username, password, _auth_users())
             if user:
+                accounts.touch_login(user)
                 st.session_state["_authenticated"] = True
                 st.session_state["_auth_user"] = user
                 st.session_state.pop("_login_attempts", None)
@@ -114,7 +116,7 @@ def _check_login():
         _clear_session_cookie()
     if st.session_state.get("_authenticated") and st.session_state.get("_auth_user"):
         return True
-    users = resolve_users()
+    users = _auth_users()
     # جلسة جديدة (ريفريش أو بعد نشر تحديث) - نشوف لو فيه كوكي دخول ساري
     # قبل ما نعرض شاشة تسجيل الدخول من الأول
     if users and not just_logged_out:
@@ -156,12 +158,51 @@ def _logout():
     st.session_state["_just_logged_out"] = True
 
 
+@st.cache_resource
+def _bootstrap_accounts():
+    """F1: الجداول + نقل حسابات secrets.toml للقاعدة، مرة واحدة لكل process.
+    آمن يتعاد: مابيضيفش مستخدم أو شركة موجودين."""
+    init_db()
+    done = accounts.migrate_accounts(resolve_users())
+    print(f"[accounts] migration: {done}", file=sys.stderr, flush=True)
+    return done
+
+
+def _auth_users():
+    """الحسابات الفعّالة من جدول users. secrets.toml احتياطي بس قبل أول نقل."""
+    return accounts.auth_users() or resolve_users()
+
+
+_bootstrap_accounts()
+
 if not _check_login():
     st.stop()
 
 _pending_cookie_token = st.session_state.pop("_pending_session_cookie", None)
 if _pending_cookie_token:
     _set_session_cookie(_pending_cookie_token)
+
+# كلمة سر مؤقتة (حساب جديد أو إعادة تعيين من الأدمن) لازم تتغير قبل أي حاجة تانية.
+_me_row = accounts.user(st.session_state.get("_auth_user") or "")
+if _me_row and _me_row["must_change_password"]:
+    st.markdown('<div class="cf-login" dir="rtl"><h2>🔐 غيّر كلمة السر / Change your password</h2>'
+                '<p>دي كلمة سر مؤقتة. اختار كلمة سر جديدة (١٠ حروف على الأقل) عشان تكمّل.</p></div>',
+                unsafe_allow_html=True)
+    _, _mid, _ = st.columns([1, 1.4, 1])
+    with _mid, st.form("_change_pw_form"):
+        _old = st.text_input("كلمة السر المؤقتة / Temporary password", type="password")
+        _new = st.text_input("كلمة السر الجديدة / New password", type="password")
+        _again = st.text_input("أعد كتابتها / Repeat it", type="password")
+        if st.form_submit_button("حفظ / Save", use_container_width=True):
+            if _new != _again:
+                st.error("الكلمتين مش زي بعض / The two passwords differ")
+            else:
+                try:
+                    accounts.change_own_password(_me_row["username"], _old, _new)
+                    st.rerun()
+                except (ValueError, accounts.AccessDenied) as _e:
+                    st.error(str(_e))
+    st.stop()
 
 init_db()
 
@@ -288,7 +329,25 @@ st.sidebar.markdown(
 
 st.sidebar.caption(tr("sidebar_projects"))
 
-projects = repo.all_projects_newest_first()
+# F1: المستخدم بيشوف مشاريع الشركات اللي هو عضو فيها بس. لو عضو في أكتر من
+# شركة (أو المشغّل)، بيختار الشركة الأول.
+_my_companies = accounts.companies_for(_current_user or "")
+if not _my_companies:
+    st.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
+    st.stop()
+if len(_my_companies) > 1:
+    _company_names = {c["name"]: c for c in _my_companies}
+    _company = _company_names[st.sidebar.selectbox(t("الشركة"), list(_company_names), key="company_selector")]
+else:
+    _company = _my_companies[0]
+    st.sidebar.caption(f"🏢 {_company['name']}")
+company_id = _company["id"]
+# صفحة الفريق (الأعضاء والأدوار وكلمات السر) في الواجهة الجديدة جنب جدول التصوير
+if os.environ.get("CIMAFAST_BOARD_URL"):
+    _team_label = t("إدارة الفريق") if _company["role"] in ("admin", "operator") else t("الفريق وحسابي")
+    st.sidebar.link_button(f"👥 {_team_label}", f"{os.environ['CIMAFAST_BOARD_URL']}team/",
+                           use_container_width=True)
+projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
 with st.sidebar.expander(tr("new_project")):
@@ -299,7 +358,7 @@ with st.sidebar.expander(tr("new_project")):
     new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], index=0)
     if st.button(t("إنشاء المشروع")):
         if new_name.strip():
-            repo.add_project(new_name, new_type, new_res, new_orient, new_ratio)
+            accounts.create_project(_current_user, company_id, new_name, new_type, new_res, new_orient, new_ratio)
             st.success(t("تم إنشاء المشروع"))
             st.rerun()
         else:

@@ -26,7 +26,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, RedirectResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
@@ -34,6 +34,7 @@ from starlette.templating import Jinja2Templates
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import accounts  # noqa: E402
 import auth  # noqa: E402
 import database  # noqa: E402
 import repo  # noqa: E402
@@ -62,7 +63,10 @@ def current_user(request: Request):
     cfg = _secrets()
     secret = (os.environ.get("CIMAFAST_SESSION_SECRET")
               or (cfg.get("auth") or {}).get("cookie_secret") or cfg.get("SESSION_SECRET"))
-    users = {auth.normalize_username(k): v for k, v in (cfg.get("users") or {}).items()}
+    # F1: الحسابات من جدول users (نفس اللي Streamlit بيستخدمه)؛ secrets.toml
+    # احتياطي بس قبل أول نقل.
+    users = accounts.auth_users() or {auth.normalize_username(k): v
+                                      for k, v in (cfg.get("users") or {}).items()}
     return auth.verify_session_token(request.cookies.get(auth.SESSION_COOKIE_NAME), users,
                                      secret=str(secret) if secret else None)
 
@@ -93,13 +97,19 @@ def _need_user(request):
     return user, None
 
 
-def _project_id(request, body=None):
+def _project_id(request, body=None, user=None):
+    """رقم المشروع من الطلب — وبس لو المستخدم عضو في الشركة اللي المشروع تبعها.
+
+    مشروع شركة تانية بيرجّع 404 زي المشروع اللي مش موجود، عشان رقم مشروع مايكشفش
+    إن فيه مشروع بالرقم ده عند شركة تانية.
+    """
     raw = (body or {}).get("project_id") if body else request.query_params.get("project_id")
     try:
         pid = int(raw)
     except (TypeError, ValueError):
         return None, JSONResponse({"error": "project_id required"}, status_code=400)
-    if not repo.project(pid):
+    user = user or current_user(request)
+    if not repo.project(pid) or not user or not accounts.can_access_project(user, pid):
         return None, JSONResponse({"error": "no such project"}, status_code=404)
     return pid, None
 
@@ -110,7 +120,7 @@ async def page(request: Request):
     user = current_user(request)
     if not user:
         return templates.TemplateResponse(request, "signin.html", {"app_url": "../"}, status_code=401)
-    projects = repo.projects()
+    projects = accounts.projects_for(user)          # only the user's companies
     return templates.TemplateResponse(request, "board.html", {"user": user, "projects": projects})
 
 
@@ -199,6 +209,121 @@ async def api_dood(request: Request):
     return JSONResponse(repo.day_out_of_days(pid))
 
 
+# --- الفريق (F1) -----------------------------------------------------------------
+# مدير الشركة يضيف ناس ويغيّر أدوارهم ويصفّر كلمات السر ويشيل حد؛ أي حد يغيّر
+# كلمة سره؛ مشغّل المنصة يضيف شركة. الصلاحيات كلها جوه accounts.py — هنا بس
+# بنترجم AccessDenied لـ 403 وValueError لـ 400.
+
+def _team_call(fn, *args):
+    try:
+        return fn(*args), None
+    except accounts.AccessDenied as exc:
+        return None, JSONResponse({"error": str(exc)}, status_code=403)
+    except ValueError as exc:
+        return None, JSONResponse({"error": str(exc)}, status_code=400)
+
+
+def _company_id(request, body=None):
+    raw = (body or {}).get("company_id") if body is not None else request.query_params.get("company_id")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+async def team_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return templates.TemplateResponse(request, "signin.html", {"app_url": "../../"}, status_code=401)
+    me = accounts.user(user)
+    return templates.TemplateResponse(request, "team.html", {
+        "user": user, "companies": accounts.companies_for(user), "is_operator": bool(me and me["is_operator"]),
+        "roles": [(r, accounts.ROLE_LABELS[r]) for r in accounts.ROLES]})
+
+
+async def api_team(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    cid = _company_id(request)
+    rows, err = _team_call(accounts.members, user, cid)
+    if err:
+        return err
+    return JSONResponse({"role": accounts.role_in(user, cid), "me": user,
+                         "members": [dict(r) for r in rows]})
+
+
+async def api_team_add(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    pw, err = _team_call(accounts.add_member, user, _company_id(request, b), b.get("username", ""),
+                         b.get("display_name") or None, b.get("role", "department"),
+                         b.get("job_title") or None, b.get("email") or None)
+    return err or JSONResponse({"temp_password": pw})
+
+
+async def api_team_update(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    _, err = _team_call(accounts.set_role, user, _company_id(request, b), request.path_params["username"],
+                        b.get("role", ""))
+    return err or JSONResponse({"ok": True})
+
+
+async def api_team_reset(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    pw, err = _team_call(accounts.reset_password, user, _company_id(request, b),
+                         request.path_params["username"])
+    return err or JSONResponse({"temp_password": pw})
+
+
+async def api_team_remove(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    _, err = _team_call(accounts.deactivate_member, user, _company_id(request, b),
+                        request.path_params["username"])
+    return err or JSONResponse({"ok": True})
+
+
+async def api_company_rename(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    _, err = _team_call(accounts.rename_company, user, _company_id(request, b), b.get("name", ""))
+    return err or JSONResponse({"ok": True})
+
+
+async def api_company_create(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    out, err = _team_call(accounts.create_company, user, b.get("name", ""), b.get("admin_username", ""),
+                          b.get("admin_display_name") or None, b.get("admin_email") or None)
+    if err:
+        return err
+    return JSONResponse({"company_id": out[0], "temp_password": out[1]})
+
+
+async def api_my_password(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    b = await request.json()
+    _, err = _team_call(accounts.change_own_password, user, b.get("old", ""), b.get("new", ""))
+    return err or JSONResponse({"ok": True})
+
+
 async def healthz(request: Request):
     """بيلمس قاعدة البيانات فعلًا — 200 من غير ما يوصل للبيانات مايثبتش حاجة."""
     try:
@@ -225,6 +350,17 @@ app = Starlette(
         Route("/api/days/{day_id:int}", api_delete_day, methods=["DELETE"]),
         Route("/api/suggest", api_suggest, methods=["POST"]),
         Route("/api/dood", api_dood, methods=["GET"]),
+        # Location نسبي: Caddy شايل /v1/board، فـ "/team/" المطلق كان هيودّي على الإنتاج
+        Route("/team", lambda request: RedirectResponse("team/", status_code=308)),
+        Route("/team/", team_page),
+        Route("/api/team", api_team, methods=["GET"]),
+        Route("/api/team/members", api_team_add, methods=["POST"]),
+        Route("/api/team/members/{username}", api_team_update, methods=["PATCH"]),
+        Route("/api/team/members/{username}", api_team_remove, methods=["DELETE"]),
+        Route("/api/team/members/{username}/reset", api_team_reset, methods=["POST"]),
+        Route("/api/companies", api_company_create, methods=["POST"]),
+        Route("/api/companies/rename", api_company_rename, methods=["POST"]),
+        Route("/api/me/password", api_my_password, methods=["POST"]),
         Mount("/static", StaticFiles(directory=str(HERE / "static")), name="static"),
         Mount("/fonts", StaticFiles(directory=str(ROOT / "static" / "fonts")), name="fonts"),
     ],

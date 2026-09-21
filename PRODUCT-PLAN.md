@@ -55,6 +55,15 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   companies and memberships in the database; each project belongs to a company;
   invite by email, password reset, deactivate. *Done when* two companies can use
   CimaFast side by side and never see each other's projects.
+  ✅ **On /v1 2026-09-21.** Accounts moved from secrets.toml into the database
+  on first start (every password unchanged); existing users and projects sit in
+  "الشركة الافتراضية". The team page (`/v1/board/team/`, linked from the
+  sidebar) lets a company admin add people (one-time temporary password, changed
+  at first login), change roles, reset passwords, remove and re-add people, and
+  rename the company; the operator creates companies. Verified in a browser: a
+  second company's admin sees none of the first company's projects (404 on the
+  board API, 403 on its team), and a company admin can never modify the
+  operator's account. Still to come: invite by email (needs an outbound mail provider).
 - **F2 Roles and permissions** [orchestrator, infrastructure]
   Anyone can delete any project. → Company admin, producer, production manager,
   department head, viewer; destructive actions need the right role. *Done when* a
@@ -64,9 +73,11 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   log of changes (who, what, when, before/after) and of key usage events (login,
   screen, export). *Done when* any change can be traced and the agents report
   adoption from events rather than guessing.
-- **F4 Off-site encrypted backups** [infrastructure] — approved by the owner
-  2026-09-21; destination to be chosen. *Done when* a restore drill runs from the
-  off-site copy.
+- **F4 Off-site encrypted backups** [infrastructure] — ✅ **done 2026-09-21.**
+  Nightly: encrypted on the server (gpg AES-256), pushed to the private repo
+  github.com/onkpictures-osama/cimafast-backups, then downloaded back, decrypted
+  and restore-drilled. Documented in that repo's README and
+  `/opt/cimafast-backup/README.md`.
 
 ### Phase 1 — A home for every user
 
@@ -135,9 +146,8 @@ orchestrator reorders items only with evidence, and brings scope or priority
 changes to the owner in #decisions. Work that users do inside the product is
 never a decision for the owner.
 
-## Owner decisions this plan needs
+## Owner decisions
 
-1. **Order of Phase 0 vs Phase 2** — recommended: F1–F3 first, because every later
-   feature (home page, permissions, per-company AI spend) depends on them.
-2. **Off-site backup destination** (F4, approved in principle).
-3. **When to promote /v1 to production.**
+1. **Order** — decided 2026-09-21: Phase 0 (ERP foundations) first. "OK, go."
+2. **Off-site backups** — decided 2026-09-21: GitHub, with proper documentation.
+3. **Promoting /v1 to production** — the owner decides when. Agents do not raise it.
