@@ -17,10 +17,11 @@ flipping it. Nothing in here changes the default path.
 | 0 | screenshot harness (`tests/visual/`) | `348d91f` (see warning below) |
 | 0 | theme tests, blur-depth check, docs | `f07e976` (see warning below) |
 | 1 | ground mesh gradient + glass base theming | `f07e976` (see warning below) |
-| 2 | three material tiers + `cf-*` migration | _not yet committed_ |
+| 2 | three material tiers + `cf-*` migration + blur-depth guard | `f4ea08e` (see warning below) |
 | 3 | component pass in frequency order | _not yet committed_ |
 | 4 | chrome: 72% gold glass sidebar, header, stepper redesign | _not yet committed_ |
 | 5 | light mode, reduced-transparency/motion, contrast audit, pointer sheen | _not yet committed_ |
+| — | Readex Pro for the whole app — **not behind the flag**, every user sees it | `f97fe5c` |
 
 This table is updated as each phase lands. A row saying _not yet committed_ means
 exactly that.
@@ -30,6 +31,23 @@ Unrelated work that got committed in the same window, kept separate on purpose:
 | Commit | What it is |
 |---|---|
 | `15ffcf7` | scene number suffixes (35A) carried through script import. Not redesign. |
+
+## Warning: a fourth commit has a misleading subject line
+
+**`f4ea08e` "Add intelligent location matching and enhanced analysis"** — its
+message describes `location_matcher.py` and `enhanced_script_prompt.py` and does
+not mention the theme at all, but it also carries the whole of Phase 2:
+
+- `theme/glass.py` (+196): `_material_rules()` (the three `.cf-glass--*` tiers),
+  `_cf_surface_rules()` (the `cf-*` migration onto the material), and
+  `_blur_guard_rules()` (the structural two-layer blur cap)
+- `theme/tokens.py` (+11), `theme/classic.py` (−8/+8)
+- `tests/test_theme.py` (+66): the tier, blur-surface and nesting-depth tests
+
+Same pathology as the three commits above, one window later. Phase 2 is complete
+and its tests pass (`venv/bin/python tests/test_theme.py` → 14/14); only this map
+was stale.
+
 
 ## Warning: three commits have misleading subject lines
 
