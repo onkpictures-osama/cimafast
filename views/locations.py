@@ -76,9 +76,32 @@ def render(project_id):
         with _lazy_exp:
             if _lazy_exp.open:
                 # اللينك أول حاجة في المكان: اللي بيدوّر عليه بيبقى واقف في
-                # الشارع. ولو مفيش لينك مبنعرضش زرار مطفي — شاشة نضيفة أحسن.
-                if l.get("maps_url"):
-                    st.link_button(t("📍 افتح على الخريطة"), l["maps_url"])
+                # الشارع. زرار واحد: لو فيه لينك محفوظ بيسأل تفتح ولا تعدل،
+                # ولو لسه مفيش بيطلب اللينك على طول.
+                _editing_key = f"loc_maps_editing_{l['id']}"
+                with st.popover(t("📍 الموقع الجغرافي")):
+                    if l.get("maps_url") and not st.session_state.get(_editing_key):
+                        st.write(t("عاوز تفتح الموقع الجغرافي ولا تعدله؟"))
+                        open_col, edit_col = st.columns(2)
+                        with open_col:
+                            st.link_button(t("🗺️ فتح"), l["maps_url"], use_container_width=True)
+                        with edit_col:
+                            if st.button(t("✏️ تعديل"), key=f"loc_maps_edit_btn_{l['id']}", use_container_width=True):
+                                st.session_state[_editing_key] = True
+                                st.rerun()
+                    else:
+                        new_maps_url = st.text_input(
+                            t("رابط الموقع على الخريطة"),
+                            value=l.get("maps_url") or "",
+                            placeholder=t("الصق رابط Google Maps أو أي رابط خريطة تاني"),
+                            key=f"loc_maps_input_{l['id']}",
+                        )
+                        if st.button(t("💾 حفظ"), key=f"loc_maps_save_{l['id']}"):
+                            repo.set_location_maps_url(_clean_maps_url(new_maps_url), l["id"])
+                            st.session_state[_editing_key] = False
+                            mark_saved(f"loc_maps_{l['id']}")
+                            st.rerun()
+                        show_saved_badge(f"loc_maps_{l['id']}")
 
                 st.markdown(f"**{t('🖼️ صورة المكان')}**")
 
@@ -108,12 +131,6 @@ def render(project_id):
                         t("وصف عام ثابت للمكان"), value=l["base_description"] or "",
                         placeholder=t("مثال: شقة قديمة في حي شعبي، جدرانها بيج فاتح، فيها أثاث خشبي تقيل"),
                     )
-                    e_loc_maps = st.text_input(
-                        t("رابط الموقع على الخريطة (اختياري)"),
-                        value=l.get("maps_url") or "",
-                        placeholder=t("الصق رابط Google Maps أو أي رابط خريطة تاني"),
-                        key=f"loc_maps_{l['id']}",
-                    )
                     save_col, del_col = st.columns(2)
                     with save_col:
                         save_loc = st.form_submit_button(t("💾 حفظ التعديل"))
@@ -124,7 +141,7 @@ def render(project_id):
                         new_parent_id = None
                         if e_loc_parent != "بدون - مكان رئيسي":
                             new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
-                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, _clean_maps_url(e_loc_maps), l["id"])
+                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, l.get("maps_url"), l["id"])
                         mark_saved(f"loc_{l['id']}")
                         st.rerun()
                     else:

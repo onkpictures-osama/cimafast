@@ -111,6 +111,23 @@ def test_editing_can_add_then_clear_the_link():
 
 
 @test
+def test_set_location_maps_url_updates_only_the_link():
+    # الزرار الجديد ("الموقع الجغرافي") بيحفظ اللينك لوحده من غير ما يلمس
+    # باقي بيانات المكان — عكس update_location اللي بياخد كل الحقول مع بعض.
+    pid = _project("مشروع الزرار")
+    repo.add_location(pid, "بار السطوح", "وصف ثابت", None, None)
+    lid = _loc(pid, "بار السطوح")["id"]
+
+    repo.set_location_maps_url(_clean_maps_url("maps.app.goo.gl/roof"), lid)
+    loc = _loc(pid, "بار السطوح")
+    assert loc["maps_url"] == "https://maps.app.goo.gl/roof"
+    assert loc["base_description"] == "وصف ثابت"   # باقي البيانات ما اتلمستش
+
+    repo.set_location_maps_url(_clean_maps_url(""), lid)
+    assert _loc(pid, "بار السطوح")["maps_url"] is None
+
+
+@test
 def test_the_column_survives_an_old_database():
     # قاعدة قديمة = السكيما الحقيقية من غير العمود. بنشيله وبعدين نشغل
     # المهاجرة، عشان نتأكد إنها بتضيفه من غير ما تلمس بيانات اليوزر.

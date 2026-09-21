@@ -557,6 +557,10 @@ def update_location(*params):
     return run_query('UPDATE locations SET name=?, base_description=?, parent_location_id=?, maps_url=? WHERE id=?', params)
 
 
+def set_location_maps_url(*params):
+    return run_query('UPDATE locations SET maps_url=? WHERE id=?', params)
+
+
 def update_location_state(*params):
     return run_query('UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=?', params)
 
