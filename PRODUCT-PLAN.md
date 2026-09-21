@@ -81,6 +81,18 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   log of changes (who, what, when, before/after) and of key usage events (login,
   screen, export). *Done when* any change can be traced and the agents report
   adoption from events rather than guessing.
+  ✅ **On /v1 2026-09-21.** Two tables kept apart: `audit_log` (accountability —
+  who changed what, with the old and new values) and `usage_events` (adoption —
+  login, screen, export, AI run). Audit rows are written by the data layer
+  itself, on the same cursor as the change, so no screen can forget to log and
+  the log commits or rolls back with the change. Both scoped per company: a
+  company admin sees their company, the operator sees all, everyone else is
+  refused. Viewing at `/v1/board/activity/` (Arabic/RTL): usage over the last
+  7/30/90 days, plus a filterable table of changes with before/after. Secrets
+  are never stored (a password column is logged as *changed*, never with its
+  value); a 143-scene import is one row, not thousands; a failed log never
+  breaks a user's save. Tests: `tests/test_audit.py` (22 checks).
+  Still to come: retention/pruning of old rows, and exporting the log to a file.
 - **F4 Off-site encrypted backups** [infrastructure] — ✅ **done 2026-09-21.**
   Nightly: encrypted on the server (gpg AES-256), pushed to the private repo
   github.com/onkpictures-osama/cimafast-backups, then downloaded back, decrypted
