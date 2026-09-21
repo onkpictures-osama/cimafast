@@ -14,6 +14,7 @@ from ui import ltr, mark_saved, safe_index, show_saved_badge
 import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
 import repo
 import accounts
+import links
 import permissions
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
@@ -348,6 +349,23 @@ _my_companies = accounts.companies_for(_current_user or "")
 if not _my_companies:
     st.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
     st.stop()
+# H2: رابط مباشر (?project=&tab=) من الصفحة الرئيسية أو تنبيه أو بوست. بيتطبّق
+# مرة واحدة لما يوصل؛ بعد كده اليوزر حر يتنقّل، وشريط العنوان بيتبعه (تحت).
+_link_project, _link_tab = links.parse(st.query_params)
+if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_state.get("_applied_link"):
+    st.session_state["_applied_link"] = (_link_project, _link_tab)
+    if _link_project:
+        if accounts.can_access_project(_current_user, _link_project):
+            _lp = repo.project(_link_project)
+            if len(_my_companies) > 1:
+                st.session_state["company_selector"] = next(
+                    c["name"] for c in _my_companies if c["id"] == _lp["company_id"])
+            st.session_state["_link_project_name"] = _lp["name"]
+        else:
+            st.toast(t("الرابط ده لمشروع مش متاح لحسابك."), icon="🔒")
+    if _link_tab:
+        st.session_state["main_tabs"] = tr(links.TABS[_link_tab])
+
 if len(_my_companies) > 1:
     _company_names = {c["name"]: c for c in _my_companies}
     _company = _company_names[st.sidebar.selectbox(t("الشركة"), list(_company_names), key="company_selector")]
@@ -391,6 +409,9 @@ if not projects:
         st.info(t("مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع."))
     st.stop()
 
+_wanted = st.session_state.pop("_link_project_name", None)
+if _wanted in project_names:
+    st.session_state["project_selector"] = _wanted
 selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
 project = repo.project_by_id(project_id)[0]
@@ -611,11 +632,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown, tab_dashboard = st.tabs(
-    [tr("tab_import"), tr("tab_locations"), tr("tab_characters"), tr("tab_props"),
-     tr("tab_scenes"), tr("tab_breakdown"), tr("tab_dashboard")],
-    key="main_tabs",
-)
+# on_change="rerun": التبويب المفتوح بس هو اللي بيتبني (tab.open)، بدل السبعة في
+# كل ضغطة — ومعرفة التبويب المفتوح بتخلّي شريط العنوان رابط للشاشة دي بالظبط.
+_tabs = st.tabs([tr(k) for k in links.TABS.values()], key="main_tabs", on_change="rerun")
+tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown, tab_dashboard = _tabs
+_open_tab = next((slug for slug, tab in zip(links.TABS, _tabs) if tab.open), "import")
+# شريط العنوان = الشاشة الحالية: يتحفظ bookmark أو يتبعت لزميل
+st.query_params.update(project=str(project_id), tab=_open_tab)
+st.session_state["_applied_link"] = (project_id, _open_tab)
 
 # ---------------- تبويب استيراد السكريبت ----------------
 
@@ -631,20 +655,27 @@ def _render(view, **kwargs):
         st.warning(t(str(exc)))
 
 
-with tab_import:
-    if permissions.can(_role, "run_ai"):
-        _render(views.import_tab, project_id=project_id)
-    else:
-        st.info(t("استيراد السكريبت وتحليله لأعضاء الفريق اللي عندهم صلاحية تعديل. حسابك مشاهدة فقط."))
-with tab_locations:
-    _render(views.locations, project_id=project_id)
-with tab_characters:
-    _render(views.characters, project_id=project_id)
-with tab_props:
-    _render(views.props, project_id=project_id)
-with tab_scenes:
-    _render(views.scenes, project=project, project_id=project_id, _is_ar=_is_ar)
-with tab_breakdown:
-    _render(views.shots, project_id=project_id)
-with tab_dashboard:
-    _render(views.reports, project=project, project_id=project_id, _char_count=_char_count, _loc_count=_loc_count, _scene_count=_scene_count, _shot_count=_shot_count)
+if tab_import.open:
+    with tab_import:
+        if permissions.can(_role, "run_ai"):
+            _render(views.import_tab, project_id=project_id)
+        else:
+            st.info(t("استيراد السكريبت وتحليله لأعضاء الفريق اللي عندهم صلاحية تعديل. حسابك مشاهدة فقط."))
+if tab_locations.open:
+    with tab_locations:
+        _render(views.locations, project_id=project_id)
+if tab_characters.open:
+    with tab_characters:
+        _render(views.characters, project_id=project_id)
+if tab_props.open:
+    with tab_props:
+        _render(views.props, project_id=project_id)
+if tab_scenes.open:
+    with tab_scenes:
+        _render(views.scenes, project=project, project_id=project_id, _is_ar=_is_ar)
+if tab_breakdown.open:
+    with tab_breakdown:
+        _render(views.shots, project_id=project_id)
+if tab_dashboard.open:
+    with tab_dashboard:
+        _render(views.reports, project=project, project_id=project_id, _char_count=_char_count, _loc_count=_loc_count, _scene_count=_scene_count, _shot_count=_shot_count)
