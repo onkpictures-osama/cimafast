@@ -11,6 +11,7 @@ from importer import import_parsed_scenes
 from script_md import to_markdown
 from script_parser import apply_character_merges, apply_location_merges, extract_lines, find_location_matches_with_states, find_similar_location_groups, find_similar_name_groups, looks_like_screenplay, parse_json_script, parse_script
 from ui import fmt_day_night, fmt_int_ext, ltr, multiselect
+import audit
 import repo
 
 
@@ -322,6 +323,9 @@ def render(project_id):
                     st.session_state["ai_job_id"] = ai_jobs.start(
                         _pending["md"], project_id, _pending["filename"],
                         known_characters=_known, max_cost_usd=_ceiling)
+                    # F3: تشغيل التحليل بيكلّف فلوس — بيتسجّل كحدث استخدام بسقفه
+                    audit.event("ai", target="script_analysis", project_id=project_id,
+                                detail={"file": _pending["filename"], "ceiling_usd": _ceiling})
                     st.session_state.pop("_ai_pending", None)
                     st.rerun()
                 except Exception as e:
@@ -550,7 +554,16 @@ def render(project_id):
             if st.button(t("🔵 تأكيد وإضافة كل المشاهد للمشروع")):
                 scenes_to_import = apply_character_merges(preview_scenes, merge_map)
                 scenes_to_import = apply_location_merges(scenes_to_import, location_merge_map)
-                summary = import_parsed_scenes(project_id, scenes_to_import, fetch_all, run_query)
+                # F3: استيراد فيه ١٤٣ مشهد بيكتب آلاف الصفوف. الصف الواحد ده
+                # بيقول مين استورد وإمتى وكام مشهد — والتفاصيل في البيانات نفسها.
+                with audit.action("import_script", "scenes", project_id=project_id) as _act:
+                    summary = import_parsed_scenes(project_id, scenes_to_import, fetch_all, run_query)
+                    _act.summary = f"استيراد سيناريو: {summary['scenes_added']} مشهد جديد"
+                    _act.extra = {"مشاهد": summary["scenes_added"],
+                                  "شخصيات جديدة": len(summary["characters_added"]),
+                                  "أماكن جديدة": len(summary["locations_added"]),
+                                  "إكسسوارات جديدة": len(summary["props_added"]),
+                                  "مشاهد متخطاة": len(summary["scenes_skipped"])}
                 msg = f"{t('تم إضافة')} {summary['scenes_added']} {t('مشهد جديد.')}"
                 if summary["characters_added"]:
                     msg += f" {t('شخصيات جديدة:')} {'، '.join(summary['characters_added'])}."

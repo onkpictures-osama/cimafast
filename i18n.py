@@ -63,6 +63,8 @@ TRANSLATIONS = {
     "إنشاء مشروع جديد لمدير الشركة أو المنتج أو مدير الإنتاج بس.": "Only the company admin, a producer or a production manager can create a project.",
     "حذف مشروع لمدير الشركة بس.": "Only the company admin can delete a project.",
     "إدارة الفريق لمدير الشركة بس.": "Only the company admin can manage the team.",
+    "سجل النشاط": "Activity log",
+    "سجل النشاط لمدير الشركة بس.": "Only the company admin can see the activity log.",
     "حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك.": "Your account is not linked to any company. Contact your company admin.",
     "جدول التصوير": "Shooting schedule",
     "مفيش حاجة ناقصة — كل المشاهد ليها لقطات وشخصيات، وكل حاجة ليها صورة ومتراجعة.": "Nothing missing — every scene has shots and characters, and everything has an image and is reviewed.",

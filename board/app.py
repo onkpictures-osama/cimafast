@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import accounts  # noqa: E402
+import audit  # noqa: E402
 import auth  # noqa: E402
 import database  # noqa: E402
 import home  # noqa: E402
@@ -70,8 +71,12 @@ def current_user(request: Request):
     # احتياطي بس قبل أول نقل.
     users = accounts.auth_users() or {auth.normalize_username(k): v
                                       for k, v in (cfg.get("users") or {}).items()}
-    return auth.verify_session_token(request.cookies.get(auth.SESSION_COOKIE_NAME), users,
+    user = auth.verify_session_token(request.cookies.get(auth.SESSION_COOKIE_NAME), users,
                                      secret=str(secret) if secret else None)
+    # F3: سياق السجل للطلب ده. كل طلب في Starlette ليه context لوحده، فمفيش
+    # طلب بيشوف سياق طلب تاني حتى لو الاتنين شغالين في نفس اللحظة.
+    audit.set_context(username=user, source="board")
+    return user
 
 
 class SameOriginWrites(BaseHTTPMiddleware):
@@ -118,6 +123,7 @@ def _project_id(request, body=None, user=None):
     # وأي طلب مش GET لازم يكون من حد يقدر يعدّل.
     role = accounts.project_role(user, pid)
     permissions.act_as(role)
+    audit.set_context(username=user, project_id=pid, source="board")   # F3
     if request.method != "GET" and not permissions.can(role, "edit"):
         return None, JSONResponse({"error": permissions.MESSAGES["edit"]}, status_code=403)
     return pid, None
@@ -130,6 +136,7 @@ async def page(request: Request):
     if not user:
         return templates.TemplateResponse(request, "signin.html", {"app_url": "../"}, status_code=401)
     projects = accounts.projects_for(user)          # only the user's companies
+    audit.event("screen", target="board")           # F3: تبنّي الشاشات الجديدة
     return templates.TemplateResponse(request, "board.html", {"user": user, "projects": projects})
 
 
@@ -157,8 +164,14 @@ async def api_save(request: Request):
     if err:
         return err
     try:
-        repo.save_layout(pid, [{"day_id": int(d["day_id"]), "scene_ids": [int(s) for s in d["scene_ids"]]}
-                               for d in body.get("days", [])])
+        # F3: حفظ الجدول بيمسح ويعيد كتابة كل المشاهد على الأيام. الصف المفيد هو
+        # "فلان حفظ جدول التصوير" مش ٣٠٠ صف نقل مشهد.
+        days = [{"day_id": int(d["day_id"]), "scene_ids": [int(s) for s in d["scene_ids"]]}
+                for d in body.get("days", [])]
+        with audit.action("schedule_save", "shooting_days", project_id=pid,
+                          summary="حفظ جدول التصوير") as act:
+            act.extra = {"أيام": len(days), "مشاهد متجدولة": sum(len(d["scene_ids"]) for d in days)}
+            repo.save_layout(pid, days)
     except (repo.LayoutError, KeyError, TypeError, ValueError) as exc:
         return JSONResponse({"error": str(exc)}, status_code=422)
     return JSONResponse({"ok": True})
@@ -205,8 +218,11 @@ async def api_suggest(request: Request):
     pid, err = _project_id(request, body)
     if err:
         return err
-    return JSONResponse({"days": repo.apply_suggestion(pid, body.get("per_day", 8),
-                                                     body.get("sites_per_day", 2))})
+    with audit.action("schedule_suggest", "shooting_days", project_id=pid,
+                      summary="اقتراح جدول تصوير") as act:
+        days = repo.apply_suggestion(pid, body.get("per_day", 8), body.get("sites_per_day", 2))
+        act.extra = {"أيام": len(days) if isinstance(days, list) else None}
+    return JSONResponse({"days": days})
 
 
 async def api_dood(request: Request):
@@ -246,9 +262,13 @@ async def team_page(request: Request):
     if not user:
         return templates.TemplateResponse(request, "signin.html", {"app_url": "../../"}, status_code=401)
     me = accounts.user(user)
+    companies = accounts.companies_for(user)
+    audit.event("screen", target="team",
+                company_id=next((c["id"] for c in companies), None))
     return templates.TemplateResponse(request, "team.html", {
-        "user": user, "companies": accounts.companies_for(user), "is_operator": bool(me and me["is_operator"]),
-        "roles": [(r, accounts.ROLE_LABELS[r]) for r in accounts.ROLES]})
+        "user": user, "companies": companies, "is_operator": bool(me and me["is_operator"]),
+        "roles": [(r, accounts.ROLE_LABELS[r]) for r in accounts.ROLES],
+        "can_view_audit": any(permissions.can(c["role"], "view_audit") for c in companies)})
 
 
 async def api_team(request: Request):
@@ -378,6 +398,7 @@ async def home_page(request: Request):
                 href = links.screen(HOME_APP, focus["id"], key)
             row.append({"icon": icon, "title": title, "desc": desc, "href": href})
         tools.append((group, row))
+    audit.event("screen", target="home", company_id=next((c["id"] for c in companies), None))
     creatable = [c for c in companies if permissions.can(c["role"], "create_project")]
     return templates.TemplateResponse(request, "home.html", {
         "user": user, "me": me, "role_label": accounts.ROLE_LABELS.get(role, role),
@@ -414,6 +435,81 @@ async def api_create_project(request: Request):
     except (accounts.AccessDenied, permissions.Denied) as exc:
         return JSONResponse({"error": str(exc)}, status_code=403)
     return JSONResponse({"project_id": pid, "href": links.screen(HOME_APP, pid, "import")})
+
+
+# --- سجل النشاط (F3) --------------------------------------------------------------
+# مدير الشركة بيشوف نشاط شركته بس، والمشغّل بيشوف الكل — الفلترة نفسها جوه
+# audit.py (دالة _scope)، فمفيش استعلام هنا بيقدر يتخطّاها.
+
+def _audit_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs), None
+    except accounts.AccessDenied as exc:
+        return None, JSONResponse({"error": str(exc)}, status_code=403)
+    except (TypeError, ValueError) as exc:
+        return None, JSONResponse({"error": str(exc)}, status_code=400)
+
+
+async def activity_page(request: Request):
+    user = current_user(request)
+    if not user:
+        return templates.TemplateResponse(request, "signin.html", {"app_url": "../../"}, status_code=401)
+    companies = [c for c in accounts.companies_for(user) if permissions.can(c["role"], "view_audit")]
+    me = accounts.user(user) or {}
+    if me.get("is_operator"):
+        companies = accounts.companies_for(user)
+    if not companies:
+        return templates.TemplateResponse(request, "activity.html", {
+            "user": user, "companies": [], "denied": True, "actions": [], "entities": []},
+            status_code=403)
+    audit.event("screen", target="activity", company_id=companies[0]["id"])
+    return templates.TemplateResponse(request, "activity.html", {
+        "user": user, "companies": companies, "denied": False,
+        "action_labels": audit.ACTION_LABELS, "entity_labels": audit.ENTITY_LABELS,
+        "event_labels": audit.EVENT_LABELS})
+
+
+def _int_or_none(raw):
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+async def api_activity(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    q = request.query_params
+    out, err = _audit_call(
+        audit.entries, user, company_id=_int_or_none(q.get("company_id")),
+        username=q.get("user") or None, entity=q.get("entity") or None,
+        action_name=q.get("action") or None, project_id=_int_or_none(q.get("project_id")),
+        since=q.get("since") or None, text=q.get("q") or None,
+        limit=_int_or_none(q.get("limit")) or 200)
+    if err:
+        return err
+    filters, err = _audit_call(audit.filters_for, user, _int_or_none(q.get("company_id")))
+    if err:
+        return err
+    names = {p["id"]: p["name"] for p in accounts.projects_for(user)}
+    rows = [dict(r, project_name=names.get(r["project_id"])) for r in out]
+    return JSONResponse({"rows": rows, "filters": filters,
+                         "action_labels": audit.ACTION_LABELS,
+                         "entity_labels": audit.ENTITY_LABELS})
+
+
+async def api_usage(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    q = request.query_params
+    out, err = _audit_call(audit.usage_summary, user, _int_or_none(q.get("company_id")),
+                           _int_or_none(q.get("days")) or 30)
+    if err:
+        return err
+    return JSONResponse(dict(out, event_labels=audit.EVENT_LABELS,
+                             target_labels=audit.TARGET_LABELS))
 
 
 async def healthz(request: Request):
@@ -454,6 +550,11 @@ app = Starlette(
         Route("/api/team/members/{username}", api_team_update, methods=["PATCH"]),
         Route("/api/team/members/{username}", api_team_remove, methods=["DELETE"]),
         Route("/api/team/members/{username}/reset", api_team_reset, methods=["POST"]),
+        # F3: سجل النشاط وتحليلات الاستخدام
+        Route("/activity", lambda request: RedirectResponse("activity/", status_code=308)),
+        Route("/activity/", activity_page),
+        Route("/api/activity", api_activity, methods=["GET"]),
+        Route("/api/usage", api_usage, methods=["GET"]),
         Route("/api/companies", api_company_create, methods=["POST"]),
         Route("/api/companies/rename", api_company_rename, methods=["POST"]),
         Route("/api/me/password", api_my_password, methods=["POST"]),

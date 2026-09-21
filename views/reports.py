@@ -5,6 +5,7 @@ from database import fetch_all, scene_label
 from export import build_characters_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel, build_props_sheet_excel, build_shot_list_excel, build_shot_list_pdf, build_shot_list_word
 from i18n import t, tr
 from ui import ltr
+import audit
 import repo
 
 
@@ -48,8 +49,19 @@ def render(project, project_id, _char_count, _loc_count, _scene_count, _shot_cou
         # غير ما العدد يتغير كان بيطلّع ملف قديم، وكان فيه زرار «تحديث الملفات»
         # بيطلب من المستخدم يفتكر يدوس عليه. وكمان السبعة كانوا بيتبنوا مع أول
         # rerun بعد أي تغيير عدد، حتى لو محدش فاتح التقارير.
+        # F3: حدث التصدير بيتسجّل جوه الدالة دي — يعني لما المستخدم يدوس تحميل
+        # فعلًا، مش لما الشاشة تترسم. ده الفرق بين "صدّر" و"شاف زرار التصدير".
+        # بنقرا المستخدم والشركة هنا (في thread الـ script) لأن بناء الملف بيحصل
+        # في thread تاني مالوش جلسة Streamlit.
+        _who = st.session_state.get("_auth_user")
+        _co = st.session_state.get("_cf_company")
+
         def _lazy(build):
-            return lambda: build(project, project_id, fetch_all)
+            def _download():
+                audit.event("export", target=build.__name__.replace("build_", ""),
+                            username=_who, company_id=_co, project_id=project_id)
+                return build(project, project_id, fetch_all)
+            return _download
 
 
         exp_col1, exp_col2, exp_col3, exp_col4 = st.columns(4)

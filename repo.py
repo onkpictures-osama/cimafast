@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from contextlib import contextmanager
 
+import audit
 import permissions
 from database import _adapt_query, fetch_all, get_connection, run_query, scene_label
 from search import normalize
@@ -24,12 +25,23 @@ NIGHT_VALUES = {"ليل"}              # فجر وغروب بيتصوروا في
 
 @contextmanager
 def _tx():
-    """اتصال واحد وtransaction واحدة: يا كله يتحفظ يا ولا حاجة."""
+    """اتصال واحد وtransaction واحدة: يا كله يتحفظ يا ولا حاجة.
+
+    F3: كل جملة بتعدّي على السجل (audit.watch/record) على نفس الـ cursor، يعني
+    صف السجل بيتحفظ مع التغيير أو بيترجع معاه.
+    """
     permissions.require("edit")
     conn = get_connection()
     try:
         cur = conn.cursor()
-        yield lambda q, p=(): cur.execute(_adapt_query(q), p)
+
+        def _execute(q, p=()):
+            token = audit.watch(cur, q, p)
+            result = cur.execute(_adapt_query(q), p)
+            audit.record(cur, token)
+            return result
+
+        yield _execute
         conn.commit()
     except Exception:
         conn.rollback()

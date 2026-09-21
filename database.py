@@ -13,6 +13,7 @@ import os
 import re
 import sqlite3
 
+import audit
 import permissions
 
 DB_PATH = os.environ.get("STUDIO_DB_PATH") or os.path.join(
@@ -113,6 +114,9 @@ def run_query(query, params=()):
         is_insert = q.strip().upper().startswith("INSERT")
         if USE_POSTGRES and is_insert and "RETURNING" not in q.upper():
             q = q.rstrip().rstrip(";") + " RETURNING id"
+        # F3: السجل بيتقري الحالة القديمة قبل التنفيذ وبيتكتب بعده على نفس
+        # الاتصال — يعني جوه نفس الـ transaction بتاعت التغيير.
+        _watch = audit.watch(cur, query, params)
         cur.execute(q, params)
         last_id = None
         if USE_POSTGRES:
@@ -122,6 +126,7 @@ def run_query(query, params=()):
                     last_id = row["id"] if isinstance(row, dict) else row[0]
         else:
             last_id = cur.lastrowid
+        audit.record(cur, _watch, last_id)
         conn.commit()
         return last_id
     finally:
@@ -359,6 +364,40 @@ def init_db():
             last_tab TEXT,
             updated_at TEXT
         );
+
+        -- F3: سجل التدقيق وأحداث الاستخدام (audit.py). من غير مفاتيح خارجية عن
+        -- قصد: السجل لازم يفضل موجود حتى لو المشروع أو الشركة اتمسحوا — ده
+        -- بالظبط الوقت اللي بيتسأل فيه "مين مسح ده".
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id SERIAL PRIMARY KEY,
+            at TEXT NOT NULL,
+            username TEXT,
+            company_id INTEGER,
+            project_id INTEGER,
+            entity TEXT NOT NULL,
+            entity_id INTEGER,
+            action TEXT NOT NULL,
+            summary TEXT,
+            changes TEXT,
+            source TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_company_at ON audit_log (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log (entity, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_username ON audit_log (username, at DESC);
+
+        CREATE TABLE IF NOT EXISTS usage_events (
+            id SERIAL PRIMARY KEY,
+            at TEXT NOT NULL,
+            username TEXT,
+            company_id INTEGER,
+            project_id INTEGER,
+            event TEXT NOT NULL,
+            target TEXT,
+            detail TEXT,
+            source TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_company_at ON usage_events (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_usage_event_at ON usage_events (event, at DESC);
         """)
     else:
         c.executescript("""
@@ -605,6 +644,41 @@ def init_db():
             last_tab TEXT,
             updated_at TEXT
         );
+
+        -- F3: سجل التدقيق وأحداث الاستخدام (audit.py). من غير مفاتيح خارجية عن
+        -- قصد: السجل لازم يفضل موجود حتى لو المشروع أو الشركة اتمسحوا — ده
+        -- بالظبط الوقت اللي بيتسأل فيه "مين مسح ده".
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at TEXT NOT NULL,                 -- ISO-8601 بتوقيت UTC
+            username TEXT,                    -- مين عمل الحركة (NULL = النظام نفسه)
+            company_id INTEGER,               -- العزل بين الشركات (F1)
+            project_id INTEGER,
+            entity TEXT NOT NULL,             -- اسم الجدول، أو auth / team
+            entity_id INTEGER,
+            action TEXT NOT NULL,             -- create / update / delete / login / role_change …
+            summary TEXT,                     -- سطر عربي جاهز للعرض
+            changes TEXT,                     -- JSON: القديم والجديد
+            source TEXT                       -- app / board / system
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_company_at ON audit_log (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log (entity, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_username ON audit_log (username, at DESC);
+
+        -- تحليلات الاستخدام: أخف وأكتر عددًا، وبتتقري مجمّعة مش صف صف.
+        CREATE TABLE IF NOT EXISTS usage_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at TEXT NOT NULL,
+            username TEXT,
+            company_id INTEGER,
+            project_id INTEGER,
+            event TEXT NOT NULL,              -- login / screen / export / ai / search
+            target TEXT,                      -- التبويب أو نوع الملف أو اسم الشاشة
+            detail TEXT,                      -- JSON اختياري
+            source TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_company_at ON usage_events (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_usage_event_at ON usage_events (event, at DESC);
         """)
     conn.commit()
     _migrate_schema(conn)

@@ -1,0 +1,15 @@
+/* سجل النشاط — نفس كروت صفحة الفريق، مع عمود تفاصيل بيتفتح لما تدوس عليه. */
+.filters { flex-wrap: wrap; align-items: end; gap: 8px; }
+.filters .field { min-width: 130px; }
+.changes { font-size: 12px; color: var(--muted); margin: 0; }
+.changes summary { cursor: pointer; color: var(--gold); list-style: none; }
+.changes summary::-webkit-details-marker { display: none; }
+.changes dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; }
+.changes dt { color: var(--muted); }
+.changes dd { margin: 0; overflow-wrap: anywhere; }
+.changes .from { text-decoration: line-through; opacity: .7; }
+.changes .to { color: var(--text); }
+/* الحركات الحسّاسة (دخول فاشل، حذف، تغيير صلاحية) لازم تبان من بعيد */
+.people td .what--alert { color: var(--danger); }
+.people td .what--auth { color: var(--gold); }
+.when { white-space: nowrap; font-variant-numeric: tabular-nums; }

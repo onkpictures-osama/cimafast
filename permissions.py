@@ -25,6 +25,7 @@ CAPABILITIES = {
     "create_project": {"operator", "admin", "producer", "manager"},
     "delete_project": {"operator", "admin"},
     "manage_team": {"operator", "admin"},
+    "view_audit": {"operator", "admin"},                      # F3: سجل النشاط بيكشف شغل كل الفريق
 }
 
 MESSAGES = {
@@ -33,6 +34,7 @@ MESSAGES = {
     "create_project": "إنشاء مشروع جديد لمدير الشركة أو المنتج أو مدير الإنتاج بس.",
     "delete_project": "حذف مشروع لمدير الشركة بس.",
     "manage_team": "إدارة الفريق لمدير الشركة بس.",
+    "view_audit": "سجل النشاط لمدير الشركة بس.",
 }
 
 

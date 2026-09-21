@@ -40,6 +40,7 @@
     <section class="card">
       <div class="card__head">
         <h2>أعضاء الشركة</h2>
+        {% if can_view_audit %}<a class="btn" href="../activity/">🧾 سجل النشاط</a>{% endif %}
         <form id="rename" class="inline admin-only" hidden>
           <input name="name" placeholder="اسم الشركة" aria-label="اسم الشركة" required>
           <button class="btn">تغيير الاسم</button>

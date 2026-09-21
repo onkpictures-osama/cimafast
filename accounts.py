@@ -23,6 +23,7 @@ import sys as _sys
 
 import contextlib
 
+import audit
 import auth
 import permissions
 from database import fetch_all
@@ -84,7 +85,20 @@ def migrate_accounts(legacy_users: dict, company_name: str = DEFAULT_COMPANY):
 
     آمن إنه يتنده في كل تشغيل: مابيضيفش مستخدم موجود، ومابيعملش شركة تانية لو
     فيه واحدة. بيرجّع ملخص باللي اتعمل.
+
+    F3: النقل ده شغل نظام مش شغل مستخدم — بيتسجّل صف واحد بالملخص لو حصل فيه
+    حاجة، مش صف لكل حساب. وبيتنده في كل تشغيل، فلو سجّلنا العدم هيتكتب صف فاضي
+    كل مرة الخدمة بتقوم.
     """
+    with audit.disabled():
+        done = _migrate_accounts(legacy_users, company_name)
+    if done["users_added"] or done["company_created"] or done["projects_linked"]:
+        audit.log("migrate_accounts", "users", summary="نقل الحسابات من ملف الأسرار للقاعدة",
+                  changes=done, source="system")
+    return done
+
+
+def _migrate_accounts(legacy_users: dict, company_name: str):
     done = {"users_added": 0, "company_created": False, "projects_linked": 0, "memberships_added": 0}
     have_users = _one("SELECT COUNT(*) AS n FROM users")["n"]
     company = _one("SELECT id FROM companies ORDER BY id LIMIT 1")
@@ -152,8 +166,36 @@ def user(username):
 
 
 def touch_login(username):
-    with _tx() as ex:
-        ex("UPDATE users SET last_login_at=? WHERE username=?", (_now(), auth.normalize_username(username)))
+    """آخر دخول + سجل الدخول (F3).
+
+    الدخول بيتسجّل في الجدولين عن قصد: في audit_log عشان سؤال الأمن ("مين دخل
+    الحساب ده وإمتى")، وفي usage_events عشان سؤال المنتج ("كام واحد بيستخدم
+    البرنامج الأسبوع ده"). الاتنين مختلفين في القراءة وفي مدة الحفظ.
+    """
+    name = auth.normalize_username(username)
+    company = next((c["id"] for c in companies_for(name)), None)
+    with audit.action("login", "auth", summary=f"دخول {name}",
+                      username=name, company_id=company):
+        with _tx() as ex:
+            ex("UPDATE users SET last_login_at=? WHERE username=?", (_now(), name))
+    audit.event("login", target="streamlit", username=name, company_id=company)
+
+
+def log_logout(username):
+    name = auth.normalize_username(username)
+    company = next((c["id"] for c in companies_for(name)), None)
+    audit.log("logout", "auth", summary=f"خروج {name}", username=name, company_id=company)
+
+
+def log_failed_login(username):
+    """محاولة دخول فاشلة — أهم صف في السجل لما حد يحاول يدخل حساب مش بتاعه.
+
+    الاسم بيتسجّل زي ما اتكتب (بعد التوحيد) من غير كلمة السر أبدًا.
+    """
+    name = auth.normalize_username(username or "")[:64]
+    company = next((c["id"] for c in companies_for(name)), None) if name else None
+    audit.log("login_failed", "auth", summary=f"محاولة دخول فاشلة باسم {name or '—'}",
+              username=name or None, company_id=company)
 
 
 # --- مين يشوف إيه ---------------------------------------------------------------------
@@ -209,11 +251,16 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
     if not permissions.can(role, "create_project"):
         raise permissions.Denied("create_project")
     from database import run_query
-    with permissions.system():
-        return run_query(
-            "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
-            "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (name, project_type, resolution, orientation, aspect_ratio, company_id))
+    with audit.action("project_create", "projects", summary=f"إنشاء مشروع «{name}»",
+                      username=actor, company_id=company_id) as act:
+        act.extra = {"نوع": project_type}
+        with permissions.system():
+            project_id = run_query(
+                "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
+                "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (name, project_type, resolution, orientation, aspect_ratio, company_id))
+        act.entity_id = act.project_id = project_id
+    return project_id
 
 
 def delete_project(actor, project_id):
@@ -260,8 +307,13 @@ def rename_company(actor, company_id, name):
     _require_admin(actor, company_id)
     if not (name or "").strip():
         raise ValueError("اسم الشركة مطلوب")
-    with _tx() as ex:
-        ex("UPDATE companies SET name=? WHERE id=?", (name.strip(), company_id))
+    old = _one("SELECT name FROM companies WHERE id=?", (company_id,))
+    with audit.action("company_rename", "companies", entity_id=company_id,
+                      summary=f"تغيير اسم الشركة لـ «{name.strip()}»",
+                      username=actor, company_id=company_id) as act:
+        act.extra = {"من": (old or {}).get("name"), "لـ": name.strip()}
+        with _tx() as ex:
+            ex("UPDATE companies SET name=? WHERE id=?", (name.strip(), company_id))
 
 
 def members(actor, company_id):
@@ -286,19 +338,25 @@ def add_member(actor, company_id, username, display_name=None, role="department"
         raise ValueError("اسم المستخدم لازم يكون حروف إنجليزي وأرقام و . _ - بس")
     existing = user(name)
     password = None
-    with _tx() as ex:
-        if not existing:
-            password = temp_password()
-            ex("INSERT INTO users (username, password_hash, display_name, email, job_title, "
-               "is_operator, active, must_change_password, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, 1, ?)",
-               (name, auth.hash_password(password), display_name or name, email, job_title, _now()))
-    uid = user(name)["id"]
-    with _tx() as ex:
-        # حساب اتقفل لما اتشال من آخر شركة ليه بيتفتح تاني لما يرجع
-        ex("UPDATE users SET active=1 WHERE id=?", (uid,))
-        ex("INSERT OR IGNORE INTO memberships (company_id, user_id, role, active, created_at) "
-           "VALUES (?, ?, ?, 1, ?)", (company_id, uid, role, _now()))
-        ex("UPDATE memberships SET role=?, active=1 WHERE company_id=? AND user_id=?", (role, company_id, uid))
+    # F3: صف سجل واحد بمعنى واضح ("ضاف فلان بدور كذا") بدل تلات صفوف جداول.
+    with audit.action("member_add", "users", summary=f"إضافة «{name}» للفريق بدور {ROLE_LABELS.get(role, role)}",
+                      username=actor, company_id=company_id) as act:
+        act.extra = {"المستخدم": name, "الدور": role, "حساب جديد": not existing}
+        with _tx() as ex:
+            if not existing:
+                password = temp_password()
+                ex("INSERT INTO users (username, password_hash, display_name, email, job_title, "
+                   "is_operator, active, must_change_password, created_at) VALUES (?, ?, ?, ?, ?, 0, 1, 1, ?)",
+                   (name, auth.hash_password(password), display_name or name, email, job_title, _now()))
+        uid = user(name)["id"]
+        act.entity_id = uid
+        with _tx() as ex:
+            # حساب اتقفل لما اتشال من آخر شركة ليه بيتفتح تاني لما يرجع
+            ex("UPDATE users SET active=1 WHERE id=?", (uid,))
+            ex("INSERT OR IGNORE INTO memberships (company_id, user_id, role, active, created_at) "
+               "VALUES (?, ?, ?, 1, ?)", (company_id, uid, role, _now()))
+            ex("UPDATE memberships SET role=?, active=1 WHERE company_id=? AND user_id=?",
+               (role, company_id, uid))
     return password
 
 
@@ -308,9 +366,15 @@ def set_role(actor, company_id, username, role):
         raise ValueError(f"دور غير معروف: {role}")
     if auth.normalize_username(username) == auth.normalize_username(actor) and role != "admin":
         raise AccessDenied("مينفعش تشيل صلاحية الأدمن من نفسك — خلّي أدمن تاني يعملها")
-    with _tx() as ex:
-        ex("UPDATE memberships SET role=? WHERE company_id=? AND user_id=(SELECT id FROM users WHERE username=?)",
-           (role, company_id, auth.normalize_username(username)))
+    name = auth.normalize_username(username)
+    before = role_in(name, company_id)
+    with audit.action("role_change", "memberships",
+                      summary=f"دور «{name}» بقى {ROLE_LABELS.get(role, role)}",
+                      username=actor, company_id=company_id) as act:
+        act.extra = {"المستخدم": name, "من": before, "لـ": role}
+        with _tx() as ex:
+            ex("UPDATE memberships SET role=? WHERE company_id=? AND "
+               "user_id=(SELECT id FROM users WHERE username=?)", (role, company_id, name))
 
 
 def deactivate_member(actor, company_id, username):
@@ -319,21 +383,28 @@ def deactivate_member(actor, company_id, username):
     if name == auth.normalize_username(actor):
         raise AccessDenied("مينفعش تقفل حسابك انت")
     uid = _require_manageable(actor, company_id, name)["id"]
-    with _tx() as ex:
-        ex("UPDATE memberships SET active=0 WHERE company_id=? AND user_id=?", (company_id, uid))
-    left = _one("SELECT COUNT(*) AS n FROM memberships WHERE user_id=? AND active=1", (uid,))["n"]
-    if not left and not user(name)["is_operator"]:
+    with audit.action("member_remove", "users", entity_id=uid, summary=f"شيل «{name}» من الفريق",
+                      username=actor, company_id=company_id) as act:
         with _tx() as ex:
-            ex("UPDATE users SET active=0 WHERE id=?", (uid,))
+            ex("UPDATE memberships SET active=0 WHERE company_id=? AND user_id=?", (company_id, uid))
+        left = _one("SELECT COUNT(*) AS n FROM memberships WHERE user_id=? AND active=1", (uid,))["n"]
+        if not left and not user(name)["is_operator"]:
+            with _tx() as ex:
+                ex("UPDATE users SET active=0 WHERE id=?", (uid,))
+        act.extra = {"المستخدم": name, "الحساب اتقفل": not left}
 
 
 def reset_password(actor, company_id, username):
     """كلمة سر مؤقتة جديدة لعضو في الشركة؛ لازم يغيّرها أول ما يدخل."""
-    _require_manageable(actor, company_id, username)
+    target = _require_manageable(actor, company_id, username)
     password = temp_password()
-    with _tx() as ex:
-        ex("UPDATE users SET password_hash=?, must_change_password=1 WHERE username=?",
-           (auth.hash_password(password), auth.normalize_username(username)))
+    # كلمة السر نفسها عمرها ما بتوصل للسجل — الصف بيقول إن التصفير حصل وبس.
+    with audit.action("password_reset", "users", entity_id=target["id"],
+                      summary=f"تصفير كلمة سر «{target['username']}»",
+                      username=actor, company_id=company_id):
+        with _tx() as ex:
+            ex("UPDATE users SET password_hash=?, must_change_password=1 WHERE username=?",
+               (auth.hash_password(password), auth.normalize_username(username)))
     return password
 
 
@@ -343,9 +414,12 @@ def change_own_password(username, old_password, new_password):
     name = auth.authenticate(username, old_password, auth_users())
     if not name:
         raise AccessDenied("كلمة السر الحالية غلط")
-    with _tx() as ex:
-        ex("UPDATE users SET password_hash=?, must_change_password=0 WHERE username=?",
-           (auth.hash_password(new_password), name))
+    company = next((c["id"] for c in companies_for(name)), None)
+    with audit.action("password_change", "users", summary=f"«{name}» غيّر كلمة سره",
+                      username=name, company_id=company):
+        with _tx() as ex:
+            ex("UPDATE users SET password_hash=?, must_change_password=0 WHERE username=?",
+               (auth.hash_password(new_password), name))
 
 
 def create_company(actor, name, admin_username, admin_display_name=None, admin_email=None):
@@ -355,8 +429,13 @@ def create_company(actor, name, admin_username, admin_display_name=None, admin_e
         raise AccessDenied("المشغّل بس يقدر يضيف شركة")
     if not (name or "").strip():
         raise ValueError("اسم الشركة مطلوب")
-    with _tx() as ex:
-        ex("INSERT INTO companies (name, active, created_at) VALUES (?, 1, ?)", (name.strip(), _now()))
-    company_id = _one("SELECT MAX(id) AS id FROM companies")["id"]
+    # صف سجل واحد للشركة الجديدة (مش صف عام + صف بمعنى).
+    with audit.action("company_create", "companies", username=actor,
+                      summary=f"شركة جديدة على المنصة: «{name.strip()}»") as act:
+        with _tx() as ex:
+            ex("INSERT INTO companies (name, active, created_at) VALUES (?, 1, ?)",
+               (name.strip(), _now()))
+        company_id = _one("SELECT MAX(id) AS id FROM companies")["id"]
+        act.entity_id = act.company_id = company_id
     return company_id, add_member(actor, company_id, admin_username, admin_display_name, "admin",
                                   "مدير الشركة", admin_email)

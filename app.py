@@ -17,6 +17,7 @@ from ui import ltr, mark_saved, safe_index, show_saved_badge
 import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
 import repo
 import accounts
+import audit
 import links
 import permissions
 
@@ -103,6 +104,8 @@ def _render_login_screen():
                 # ينفّذ السكريبت اللي بيحط الكوكي فعليًا
                 st.session_state["_pending_session_cookie"] = make_session_token(user)
                 st.rerun()
+            # F3: كل محاولة فاشلة بتتسجّل (الاسم بس، من غير كلمة السر أبدًا)
+            accounts.log_failed_login(username)
             # تأخير بسيط ومتزايد بعد كل محاولة فاشلة عشان نصعّب التخمين الآلي
             attempts = st.session_state.get("_login_attempts", 0) + 1
             st.session_state["_login_attempts"] = attempts
@@ -158,6 +161,8 @@ def _check_login():
 def _logout():
     """خروج: بنمسح مفاتيح الدخول بس وسايبين باقي حالة الجلسة زي ما هي عشان
     المستخدم ميخسرش اختياراته لو رجع دخل تاني."""
+    if st.session_state.get("_auth_user"):
+        accounts.log_logout(st.session_state["_auth_user"])
     for key in ("_authenticated", "_auth_user", "_login_attempts", "_cf_role"):
         st.session_state.pop(key, None)
     st.session_state["_just_logged_out"] = True
@@ -180,7 +185,19 @@ def _session_role():
     return st.session_state.get("_cf_role")
 
 
+def _session_audit_context():
+    """F3: مين شغّال وعلى أنهي شركة ومشروع — نفس حكاية الدور: من session_state."""
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+    if get_script_run_ctx(suppress_warning=True) is None:
+        return {}
+    return {"username": st.session_state.get("_auth_user"),
+            "company_id": st.session_state.get("_cf_company"),
+            "project_id": st.session_state.get("_cf_project"),
+            "source": "app"}
+
+
 permissions.set_resolver(_session_role)
+audit.set_resolver(_session_audit_context)
 
 
 @st.cache_resource
@@ -398,6 +415,8 @@ company_id = _company["id"]
 # F2: من هنا لحد آخر الـ run (والـ callbacks في الـ run الجاي) كل كتابة بتتفحص بالدور ده
 _role = _company["role"]
 st.session_state["_cf_role"] = _role
+# F3: نفس الفكرة للسجل — كل كتابة بتتسجّل باسم المستخدم والشركة دي
+st.session_state["_cf_company"] = company_id
 _can_edit = permissions.can(_role, "edit")
 if not _can_edit:
     st.sidebar.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
@@ -407,6 +426,10 @@ if os.environ.get("CIMAFAST_HOME_URL"):
 if os.environ.get("CIMAFAST_BOARD_URL"):
     _team_label = t("إدارة الفريق") if _company["role"] in ("admin", "operator") else t("الفريق وحسابي")
     _nav_link(f"👥 {_team_label}", f"{os.environ['CIMAFAST_BOARD_URL']}team/")
+    # F3: سجل النشاط — مدير الشركة (والمشغّل) بس
+    if permissions.can(_role, "view_audit"):
+        _nav_link(f"🧾 {t('سجل النشاط')}",
+                  f"{os.environ['CIMAFAST_BOARD_URL']}activity/?company_id={company_id}")
 projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
@@ -437,6 +460,7 @@ if _wanted in project_names:
     st.session_state["project_selector"] = _wanted
 selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
+st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
 
 # جدول التصوير — أول شاشة في الواجهة الجديدة (board/). اللينك بيظهر بس لما
@@ -667,6 +691,8 @@ if st.session_state.get("_remembered") != (project_id, _open_tab):
     repo.remember_screen(_current_user, project_id, _open_tab,
                          datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"))
     st.session_state["_remembered"] = (project_id, _open_tab)
+    # F3: نفس الشرط بيخلّي الحدث ده "فتح شاشة" مرة واحدة، مش مع كل ضغطة جوه الشاشة
+    audit.event("screen", target=_open_tab, project_id=project_id, company_id=company_id)
 
 # ---------------- تبويب استيراد السكريبت ----------------
 
