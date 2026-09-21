@@ -40,8 +40,10 @@ def _tx():
 
 # --- المشاريع -----------------------------------------------------------------
 
-def projects():
-    return fetch_all("SELECT id, name, project_type FROM projects ORDER BY id")
+# مفيش دالة هنا بترجّع "كل المشاريع". أي قايمة مشاريع بتيجي من
+# accounts.projects_for(username) — اللي بيفلتر بشركات المستخدم. الدوال القديمة
+# projects() وall_projects_newest_first() وadd_project() (من غير company_id)
+# اتشالت: كانت ميتة بس أي شاشة جديدة كانت ممكن توصّلها وترجّع مشاريع شركة تانية.
 
 
 def project(project_id):
@@ -402,10 +404,6 @@ def day_out_of_days(project_id):
 # ----------------------------------------------------------------------------
 
 
-def all_projects_newest_first(*params):
-    return fetch_all('SELECT * FROM projects ORDER BY id DESC', params)
-
-
 def project_by_id(*params):
     return fetch_all('SELECT * FROM projects WHERE id=?', params)
 
@@ -415,6 +413,8 @@ def episodes_of_project(*params):
 
 
 def delete_project(*params):
+    """المسح نفسه. الفحص إن المشروع تبع شركة المستخدم بيحصل في
+    accounts.delete_project — الشاشات بتنده دي هي، مش الدالة دي."""
     permissions.require("delete_project")
     return run_query('DELETE FROM projects WHERE id=?', params)
 
@@ -441,10 +441,6 @@ def count_confirmed_shots(*params):
 
 def count_scenes_with_shots(*params):
     return fetch_all('SELECT COUNT(DISTINCT s.id) c FROM scenes s JOIN shots sh ON sh.scene_id=s.id WHERE s.project_id=?', params)
-
-
-def add_project(*params):
-    return run_query('INSERT INTO projects (name, project_type, default_resolution, default_orientation, default_aspect_ratio) VALUES (?,?,?,?,?)', params)
 
 
 def update_project_settings(*params):

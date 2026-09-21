@@ -702,6 +702,15 @@ def _existing_columns(conn, table):
     return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
+# فهارس على أعمدة اتضافت بعدين — لازم تتعمل بعد _MIGRATIONS مش مع إنشاء الجداول،
+# لأن العمود نفسه لسه مش موجود في قاعدة قديمة وقت الإنشاء.
+_INDEXES = [
+    # كل قراءة مشاريع بتفلتر بالشركة (accounts.projects_for)، فده الفهرس اللي
+    # العزل بين الشركات بيقف عليه.
+    ("idx_projects_company", "projects (company_id)"),
+]
+
+
 def _migrate_schema(conn):
     for table, columns in _MIGRATIONS.items():
         existing = _existing_columns(conn, table)
@@ -712,6 +721,12 @@ def _migrate_schema(conn):
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
                 else:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
+    for name, target in _INDEXES:
+        sql = f"CREATE INDEX IF NOT EXISTS {name} ON {target}"
+        if USE_POSTGRES:
+            conn.cursor().execute(sql)
+        else:
+            conn.execute(sql)
     conn.commit()
 
 

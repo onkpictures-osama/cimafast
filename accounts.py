@@ -19,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 import secrets as _secrets
 import string
+import sys as _sys
 
 import contextlib
 
@@ -111,11 +112,27 @@ def migrate_accounts(legacy_users: dict, company_name: str = DEFAULT_COMPANY):
                 ex("INSERT OR IGNORE INTO memberships (company_id, user_id, role, active, created_at) "
                    "VALUES (?, ?, ?, 1, ?)", (company_id, u["id"], role, _now()))
             done["memberships_added"] += 1
+    # ربط المشاريع اليتيمة (من غير شركة) بالشركة الافتراضية — ده نقل مرة واحدة
+    # للمشاريع اللي اتعملت قبل F1، مش قاعدة دايمة.
+    #
+    # الدالة دي بتتنده في كل تشغيل للخدمة. لو سِبناها تتبنى أي مشروع يتيم على
+    # طول، تبقى وظيفة شغالة للأبد بتدّي أقدم شركة على المنصة أي مشروع
+    # company_id بتاعه NULL لأي سبب (باج، صف راجع من باك أب، استيراد غلط).
+    # مع شركتين أو أكتر ده بالظبط "بيانات شركة بتظهر عند شركة تانية".
+    # فبناخد اليتامى بس وإحنا لسه شركة واحدة — يعني ده فعلًا النقل القديم.
+    # غير كده بنسيبهم: مشروع من غير شركة مش بيبان لحد (projects_for بتفلتر
+    # بـ company_id IN (...) وNULL عمرها ما بتطابق)، وده الفشل الآمن.
     orphans = _one("SELECT COUNT(*) AS n FROM projects WHERE company_id IS NULL")["n"]
-    if orphans:
+    companies = _one("SELECT COUNT(*) AS n FROM companies")["n"]
+    if orphans and companies == 1:
         with _tx() as ex:
             ex("UPDATE projects SET company_id=? WHERE company_id IS NULL", (company_id,))
         done["projects_linked"] = orphans
+    elif orphans:
+        done["orphans_left"] = orphans
+        print(f"[accounts] {orphans} project(s) have no company and {companies} companies exist — "
+              "leaving them unassigned (they stay invisible). Assign them deliberately.",
+              file=_sys.stderr, flush=True)
     return done
 
 
@@ -197,6 +214,23 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
             "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
             "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
             (name, project_type, resolution, orientation, aspect_ratio, company_id))
+
+
+def delete_project(actor, project_id):
+    """مسح مشروع — بعد التأكد إنه تبع شركة المستخدم فعلًا.
+
+    repo.delete_project بيفحص الصلاحية (مدير الشركة) بس مش بيفحص المشروع تبع
+    مين، فـ id من شركة تانية كان هيتمسح بصلاحية أدمن شركتك انت. أخطر عملية في
+    البرنامج، فالفحص هنا قبل أي مسح.
+    """
+    role = project_role(actor, project_id)
+    if role is None:
+        raise AccessDenied("المشروع ده مش من مشاريع شركتك")
+    if not permissions.can(role, "delete_project"):
+        raise permissions.Denied("delete_project")
+    import repo
+    with permissions.system():
+        repo.delete_project(project_id)
 
 
 # --- إدارة الفريق (مدير الشركة أو المشغّل) -------------------------------------------------

@@ -541,7 +541,7 @@ if _can_edit:
                 key=f"confirm_delete_project_{project_id}",
             )
             if st.button(t("🗑️ حذف المشروع نهائيًا"), disabled=not confirm_delete_project, key=f"delete_proj_btn_{project_id}"):
-                repo.delete_project(project_id)
+                accounts.delete_project(_current_user, project_id)
                 st.success(t("تم حذف المشروع"))
                 st.rerun()
 
