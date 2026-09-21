@@ -6,11 +6,14 @@ import uuid
 import json
 import datetime
 import streamlit as st
+import pandas as pd
 import streamlit.components.v1 as st_components
 from auth import (
     authenticate, no_login_allowed, resolve_users,
     make_session_token, verify_session_token, SESSION_COOKIE_NAME,
 )
+from search import matches
+from importer import DEFAULT_VARIANT
 from database import (
     scene_label,
     next_free_number,
@@ -249,6 +252,35 @@ def tr(key):
 # قاموس ترجمة مباشر: النص العربي نفسه هو المفتاح، وقيمته الترجمة الإنجليزية.
 # بيغطي كل تسميات الحقول والأزرار والرسايل جوه كل الفورمات في البرنامج.
 TRANSLATIONS = {
+    "مفيش حاجة ناقصة — كل المشاهد ليها لقطات وشخصيات، وكل حاجة ليها صورة ومتراجعة.": "Nothing missing — every scene has shots and characters, and everything has an image and is reviewed.",
+    "إيه اللي لسه ناقص": "What's still missing",
+    "لقطات لسه متراجعتش": "Shots not reviewed yet",
+    "شخصيات من غير صورة مرجعية": "Characters with no reference image",
+    "أماكن من غير صورة مرجعية": "Locations with no reference image",
+    "مشاهد من غير شخصيات": "Scenes with no characters",
+    "مشاهد من غير لقطات": "Scenes with no shots",
+    "اختار مشهد أو أكتر من الجدول (المربع جنب الصف) عشان تعدّلهم أو تمسحهم.": "Tick one or more scenes in the table to edit or delete them.",
+    "مشاهد": "scenes",
+    "اللقطات": "Shots",
+    "الشخصيات": "Characters",
+    "رقم": "No.",
+    "إضافة مشهد جديد": "Add a scene",
+    "إكسسوار": "props",
+    "إضافة إكسسوار جديد": "Add a prop",
+    "إضافة مظهر إضافي لشخصية": "Add a look to a character",
+    "إضافة شخصية جديدة": "Add a character",
+    "مفيش نتايج — جرّب كلمة تانية": "No matches — try another word",
+    "إضافة مكان جديد": "Add a location",
+    "دوّر في": "Search",
+    "بحث": "Search",
+    "كل اللقطات اتراجعت واتأكدت": "Every shot reviewed and confirmed",
+    "مكان": "locations",
+    "شخصية": "characters",
+    "لسه مفيش مشاهد — ابدأ من «إضافة سيناريو»": "No scenes yet — start from “Add Screenplay”",
+    "من": "of",
+    "مشهد ليهم لقطات": "scenes have shots",
+    "لقطة اتراجعت": "shots reviewed",
+    "الخطوة": "Step",
     "اختار واحد أو أكتر": "Choose one or more",
     "الحلقات": "Episodes",
     # عام
@@ -570,9 +602,6 @@ TRANSLATIONS = {
     "مثال: أحمد حزين، سارة غير مهتمة": "e.g. Ahmed is sad, Sara is indifferent",
     "مثال: أحمد (حزين): إزيك يا سارة؟\nسارة (غير مبالية): تمام والحمد لله.":
         "e.g. Ahmed (sad): How are you, Sara?\nSara (indifferent): I'm fine, thank God.",
-    "🔄 تحديث الملفات": "🔄 Refresh Files",
-    "لو عدّلت محتوى لقطة موجودة (حوار، وصف...) من غير ما تضيف أو تمسح لقطات، دوس هنا عشان الملفات تتحدث بآخر بياناتك.":
-        "If you edited an existing shot's content (dialogue, description...) without adding or deleting shots, click here to refresh the files with your latest data.",
     "📋 تقارير الإنتاج القياسية": "📋 Standard Production Reports",
     "نفس الأوراق القياسية اللي بيستخدمها مديرو الإنتاج (كشف الشخصيات، التفريغ العام، كشف أماكن "
     "التصوير)، متملية أوتوماتيك من بيانات مشروعك. الخانات اللي محتاجة قرار بشري (زي الترشيح، عدد "
@@ -605,6 +634,37 @@ def multiselect(*args, **kwargs):
     """
     kwargs.setdefault("placeholder", t("اختار واحد أو أكتر"))
     return st.multiselect(*args, **kwargs)
+
+
+def _loc_display(label):
+    """اسم المكان للعرض من غير «الشكل الأساسي».
+
+    كل مكان بيتعمله حالة افتراضية بالاسم ده (importer.DEFAULT_VARIANT)، فكل
+    مشهد كان بيتكتب «محطة مصر - الشكل الأساسي». الحالة بتظهر بس لو غير الافتراضية.
+    """
+    if not label:
+        return label
+    suffix = " - " + DEFAULT_VARIANT
+    return label[: -len(suffix)] if label.endswith(suffix) else label
+
+
+def library_search(key, total, noun):
+    """خانة البحث فوق أي مكتبة. بترجع نص البحث (فاضي = اعرض الكل).
+
+    العدد جوه النص الفاضي نفسه، فالمكتبة بتقول حجمها من غير سطر زيادة.
+    """
+    return st.text_input(
+        t("بحث"), key=key, label_visibility="collapsed",
+        placeholder=f"🔍 {t('دوّر في')} {total} {t(noun)}",
+    )
+
+
+def library_result_count(shown, total):
+    """سطر «12 من 99» — بيظهر بس وقت البحث."""
+    if shown == 0:
+        st.caption(t("مفيش نتايج — جرّب كلمة تانية"))
+    else:
+        st.caption(f"{ltr(shown)} {t('من')} {ltr(total)}")
 
 
 def fmt_int_ext(value):
@@ -1103,22 +1163,44 @@ _done_flags = [
 ]
 _current_idx = next((i for i, d in enumerate(_done_flags) if not d), len(_done_flags) - 1)
 
-_stage_html = ['<div class="cf-stepper">']
-for _i, ((_icon, _label), _done) in enumerate(zip(_stage_defs, _done_flags)):
-    if _done:
-        _state, _display_icon = "done", '<span class="cf-check-badge">✓</span>'
-    elif _i == _current_idx:
-        _state, _display_icon = "current", _icon
-    else:
-        _state, _display_icon = "pending", _icon
-    _stage_html.append(
-        f'<div class="cf-stage cf-stage-{_state}">'
-        f'<div class="cf-stage-icon">{_display_icon}</div>'
-        f'<div class="cf-stage-label">{_label}</div>'
-        f'</div>'
-    )
-_stage_html.append('</div>')
-st.markdown("".join(_stage_html), unsafe_allow_html=True)
+_scenes_with_shots = fetch_all(
+    "SELECT COUNT(DISTINCT s.id) c FROM scenes s JOIN shots sh ON sh.scene_id=s.id WHERE s.project_id=?",
+    (project_id,),
+)[0]["c"]
+_all_done = all(_done_flags)
+
+# سطر تقدّم واحد بدل خمس كروت. الكروت كانت بتاخد ~90px فوق كل تبويب وبتكرر
+# نفس التقسيمة اللي التبويبات تحتها عاملاها بأسامي تانية — تنقل مزدوج.
+# السطر بيقول المرحلة الحالية وإيه اللي فاضل فيها بالأرقام.
+if _all_done:
+    _progress_detail = t("كل اللقطات اتراجعت واتأكدت")
+elif _current_idx == 1:
+    _progress_detail = f"{ltr(_loc_count)} {t('مكان')} · {ltr(_char_count)} {t('شخصية')}"
+elif _current_idx == 2:
+    _progress_detail = t("لسه مفيش مشاهد — ابدأ من «إضافة سيناريو»")
+elif _current_idx == 3:
+    _progress_detail = (f"{ltr(_scenes_with_shots)} {t('من')} {ltr(_scene_count)} "
+                        f"{t('مشهد ليهم لقطات')}")
+else:
+    _progress_detail = (f"{ltr(_confirmed_count)} {t('من')} {ltr(_shot_count)} "
+                        f"{t('لقطة اتراجعت')}")
+
+_segments = "".join(
+    f'<span class="cf-progress-seg cf-progress-seg--'
+    f'{"done" if _d else ("current" if _i == _current_idx else "pending")}" '
+    f'title="{_lbl}"></span>'
+    for _i, ((_icon, _lbl), _d) in enumerate(zip(_stage_defs, _done_flags))
+)
+_step_no = len(_stage_defs) if _all_done else _current_idx + 1
+st.markdown(
+    f'<div class="cf-progress" dir="{_dir}">'
+    f'<div class="cf-progress-bar" aria-hidden="true">{_segments}</div>'
+    f'<div class="cf-progress-text"><strong>{t("الخطوة")} {ltr(_step_no)} {t("من")} '
+    f'{ltr(len(_stage_defs))} · {_stage_defs[min(_step_no, len(_stage_defs)) - 1][1]}</strong>'
+    f' — {_progress_detail}</div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown, tab_dashboard = st.tabs(
     [tr("tab_import"), tr("tab_locations"), tr("tab_characters"), tr("tab_props"),
@@ -1707,16 +1789,19 @@ with tab_import:
 # ---------------- تبويب الأماكن ----------------
 with tab_locations:
     st.subheader(tr("sub_locations"))
-    st.caption(t(
-        "لو عندك مكان رئيسي وجواه أماكن فرعية (زي شقة حسام وجواها غرفة نوم)، "
-        "أضف المكان الرئيسي الأول، وبعدين أضف المكان الفرعي واختار له 'تابع لمكان رئيسي'."
-    ))
 
     locations = fetch_all("SELECT * FROM locations WHERE project_id=?", (project_id,))
     location_name_by_id = {l["id"]: l["name"] for l in locations}
 
-    col1, _ = st.columns([1, 2])
-    with col1:
+    # المكتبة الأول، والإضافة سطر واحد مقفول. قبل كده فورم الإضافة الفاضي كان
+    # أول حاجة في التبويب والـ 99 مكان تحت منه. لما المكتبة فاضية الفورم بيبقى
+    # مفتوح — الشاشة الفاضية دعوة إنك تضيف.
+    _loc_q = library_search(f"loc_search_{project_id}", len(locations), "مكان") if locations else ""
+    with st.expander(f"➕ {t('إضافة مكان جديد')}", expanded=not locations):
+        st.caption(t(
+            "لو عندك مكان رئيسي وجواه أماكن فرعية (زي شقة حسام وجواها غرفة نوم)، "
+            "أضف المكان الرئيسي الأول، وبعدين أضف المكان الفرعي واختار له 'تابع لمكان رئيسي'."
+        ))
         with st.form(f"add_location_{project_id}"):
             loc_name = st.text_input(t("اسم المكان"), placeholder=t("مثال: شقة حسام"))
             parent_add_options = ["بدون - مكان رئيسي"] + [l["name"] for l in locations]
@@ -1746,164 +1831,179 @@ with tab_locations:
             children_by_parent.setdefault(l["parent_location_id"], []).append(l)
 
     def render_location(l, indent=""):
-        with st.expander(f"{indent}📍 {l['name']}", key=f"exp_loc_{l['id']}"):
-            st.markdown(f"**{t('🖼️ صورة المكان')}**")
+        # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
+        # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
+        # 16 ثانية لكل rerun على الإنتاج).
+        _lazy_exp = st.expander(f"{indent}📍 {l['name']}", key=f"exp_loc_{l['id']}", on_change="rerun")
+        with _lazy_exp:
+            if _lazy_exp.open:
+                st.markdown(f"**{t('🖼️ صورة المكان')}**")
 
-            def _save_loc_image(rel, _id=l["id"]):
-                run_query("UPDATE locations SET reference_image_path=? WHERE id=?", (rel, _id))
+                def _save_loc_image(rel, _id=l["id"]):
+                    run_query("UPDATE locations SET reference_image_path=? WHERE id=?", (rel, _id))
 
-            render_image_picker(
-                f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
-                lambda extra, _l=l: image_gen.build_prompt(
-                    _l["name"], _l["base_description"] or "", extra=extra),
-                _save_loc_image,
-            )
-            st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
-
-            with st.form(f"edit_location_{l['id']}"):
-                e_loc_name = st.text_input(t("اسم المكان"), value=l["name"])
-                edit_parent_options = ["بدون - مكان رئيسي"] + [
-                    other["name"] for other in locations if other["id"] != l["id"]
-                ]
-                current_parent_name = location_name_by_id.get(l["parent_location_id"], "بدون - مكان رئيسي")
-                e_loc_parent = st.selectbox(
-                    t("تابع لمكان رئيسي؟"), edit_parent_options,
-                    index=safe_index(edit_parent_options, current_parent_name),
-                    format_func=t,
+                render_image_picker(
+                    f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
+                    lambda extra, _l=l: image_gen.build_prompt(
+                        _l["name"], _l["base_description"] or "", extra=extra),
+                    _save_loc_image,
                 )
-                e_loc_desc = st.text_area(
-                    t("وصف عام ثابت للمكان"), value=l["base_description"] or "",
-                    placeholder=t("مثال: شقة قديمة في حي شعبي، جدرانها بيج فاتح، فيها أثاث خشبي تقيل"),
-                )
-                save_col, del_col = st.columns(2)
-                with save_col:
-                    save_loc = st.form_submit_button(t("💾 حفظ التعديل"))
-                with del_col:
-                    del_loc = st.form_submit_button(t("🗑️ حذف المكان (وكل حالاته)"))
-            if save_loc:
-                if e_loc_name.strip():
-                    new_parent_id = None
-                    if e_loc_parent != "بدون - مكان رئيسي":
-                        new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
-                    run_query("UPDATE locations SET name=?, base_description=?, parent_location_id=? WHERE id=?",
-                               (e_loc_name, e_loc_desc, new_parent_id, l["id"]))
-                    mark_saved(f"loc_{l['id']}")
-                    st.rerun()
-                else:
-                    st.warning(t("اسم المكان مينفعش يبقى فاضي"))
-            show_saved_badge(f"loc_{l['id']}")
-            if del_loc:
-                ok = run_delete(
-                    "DELETE FROM locations WHERE id=?", (l["id"],),
-                    t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."),
-                )
-                if ok:
-                    delete_image_file(l["reference_image_path"])
-                    st.success(t("تم حذف المكان"))
-                    st.rerun()
+                st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
 
-            st.markdown(f"**{t('الحالات (Variants):')}**")
-            st.caption(t(
-                "الحالة هي شكل المكان نفسه في وقت معيّن من الأحداث (محروق، بعد التجديد، بعد سنين). "
-                "داخلي/خارجي ونهار/ليل بيتحددوا في المشهد، مش هنا."
-            ))
-            variants = fetch_all("SELECT * FROM location_variants WHERE location_id=?", (l["id"],))
-            if not variants:
-                st.caption(t("مفيش حالات مضافة لسه"))
-            move_options = {other["name"]: other["id"] for other in locations}
-            for v in variants:
-                with st.container(border=True):
-                    with st.form(f"edit_variant_{v['id']}"):
-                        ev_name = st.text_input(t("حالة المكان"), value=v["variant_name"])
-                        ev_desc = st.text_area(t("وصف التغييرات الخاصة بهذه الحالة"), value=v["description"] or "")
-                        ev_move_to = st.selectbox(
-                            t("المكان (غيّره لو عايز تنقل الحالة دي لمكان تاني — مفيد لدمج أماكن مكررة)"),
-                            list(move_options.keys()), index=safe_index(list(move_options.keys()), l["name"]),
-                        )
-                        vsave_col, vdel_col = st.columns(2)
-                        with vsave_col:
-                            save_var = st.form_submit_button(t("💾 حفظ"))
-                        with vdel_col:
-                            del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
-                    if save_var:
-                        run_query(
-                            "UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=?",
-                            (ev_name, ev_desc, move_options[ev_move_to], v["id"]),
-                        )
-                        mark_saved(f"variant_{v['id']}")
-                        st.rerun()
-                    if del_var:
-                        ok = run_delete(
-                            "DELETE FROM location_variants WHERE id=?", (v["id"],),
-                            t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."),
-                        )
-                        if ok:
-                            delete_image_file(v["reference_image_path"])
-                            st.success(t("تم حذف الحالة"))
-                            st.rerun()
-                    show_saved_badge(f"variant_{v['id']}")
-
-                    st.caption(t("صورة مرجعية للحالة"))
-
-                    def _save_var_image(rel, _id=v["id"]):
-                        run_query("UPDATE location_variants SET reference_image_path=? WHERE id=?", (rel, _id))
-
-                    render_image_picker(
-                        f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",
-                        lambda extra, _l=l, _v=v: image_gen.build_prompt(
-                            _l["name"], _l["base_description"] or "",
-                            _v["variant_name"], _v["description"] or "", extra=extra),
-                        _save_var_image,
+                with st.form(f"edit_location_{l['id']}"):
+                    e_loc_name = st.text_input(t("اسم المكان"), value=l["name"])
+                    edit_parent_options = ["بدون - مكان رئيسي"] + [
+                        other["name"] for other in locations if other["id"] != l["id"]
+                    ]
+                    current_parent_name = location_name_by_id.get(l["parent_location_id"], "بدون - مكان رئيسي")
+                    e_loc_parent = st.selectbox(
+                        t("تابع لمكان رئيسي؟"), edit_parent_options,
+                        index=safe_index(edit_parent_options, current_parent_name),
+                        format_func=t,
                     )
-
-            # فورم إضافة الحالة مقفول لحد ما اليوزر يطلبه — لو مفتوح تحت كل
-            # مكان من الأول الصفحة بتبقى زحمة ومشتتة.
-            open_key = f"add_var_open_{l['id']}"
-            if not st.session_state.get(open_key):
-                if st.button(t("➕ إضافة حالة"), key=f"add_var_btn_{l['id']}"):
-                    st.session_state[open_key] = True
-                    st.rerun()
-            else:
-                with st.form(f"add_variant_{l['id']}", clear_on_submit=True):
-                    st.markdown(f"**{t('➕ حالة جديدة لـ')} {l['name']}**")
-                    v_name = st.text_input(
-                        t("حالة المكان"),
-                        placeholder=t("مثال: الشكل الرئيسي للمكان، أو: المكان محروق، أو: المكان بعد التجديد"))
-                    v_desc = st.text_area(
-                        t("وصف التغييرات الخاصة بهذه الحالة"),
-                        placeholder=t("مثال: المكان اتحرق واتهد بعد حريق في نص الأحداث"))
-                    st.caption(t("تقدر تضيف صورة للحالة بعد ما تتحفظ — رفع أو كاميرا أو توليد."))
-                    add_col, cancel_col = st.columns(2)
-                    with add_col:
-                        add_var = st.form_submit_button(t("إضافة الحالة"))
-                    with cancel_col:
-                        cancel_var = st.form_submit_button(t("إلغاء"))
-                if add_var:
-                    if v_name.strip():
-                        run_query(
-                            "INSERT INTO location_variants (location_id, variant_name, description) VALUES (?,?,?)",
-                            (l["id"], v_name.strip(), v_desc),
-                        )
-                        st.session_state[open_key] = False
+                    e_loc_desc = st.text_area(
+                        t("وصف عام ثابت للمكان"), value=l["base_description"] or "",
+                        placeholder=t("مثال: شقة قديمة في حي شعبي، جدرانها بيج فاتح، فيها أثاث خشبي تقيل"),
+                    )
+                    save_col, del_col = st.columns(2)
+                    with save_col:
+                        save_loc = st.form_submit_button(t("💾 حفظ التعديل"))
+                    with del_col:
+                        del_loc = st.form_submit_button(t("🗑️ حذف المكان (وكل حالاته)"))
+                if save_loc:
+                    if e_loc_name.strip():
+                        new_parent_id = None
+                        if e_loc_parent != "بدون - مكان رئيسي":
+                            new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
+                        run_query("UPDATE locations SET name=?, base_description=?, parent_location_id=? WHERE id=?",
+                                   (e_loc_name, e_loc_desc, new_parent_id, l["id"]))
+                        mark_saved(f"loc_{l['id']}")
                         st.rerun()
                     else:
-                        st.warning(t("اكتب اسم الحالة الأول"))
-                if cancel_var:
-                    st.session_state[open_key] = False
-                    st.rerun()
+                        st.warning(t("اسم المكان مينفعش يبقى فاضي"))
+                show_saved_badge(f"loc_{l['id']}")
+                if del_loc:
+                    ok = run_delete(
+                        "DELETE FROM locations WHERE id=?", (l["id"],),
+                        t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."),
+                    )
+                    if ok:
+                        delete_image_file(l["reference_image_path"])
+                        st.success(t("تم حذف المكان"))
+                        st.rerun()
+
+                st.markdown(f"**{t('الحالات (Variants):')}**")
+                st.caption(t(
+                    "الحالة هي شكل المكان نفسه في وقت معيّن من الأحداث (محروق، بعد التجديد، بعد سنين). "
+                    "داخلي/خارجي ونهار/ليل بيتحددوا في المشهد، مش هنا."
+                ))
+                variants = fetch_all("SELECT * FROM location_variants WHERE location_id=?", (l["id"],))
+                if not variants:
+                    st.caption(t("مفيش حالات مضافة لسه"))
+                move_options = {other["name"]: other["id"] for other in locations}
+                for v in variants:
+                    with st.container(border=True):
+                        with st.form(f"edit_variant_{v['id']}"):
+                            ev_name = st.text_input(t("حالة المكان"), value=v["variant_name"])
+                            ev_desc = st.text_area(t("وصف التغييرات الخاصة بهذه الحالة"), value=v["description"] or "")
+                            ev_move_to = st.selectbox(
+                                t("المكان (غيّره لو عايز تنقل الحالة دي لمكان تاني — مفيد لدمج أماكن مكررة)"),
+                                list(move_options.keys()), index=safe_index(list(move_options.keys()), l["name"]),
+                            )
+                            vsave_col, vdel_col = st.columns(2)
+                            with vsave_col:
+                                save_var = st.form_submit_button(t("💾 حفظ"))
+                            with vdel_col:
+                                del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
+                        if save_var:
+                            run_query(
+                                "UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=?",
+                                (ev_name, ev_desc, move_options[ev_move_to], v["id"]),
+                            )
+                            mark_saved(f"variant_{v['id']}")
+                            st.rerun()
+                        if del_var:
+                            ok = run_delete(
+                                "DELETE FROM location_variants WHERE id=?", (v["id"],),
+                                t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."),
+                            )
+                            if ok:
+                                delete_image_file(v["reference_image_path"])
+                                st.success(t("تم حذف الحالة"))
+                                st.rerun()
+                        show_saved_badge(f"variant_{v['id']}")
+
+                        st.caption(t("صورة مرجعية للحالة"))
+
+                        def _save_var_image(rel, _id=v["id"]):
+                            run_query("UPDATE location_variants SET reference_image_path=? WHERE id=?", (rel, _id))
+
+                        render_image_picker(
+                            f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",
+                            lambda extra, _l=l, _v=v: image_gen.build_prompt(
+                                _l["name"], _l["base_description"] or "",
+                                _v["variant_name"], _v["description"] or "", extra=extra),
+                            _save_var_image,
+                        )
+
+                # فورم إضافة الحالة مقفول لحد ما اليوزر يطلبه — لو مفتوح تحت كل
+                # مكان من الأول الصفحة بتبقى زحمة ومشتتة.
+                open_key = f"add_var_open_{l['id']}"
+                if not st.session_state.get(open_key):
+                    if st.button(t("➕ إضافة حالة"), key=f"add_var_btn_{l['id']}"):
+                        st.session_state[open_key] = True
+                        st.rerun()
+                else:
+                    with st.form(f"add_variant_{l['id']}", clear_on_submit=True):
+                        st.markdown(f"**{t('➕ حالة جديدة لـ')} {l['name']}**")
+                        v_name = st.text_input(
+                            t("حالة المكان"),
+                            placeholder=t("مثال: الشكل الرئيسي للمكان، أو: المكان محروق، أو: المكان بعد التجديد"))
+                        v_desc = st.text_area(
+                            t("وصف التغييرات الخاصة بهذه الحالة"),
+                            placeholder=t("مثال: المكان اتحرق واتهد بعد حريق في نص الأحداث"))
+                        st.caption(t("تقدر تضيف صورة للحالة بعد ما تتحفظ — رفع أو كاميرا أو توليد."))
+                        add_col, cancel_col = st.columns(2)
+                        with add_col:
+                            add_var = st.form_submit_button(t("إضافة الحالة"))
+                        with cancel_col:
+                            cancel_var = st.form_submit_button(t("إلغاء"))
+                    if add_var:
+                        if v_name.strip():
+                            run_query(
+                                "INSERT INTO location_variants (location_id, variant_name, description) VALUES (?,?,?)",
+                                (l["id"], v_name.strip(), v_desc),
+                            )
+                            st.session_state[open_key] = False
+                            st.rerun()
+                        else:
+                            st.warning(t("اكتب اسم الحالة الأول"))
+                    if cancel_var:
+                        st.session_state[open_key] = False
+                        st.rerun()
 
         for child in children_by_parent.get(l["id"], []):
             render_location(child, indent="↳ ")
 
+    def _loc_hit(l):
+        return matches(_loc_q, l["name"], l["base_description"])
+
     top_level_locations = [l for l in locations if not l["parent_location_id"]]
+    _loc_shown = 0
     for l in top_level_locations:
-        render_location(l)
+        if _loc_hit(l) or any(_loc_hit(k) for k in children_by_parent.get(l["id"], [])):
+            render_location(l)
+            _loc_shown += 1
+    if _loc_q:
+        library_result_count(_loc_shown, len(top_level_locations))
 
 # ---------------- تبويب الشخصيات ----------------
 with tab_characters:
     st.subheader(tr("sub_characters"))
-    col1, col2 = st.columns([1, 2])
-    with col1:
+    _chars_before = fetch_all("SELECT id FROM characters WHERE project_id=?", (project_id,))
+    _char_q = (library_search(f"char_search_{project_id}", len(_chars_before), "شخصية")
+               if _chars_before else "")
+    with st.expander(f"➕ {t('إضافة شخصية جديدة')}", expanded=not _chars_before):
         with st.form(f"add_character_{project_id}"):
             ch_name = st.text_input(t("اسم الشخصية"), placeholder=t("مثال: أحمد"))
             ch_role = st.selectbox(t("نوع الدور"), ["بطل", "شرير", "مساعد", "كومبارس"], format_func=t)
@@ -1928,7 +2028,7 @@ with tab_characters:
                     st.rerun()
 
     characters = fetch_all("SELECT * FROM characters WHERE project_id=?", (project_id,))
-    with col2:
+    with st.expander(f"➕ {t('إضافة مظهر إضافي لشخصية')}", expanded=False):
         if characters:
             char_map = {c["name"]: c["id"] for c in characters}
             sel_char = st.selectbox(t("اختر شخصية لإضافة مظهر إضافي لها"), list(char_map.keys()))
@@ -1960,190 +2060,213 @@ with tab_characters:
     st.divider()
     role_options = ["بطل", "شرير", "مساعد", "كومبارس", "غير محدد"]
     makeup_options = ["طبيعي", "كامل", "بدون", "آثار إصابة", "مكياج شيخوخة"]
-    for ch in characters:
-        with st.expander(f"🎭 {ch['name']} ({t(ch['role_type'])})", key=f"exp_char_{ch['id']}"):
-            with st.form(f"edit_character_{ch['id']}"):
-                ech_name = st.text_input(t("اسم الشخصية"), value=ch["name"])
-                ech_role = st.selectbox(t("نوع الدور"), role_options,
-                                         index=safe_index(role_options, ch["role_type"]), format_func=t)
-                ech_species = st.selectbox(t("نوع الكائن"), SPECIES_OPTIONS,
-                                            index=safe_index(SPECIES_OPTIONS, ch["species"]), format_func=t, help=FIELD_HELP["species"])
-                ech_gender = st.selectbox(t("الجنس"), GENDER_OPTIONS,
-                                           index=safe_index(GENDER_OPTIONS, ch["gender"]), format_func=t, help=FIELD_HELP["gender"])
-                ech_notes = st.text_area(
-                    t("ملاحظات عامة عن الشخصية"), value=ch["personality_notes"] or "",
-                    placeholder=t("زي الوزن والبنية الجسمانية (نحيف/تخين/رياضي...) وأي تفاصيل تانية"),
-                )
-                if ch["reference_image_path"]:
-                    existing_ch_img = image_abs_path(ch["reference_image_path"])
-                    if existing_ch_img:
-                        st.image(existing_ch_img, width=220)
+    _chars_shown = [c for c in characters
+                    if matches(_char_q, c["name"], c["role_type"], c["personality_notes"])]
+    if _char_q:
+        library_result_count(len(_chars_shown), len(characters))
+    for ch in _chars_shown:
+        # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
+        # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
+        # 16 ثانية لكل rerun على الإنتاج).
+        _lazy_exp = st.expander(f"🎭 {ch['name']} ({t(ch['role_type'])})", key=f"exp_char_{ch['id']}", on_change="rerun")
+        with _lazy_exp:
+            if _lazy_exp.open:
+                with st.form(f"edit_character_{ch['id']}"):
+                    ech_name = st.text_input(t("اسم الشخصية"), value=ch["name"])
+                    ech_role = st.selectbox(t("نوع الدور"), role_options,
+                                             index=safe_index(role_options, ch["role_type"]), format_func=t)
+                    ech_species = st.selectbox(t("نوع الكائن"), SPECIES_OPTIONS,
+                                                index=safe_index(SPECIES_OPTIONS, ch["species"]), format_func=t, help=FIELD_HELP["species"])
+                    ech_gender = st.selectbox(t("الجنس"), GENDER_OPTIONS,
+                                               index=safe_index(GENDER_OPTIONS, ch["gender"]), format_func=t, help=FIELD_HELP["gender"])
+                    ech_notes = st.text_area(
+                        t("ملاحظات عامة عن الشخصية"), value=ch["personality_notes"] or "",
+                        placeholder=t("زي الوزن والبنية الجسمانية (نحيف/تخين/رياضي...) وأي تفاصيل تانية"),
+                    )
+                    if ch["reference_image_path"]:
+                        existing_ch_img = image_abs_path(ch["reference_image_path"])
+                        if existing_ch_img:
+                            st.image(existing_ch_img, width=220)
                 
-                # Generate or Upload menu
-                char_image_action = st.radio(
-                    t("طريقة إضافة صورة الشخصية"),
-                    [t("رفع من الجهاز"), t("توليد (قريباً)")],
-                    index=0,
-                    key=f"character_image_action_{ch['id']}"
-                )
+                    # Generate or Upload menu
+                    char_image_action = st.radio(
+                        t("طريقة إضافة صورة الشخصية"),
+                        [t("رفع من الجهاز"), t("توليد (قريباً)")],
+                        index=0,
+                        key=f"character_image_action_{ch['id']}"
+                    )
                 
-                ech_image = None
-                if char_image_action == t("رفع من الجهاز"):
-                    ech_image = st.file_uploader(
-                        t("اختر صورة مرجعية للشخصية"), type=IMAGE_TYPES, key=f"character_image_{ch['id']}"
-                    )
-                else:
-                    st.info("🔒 ميزة توليد صور الشخصيات الذكية قيد التطوير — ستتمكن قريباً من توليد صور بناءً على الوصف والملابس والمكياج")
-                csave_col, cdel_col = st.columns(2)
-                with csave_col:
-                    save_ch = st.form_submit_button(t("💾 حفظ التعديل"))
-                with cdel_col:
-                    del_ch = st.form_submit_button(t("🗑️ حذف الشخصية (وكل مظاهرها)"))
-            if save_ch:
-                if ech_name.strip():
-                    new_ch_image_path = ch["reference_image_path"]
-                    if ech_image is not None:
-                        new_ch_image_path = save_uploaded_image(ech_image, f"characters/{ch['id']}")
-                    run_query(
-                        """UPDATE characters SET name=?, role_type=?, species=?, gender=?,
-                        personality_notes=?, reference_image_path=? WHERE id=?""",
-                        (ech_name, ech_role, ech_species, ech_gender, ech_notes, new_ch_image_path, ch["id"]),
-                    )
-                    mark_saved(f"char_{ch['id']}")
-                    st.rerun()
-                else:
-                    st.warning(t("اسم الشخصية مينفعش يبقى فاضي"))
-            if del_ch:
-                ok = run_delete(
-                    "DELETE FROM characters WHERE id=?", (ch["id"],),
-                    t("معرفش أمسح الشخصية دي لأن مظهر بتاعها مستخدم في لقطة أو أكتر. شيلها من اللقطات دي الأول من تبويب التفريغ."),
-                )
-                if ok:
-                    delete_image_file(ch["reference_image_path"])
-                    st.success(t("تم حذف الشخصية"))
-                    st.rerun()
-            show_saved_badge(f"char_{ch['id']}")
-
-            st.markdown(f"**{t('المظاهر الإضافية:')}**")
-            looks = fetch_all("SELECT * FROM character_looks WHERE character_id=?", (ch["id"],))
-            if not looks:
-                st.caption(t("مفيش مظاهر إضافية متضافة لسه"))
-            for lk in looks:
-                with st.form(f"edit_look_{lk['id']}"):
-                    elk_name = st.text_input(t("اسم المظهر الإضافي"), value=lk["look_name"])
-                    elk_age = st.text_input(t("السن الظاهر"), value=lk["apparent_age"] or "", placeholder=t("مثال: 30 سنة"))
-                    elk_makeup = st.selectbox(t("حالة المكياج"), makeup_options,
-                                               index=safe_index(makeup_options, lk["makeup_state"]), format_func=t)
-                    elk_hair = st.text_input(t("حالة الشعر"), value=lk["hair_state"] or "", placeholder=t("مثال: شعر قصير أسود"))
-                    elk_wardrobe = st.text_area(
-                        t("وصف الملابس والإكسسوارات"), value=lk["wardrobe_description"] or "",
-                        placeholder=t("مثال: قميص أبيض وبنطلون جينز وساعة يد"),
-                    )
-                    elk_desc = st.text_area(
-                        t("وصف تفصيلي كامل للمظهر"), value=lk["description"] or "",
-                        placeholder=t("مثال: راجل في الثلاثينات، نحيف، شعره قصير أسود، لابس نضارة طبية..."),
-                    )
-                    if lk["reference_image_path"]:
-                        existing_look_img = image_abs_path(lk["reference_image_path"])
-                        if existing_look_img:
-                            st.image(existing_look_img, width=220)
-                    elk_image = st.file_uploader(t("تغيير الصورة المرجعية"), type=IMAGE_TYPES, key=f"look_image_{lk['id']}")
-                    lsave_col, ldel_col = st.columns(2)
-                    with lsave_col:
-                        save_lk = st.form_submit_button(t("💾 حفظ"))
-                    with ldel_col:
-                        del_lk = st.form_submit_button(t("🗑️ حذف المظهر الإضافي"))
-                if save_lk:
-                    new_look_image_path = lk["reference_image_path"]
-                    if elk_image is not None:
-                        new_look_image_path = save_uploaded_image(elk_image, f"characters/{ch['id']}")
-                    run_query(
-                        """UPDATE character_looks SET look_name=?, apparent_age=?, makeup_state=?,
-                        hair_state=?, wardrobe_description=?, description=?, reference_image_path=? WHERE id=?""",
-                        (elk_name, elk_age, elk_makeup, elk_hair, elk_wardrobe, elk_desc, new_look_image_path, lk["id"]),
-                    )
-                    mark_saved(f"look_{lk['id']}")
-                    st.rerun()
-                if del_lk:
+                    ech_image = None
+                    if char_image_action == t("رفع من الجهاز"):
+                        ech_image = st.file_uploader(
+                            t("اختر صورة مرجعية للشخصية"), type=IMAGE_TYPES, key=f"character_image_{ch['id']}"
+                        )
+                    else:
+                        st.info("🔒 ميزة توليد صور الشخصيات الذكية قيد التطوير — ستتمكن قريباً من توليد صور بناءً على الوصف والملابس والمكياج")
+                    csave_col, cdel_col = st.columns(2)
+                    with csave_col:
+                        save_ch = st.form_submit_button(t("💾 حفظ التعديل"))
+                    with cdel_col:
+                        del_ch = st.form_submit_button(t("🗑️ حذف الشخصية (وكل مظاهرها)"))
+                if save_ch:
+                    if ech_name.strip():
+                        new_ch_image_path = ch["reference_image_path"]
+                        if ech_image is not None:
+                            new_ch_image_path = save_uploaded_image(ech_image, f"characters/{ch['id']}")
+                        run_query(
+                            """UPDATE characters SET name=?, role_type=?, species=?, gender=?,
+                            personality_notes=?, reference_image_path=? WHERE id=?""",
+                            (ech_name, ech_role, ech_species, ech_gender, ech_notes, new_ch_image_path, ch["id"]),
+                        )
+                        mark_saved(f"char_{ch['id']}")
+                        st.rerun()
+                    else:
+                        st.warning(t("اسم الشخصية مينفعش يبقى فاضي"))
+                if del_ch:
                     ok = run_delete(
-                        "DELETE FROM character_looks WHERE id=?", (lk["id"],),
-                        t("معرفش أمسح المظهر ده لأنه مستخدم في لقطة أو أكتر. شيله من اللقطات دي الأول من تبويب التفريغ."),
+                        "DELETE FROM characters WHERE id=?", (ch["id"],),
+                        t("معرفش أمسح الشخصية دي لأن مظهر بتاعها مستخدم في لقطة أو أكتر. شيلها من اللقطات دي الأول من تبويب التفريغ."),
                     )
                     if ok:
-                        delete_image_file(lk["reference_image_path"])
-                        st.success(t("تم حذف المظهر الإضافي"))
+                        delete_image_file(ch["reference_image_path"])
+                        st.success(t("تم حذف الشخصية"))
                         st.rerun()
-                show_saved_badge(f"look_{lk['id']}")
+                show_saved_badge(f"char_{ch['id']}")
+
+                st.markdown(f"**{t('المظاهر الإضافية:')}**")
+                looks = fetch_all("SELECT * FROM character_looks WHERE character_id=?", (ch["id"],))
+                if not looks:
+                    st.caption(t("مفيش مظاهر إضافية متضافة لسه"))
+                for lk in looks:
+                    with st.form(f"edit_look_{lk['id']}"):
+                        elk_name = st.text_input(t("اسم المظهر الإضافي"), value=lk["look_name"])
+                        elk_age = st.text_input(t("السن الظاهر"), value=lk["apparent_age"] or "", placeholder=t("مثال: 30 سنة"))
+                        elk_makeup = st.selectbox(t("حالة المكياج"), makeup_options,
+                                                   index=safe_index(makeup_options, lk["makeup_state"]), format_func=t)
+                        elk_hair = st.text_input(t("حالة الشعر"), value=lk["hair_state"] or "", placeholder=t("مثال: شعر قصير أسود"))
+                        elk_wardrobe = st.text_area(
+                            t("وصف الملابس والإكسسوارات"), value=lk["wardrobe_description"] or "",
+                            placeholder=t("مثال: قميص أبيض وبنطلون جينز وساعة يد"),
+                        )
+                        elk_desc = st.text_area(
+                            t("وصف تفصيلي كامل للمظهر"), value=lk["description"] or "",
+                            placeholder=t("مثال: راجل في الثلاثينات، نحيف، شعره قصير أسود، لابس نضارة طبية..."),
+                        )
+                        if lk["reference_image_path"]:
+                            existing_look_img = image_abs_path(lk["reference_image_path"])
+                            if existing_look_img:
+                                st.image(existing_look_img, width=220)
+                        elk_image = st.file_uploader(t("تغيير الصورة المرجعية"), type=IMAGE_TYPES, key=f"look_image_{lk['id']}")
+                        lsave_col, ldel_col = st.columns(2)
+                        with lsave_col:
+                            save_lk = st.form_submit_button(t("💾 حفظ"))
+                        with ldel_col:
+                            del_lk = st.form_submit_button(t("🗑️ حذف المظهر الإضافي"))
+                    if save_lk:
+                        new_look_image_path = lk["reference_image_path"]
+                        if elk_image is not None:
+                            new_look_image_path = save_uploaded_image(elk_image, f"characters/{ch['id']}")
+                        run_query(
+                            """UPDATE character_looks SET look_name=?, apparent_age=?, makeup_state=?,
+                            hair_state=?, wardrobe_description=?, description=?, reference_image_path=? WHERE id=?""",
+                            (elk_name, elk_age, elk_makeup, elk_hair, elk_wardrobe, elk_desc, new_look_image_path, lk["id"]),
+                        )
+                        mark_saved(f"look_{lk['id']}")
+                        st.rerun()
+                    if del_lk:
+                        ok = run_delete(
+                            "DELETE FROM character_looks WHERE id=?", (lk["id"],),
+                            t("معرفش أمسح المظهر ده لأنه مستخدم في لقطة أو أكتر. شيله من اللقطات دي الأول من تبويب التفريغ."),
+                        )
+                        if ok:
+                            delete_image_file(lk["reference_image_path"])
+                            st.success(t("تم حذف المظهر الإضافي"))
+                            st.rerun()
+                    show_saved_badge(f"look_{lk['id']}")
 
 # ---------------- تبويب الإكسسوارات ----------------
 with tab_props:
     st.subheader(tr("sub_props"))
-    st.caption(t(
-        "أي حاجة بيمسكها أو بيستخدمها أي شخصية أو ليها دور في حدث المشهد (سكينة، تليفون، شنطة، سلاح...). "
-        "تقدر تربط الإكسسوار بشخصية معينة (زي مسدس البطل)، وتعلّم عليه لو حساس للراكورد (يعني لازم يفضل في "
-        "نفس الحالة بين اللقطات المتتالية)."
-    ))
 
     characters_for_props = fetch_all("SELECT * FROM characters WHERE project_id=? ORDER BY id", (project_id,))
     char_options_for_props = ["بدون - غير مرتبط بشخصية"] + [c["name"] for c in characters_for_props]
     char_id_by_name = {c["name"]: c["id"] for c in characters_for_props}
 
-    with st.form(f"add_prop_{project_id}"):
-        prop_name = st.text_input(t("اسم الإكسسوار"), placeholder=t("مثال: سكينة عم جابر"))
-        prop_continuity = st.checkbox(t("حساس للراكورد؟ (لازم يفضل في نفس الحالة بين اللقطات)"))
-        prop_character = st.selectbox(t("مرتبط بشخصية (اختياري)"), char_options_for_props)
-        if st.form_submit_button(t("إضافة إكسسوار")):
-            if prop_name.strip():
-                linked_char_id = char_id_by_name.get(prop_character)
-                run_query(
-                    "INSERT INTO props (project_id, name, continuity_sensitive, character_id) VALUES (?,?,?,?)",
-                    (project_id, prop_name, int(prop_continuity), linked_char_id),
-                )
-                st.rerun()
-            else:
-                st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
+    _props_before = fetch_all("SELECT id FROM props WHERE project_id=?", (project_id,))
+    _prop_q = (library_search(f"prop_search_{project_id}", len(_props_before), "إكسسوار")
+               if _props_before else "")
+    with st.expander(f"➕ {t('إضافة إكسسوار جديد')}", expanded=not _props_before):
+        st.caption(t(
+            "أي حاجة بيمسكها أو بيستخدمها أي شخصية أو ليها دور في حدث المشهد (سكينة، تليفون، شنطة، سلاح...). "
+            "تقدر تربط الإكسسوار بشخصية معينة (زي مسدس البطل)، وتعلّم عليه لو حساس للراكورد (يعني لازم يفضل في "
+            "نفس الحالة بين اللقطات المتتالية)."
+        ))
+        with st.form(f"add_prop_{project_id}"):
+            prop_name = st.text_input(t("اسم الإكسسوار"), placeholder=t("مثال: سكينة عم جابر"))
+            prop_continuity = st.checkbox(t("حساس للراكورد؟ (لازم يفضل في نفس الحالة بين اللقطات)"))
+            prop_character = st.selectbox(t("مرتبط بشخصية (اختياري)"), char_options_for_props)
+            if st.form_submit_button(t("إضافة إكسسوار")):
+                if prop_name.strip():
+                    linked_char_id = char_id_by_name.get(prop_character)
+                    run_query(
+                        "INSERT INTO props (project_id, name, continuity_sensitive, character_id) VALUES (?,?,?,?)",
+                        (project_id, prop_name, int(prop_continuity), linked_char_id),
+                    )
+                    st.rerun()
+                else:
+                    st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
 
     st.divider()
     props_list = fetch_all("SELECT * FROM props WHERE project_id=? ORDER BY id", (project_id,))
     if not props_list:
         st.caption(t("مفيش إكسسوارات مضافة لسه"))
-    for pr in props_list:
+    _char_name_by_id = {c["id"]: c["name"] for c in characters_for_props}
+    _props_shown = [pr for pr in props_list
+                    if matches(_prop_q, pr["name"], _char_name_by_id.get(pr["character_id"]))]
+    if _prop_q:
+        library_result_count(len(_props_shown), len(props_list))
+    for pr in _props_shown:
         char_label = next((c["name"] for c in characters_for_props if c["id"] == pr["character_id"]), None)
         badge = f" — {t('مرتبط بـ')} {char_label}" if char_label else ""
-        with st.expander(f"🎒 {pr['name']}{badge}", key=f"exp_prop_{pr['id']}"):
-            with st.form(f"edit_prop_{pr['id']}"):
-                ep_name = st.text_input(t("اسم الإكسسوار"), value=pr["name"])
-                ep_continuity = st.checkbox(
-                    t("حساس للراكورد؟ (لازم يفضل في نفس الحالة بين اللقطات)"),
-                    value=bool(pr["continuity_sensitive"]),
-                )
-                ep_char_options = ["بدون - غير مرتبط بشخصية"] + [c["name"] for c in characters_for_props]
-                current_char_name = char_label or "بدون - غير مرتبط بشخصية"
-                ep_character = st.selectbox(
-                    t("مرتبط بشخصية (اختياري)"), ep_char_options,
-                    index=safe_index(ep_char_options, current_char_name),
-                )
-                psave_col, pdel_col = st.columns(2)
-                with psave_col:
-                    save_pr = st.form_submit_button(t("💾 حفظ التعديل"))
-                with pdel_col:
-                    del_pr = st.form_submit_button(t("🗑️ حذف الإكسسوار"))
-            if save_pr:
-                if ep_name.strip():
-                    new_linked_char_id = char_id_by_name.get(ep_character)
-                    run_query(
-                        "UPDATE props SET name=?, continuity_sensitive=?, character_id=? WHERE id=?",
-                        (ep_name, int(ep_continuity), new_linked_char_id, pr["id"]),
+        # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
+        # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
+        # 16 ثانية لكل rerun على الإنتاج).
+        _lazy_exp = st.expander(f"🎒 {pr['name']}{badge}", key=f"exp_prop_{pr['id']}", on_change="rerun")
+        with _lazy_exp:
+            if _lazy_exp.open:
+                with st.form(f"edit_prop_{pr['id']}"):
+                    ep_name = st.text_input(t("اسم الإكسسوار"), value=pr["name"])
+                    ep_continuity = st.checkbox(
+                        t("حساس للراكورد؟ (لازم يفضل في نفس الحالة بين اللقطات)"),
+                        value=bool(pr["continuity_sensitive"]),
                     )
-                    mark_saved(f"prop_{pr['id']}")
+                    ep_char_options = ["بدون - غير مرتبط بشخصية"] + [c["name"] for c in characters_for_props]
+                    current_char_name = char_label or "بدون - غير مرتبط بشخصية"
+                    ep_character = st.selectbox(
+                        t("مرتبط بشخصية (اختياري)"), ep_char_options,
+                        index=safe_index(ep_char_options, current_char_name),
+                    )
+                    psave_col, pdel_col = st.columns(2)
+                    with psave_col:
+                        save_pr = st.form_submit_button(t("💾 حفظ التعديل"))
+                    with pdel_col:
+                        del_pr = st.form_submit_button(t("🗑️ حذف الإكسسوار"))
+                if save_pr:
+                    if ep_name.strip():
+                        new_linked_char_id = char_id_by_name.get(ep_character)
+                        run_query(
+                            "UPDATE props SET name=?, continuity_sensitive=?, character_id=? WHERE id=?",
+                            (ep_name, int(ep_continuity), new_linked_char_id, pr["id"]),
+                        )
+                        mark_saved(f"prop_{pr['id']}")
+                        st.rerun()
+                    else:
+                        st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
+                if del_pr:
+                    run_query("DELETE FROM props WHERE id=?", (pr["id"],))
+                    st.success(t("تم حذف الإكسسوار"))
                     st.rerun()
-                else:
-                    st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
-            if del_pr:
-                run_query("DELETE FROM props WHERE id=?", (pr["id"],))
-                st.success(t("تم حذف الإكسسوار"))
-                st.rerun()
-            show_saved_badge(f"prop_{pr['id']}")
+                show_saved_badge(f"prop_{pr['id']}")
 
 # ---------------- تبويب السكريبت (المشاهد) ----------------
 with tab_scenes:
@@ -2156,166 +2279,225 @@ with tab_scenes:
     """, (project_id,))
     loc_variant_map = {r["label"]: r["id"] for r in locations_all}
 
-    with st.form(f"add_scene_{project_id}"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            sc_number = st.number_input(
-                t("رقم المشهد"), min_value=1, step=1,
-                value=next_free_number(r["scene_number"] for r in fetch_all(
-                    "SELECT scene_number FROM scenes WHERE project_id=?", (project_id,))))
-            sc_int_ext = st.selectbox(t("داخلي/خارجي"), INT_EXT_OPTIONS, format_func=fmt_int_ext, key="scene_int_ext")
-        with col2:
-            sc_day_night = st.selectbox(t("التوقيت"), DAY_NIGHT_OPTIONS, format_func=fmt_day_night, key="scene_day_night")
-            sc_location = st.selectbox(t("المكان"), ["بدون تحديد"] + list(loc_variant_map.keys()), format_func=t)
-        with col3:
-            sc_weather = st.text_input(t("الطقس"), placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"))
+    _scenes_before = fetch_all("SELECT id FROM scenes WHERE project_id=?", (project_id,))
+    _scene_q = (library_search(f"scene_search_{project_id}", len(_scenes_before), "مشاهد")
+                if _scenes_before else "")
+    with st.expander(f"➕ {t('إضافة مشهد جديد')}", expanded=not _scenes_before):
+        with st.form(f"add_scene_{project_id}"):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                sc_number = st.number_input(
+                    t("رقم المشهد"), min_value=1, step=1,
+                    value=next_free_number(r["scene_number"] for r in fetch_all(
+                        "SELECT scene_number FROM scenes WHERE project_id=?", (project_id,))))
+                sc_int_ext = st.selectbox(t("داخلي/خارجي"), INT_EXT_OPTIONS, format_func=fmt_int_ext, key="scene_int_ext")
+            with col2:
+                sc_day_night = st.selectbox(t("التوقيت"), DAY_NIGHT_OPTIONS, format_func=fmt_day_night, key="scene_day_night")
+                sc_location = st.selectbox(t("المكان"), ["بدون تحديد"] + list(loc_variant_map.keys()), format_func=t)
+            with col3:
+                sc_weather = st.text_input(t("الطقس"), placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"))
         
-        # Episode selection for series
-        sc_episode_id = None
-        if project["project_type"] == "مسلسل":
-            episodes = fetch_all("SELECT id, episode_number, title FROM episodes WHERE project_id=? ORDER BY episode_number", (project_id,))
-            if episodes:
-                ep_options = ["بدون حلقة"] + [f"الحلقة {ep['episode_number']}: {ep['title']}" for ep in episodes]
-                sc_episode_choice = st.selectbox(t("اختر الحلقة"), ep_options, key=f"scene_episode_{project_id}")
-                if sc_episode_choice != "بدون حلقة":
-                    ep_idx = ep_options.index(sc_episode_choice) - 1
-                    sc_episode_id = episodes[ep_idx]['id']
-        sc_notes = st.text_area(t("ملاحظات المشهد العامة"), height=150)
-        all_chars_for_scene = fetch_all("SELECT id, name FROM characters WHERE project_id=? ORDER BY id", (project_id,))
-        char_map_for_scene = {c["name"]: c["id"] for c in all_chars_for_scene}
-        sc_characters = multiselect(t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()))
-        all_props_for_scene = fetch_all("SELECT id, name FROM props WHERE project_id=? ORDER BY id", (project_id,))
-        prop_map_for_scene = {p["name"]: p["id"] for p in all_props_for_scene}
-        sc_props = multiselect(t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()))
-        if st.form_submit_button(t("إضافة مشهد")):
-            loc_id = loc_variant_map.get(sc_location)
-            existing_scene_numbers_now = {
-                s["scene_number"] for s in fetch_all("SELECT scene_number FROM scenes WHERE project_id=?", (project_id,))
-            }
-            if sc_number in existing_scene_numbers_now:
-                # الرقم ده مستخدم قبل كده - بندفع كل المشاهد اللي رقمها أكبر
-                # أو يساويه رقم واحد لقدام، عشان المشهد الجديد يحتل الرقم ده
-                # بالظبط من غير ما يبوّظ ترتيب المشاهد التانية
-                shift_scene_numbers(project_id, sc_number)
-                st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
-            new_scene_id = run_query(
-                "INSERT INTO scenes (project_id, episode_id, scene_number, int_ext, day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?,?)",
-                (project_id, sc_episode_id, sc_number, sc_int_ext, sc_day_night, sc_weather, loc_id, sc_notes),
-            )
-            for _cname in sc_characters:
-                run_query("INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)",
-                           (new_scene_id, char_map_for_scene[_cname]))
-            for _pname in sc_props:
-                run_query("INSERT OR IGNORE INTO scene_props (scene_id, prop_id) VALUES (?,?)",
-                           (new_scene_id, prop_map_for_scene[_pname]))
-            bump_version(project_id)
-            st.rerun()
+            # Episode selection for series
+            sc_episode_id = None
+            if project["project_type"] == "مسلسل":
+                episodes = fetch_all("SELECT id, episode_number, title FROM episodes WHERE project_id=? ORDER BY episode_number", (project_id,))
+                if episodes:
+                    ep_options = ["بدون حلقة"] + [f"الحلقة {ep['episode_number']}: {ep['title']}" for ep in episodes]
+                    sc_episode_choice = st.selectbox(t("اختر الحلقة"), ep_options, key=f"scene_episode_{project_id}")
+                    if sc_episode_choice != "بدون حلقة":
+                        ep_idx = ep_options.index(sc_episode_choice) - 1
+                        sc_episode_id = episodes[ep_idx]['id']
+            sc_notes = st.text_area(t("ملاحظات المشهد العامة"), height=150)
+            all_chars_for_scene = fetch_all("SELECT id, name FROM characters WHERE project_id=? ORDER BY id", (project_id,))
+            char_map_for_scene = {c["name"]: c["id"] for c in all_chars_for_scene}
+            sc_characters = multiselect(t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()))
+            all_props_for_scene = fetch_all("SELECT id, name FROM props WHERE project_id=? ORDER BY id", (project_id,))
+            prop_map_for_scene = {p["name"]: p["id"] for p in all_props_for_scene}
+            sc_props = multiselect(t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()))
+            if st.form_submit_button(t("إضافة مشهد")):
+                loc_id = loc_variant_map.get(sc_location)
+                existing_scene_numbers_now = {
+                    s["scene_number"] for s in fetch_all("SELECT scene_number FROM scenes WHERE project_id=?", (project_id,))
+                }
+                if sc_number in existing_scene_numbers_now:
+                    # الرقم ده مستخدم قبل كده - بندفع كل المشاهد اللي رقمها أكبر
+                    # أو يساويه رقم واحد لقدام، عشان المشهد الجديد يحتل الرقم ده
+                    # بالظبط من غير ما يبوّظ ترتيب المشاهد التانية
+                    shift_scene_numbers(project_id, sc_number)
+                    st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
+                new_scene_id = run_query(
+                    "INSERT INTO scenes (project_id, episode_id, scene_number, int_ext, day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?,?)",
+                    (project_id, sc_episode_id, sc_number, sc_int_ext, sc_day_night, sc_weather, loc_id, sc_notes),
+                )
+                for _cname in sc_characters:
+                    run_query("INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)",
+                               (new_scene_id, char_map_for_scene[_cname]))
+                for _pname in sc_props:
+                    run_query("INSERT OR IGNORE INTO scene_props (scene_id, prop_id) VALUES (?,?)",
+                               (new_scene_id, prop_map_for_scene[_pname]))
+                bump_version(project_id)
+                st.rerun()
 
     st.divider()
     scenes = fetch_all("SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number", (project_id,))
     id_to_loc_label = {v: k for k, v in loc_variant_map.items()}
+
+    # جدول المشاهد: نظرة واحدة على كل المشاهد بدل 143 سطر مقفول شبه بعض.
+    # البحث والاختيار من الجدول بيصفّوا القايمة اللي تحت (اللي فيها التعديل).
+    _chars_by_scene = {}
+    for r in fetch_all(
+        "SELECT sc.scene_id, c.name FROM scene_characters sc JOIN characters c ON c.id = sc.character_id "
+        "JOIN scenes s ON s.id = sc.scene_id WHERE s.project_id=?", (project_id,)):
+        _chars_by_scene.setdefault(r["scene_id"], []).append(r["name"])
+    _shots_by_scene = {r["scene_id"]: r["n"] for r in fetch_all(
+        "SELECT sh.scene_id, COUNT(*) n FROM shots sh JOIN scenes s ON s.id = sh.scene_id "
+        "WHERE s.project_id=? GROUP BY sh.scene_id", (project_id,))}
+
+    _scenes_shown = scenes
+    if scenes:
+        _scenes_shown = [
+            sc for sc in scenes
+            if matches(_scene_q, scene_label(sc), sc["int_ext"], sc["day_night"],
+                       id_to_loc_label.get(sc["location_variant_id"]), sc["notes"],
+                       " ".join(_chars_by_scene.get(sc["id"], [])))
+        ]
+        _table = pd.DataFrame([{
+            t("رقم"): scene_label(sc),
+            t("داخلي/خارجي"): fmt_int_ext(sc["int_ext"] or "غير محدد"),
+            t("التوقيت"): fmt_day_night(sc["day_night"] or "غير محدد"),
+            t("المكان"): _loc_display(id_to_loc_label.get(sc["location_variant_id"])) or "—",
+            t("الشخصيات"): len(_chars_by_scene.get(sc["id"], [])),
+            t("اللقطات"): _shots_by_scene.get(sc["id"], 0),
+        } for sc in _scenes_shown])
+        if _is_ar and not _table.empty:
+            _table = _table[_table.columns[::-1]]       # الرقم يبقى في أول العين: يمين
+        with st.container(key="cf_scene_table"):
+            _pick = st.dataframe(
+                _table, hide_index=True, use_container_width=True,
+                height=min(38 + 35 * max(len(_table), 1), 420),
+                on_select="rerun", selection_mode="multi-row",
+                key=f"scene_table_{project_id}",
+            )
+        _rows = [r for r in (_pick.selection.rows if _pick is not None else []) if r < len(_scenes_shown)]
+        if _scene_q:
+            library_result_count(len(_scenes_shown), len(scenes))
+        if _rows:
+            _scenes_shown = [_scenes_shown[r] for r in _rows]
+        elif not _scene_q:
+            # من غير اختيار ولا بحث مفيش فورمات تعديل خالص. قبل كده كان فيه 143
+            # فورم كامل بيتبنوا تحت الجدول — وتبويبات Streamlit كلها بتتنفذ مع أي
+            # ضغطة في أي مكان، فكانوا بيتبنوا مع كل حركة في البرنامج.
+            _scenes_shown = []
+            st.caption(t("اختار مشهد أو أكتر من الجدول (المربع جنب الصف) عشان تعدّلهم أو تمسحهم."))
     int_ext_edit_options = ["غير محدد"] + INT_EXT_OPTIONS
     day_night_edit_options = ["غير محدد"] + DAY_NIGHT_OPTIONS
     loc_edit_options = ["بدون تحديد"] + list(loc_variant_map.keys())
 
     selected_scene_ids_for_bulk_delete = []
-    for sc in scenes:
+    for sc in _scenes_shown:
+        _loc_label = _loc_display(id_to_loc_label.get(sc["location_variant_id"]))
         title = (
             f"{t('مشهد')} {ltr(scene_label(sc))} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
             f"{fmt_day_night(sc['day_night'] or 'غير محدد')}"
+            + (f" — 📍 {_loc_label}" if _loc_label else "")
         )
         cb_col, exp_col = st.columns([0.05, 0.95])
         with cb_col:
             st.markdown("<div style='margin-top:8px'></div>", unsafe_allow_html=True)
             if st.checkbox("", key=f"bulk_sel_scene_{sc['id']}", label_visibility="collapsed"):
                 selected_scene_ids_for_bulk_delete.append(sc["id"])
-        with exp_col.expander(title, key=f"exp_scene_{sc['id']}"):
-            with st.form(f"edit_scene_{sc['id']}"):
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    esc_number = st.number_input(t("رقم المشهد"), min_value=1, step=1, value=sc["scene_number"])
-                    esc_int_ext = st.selectbox(
-                        t("داخلي/خارجي"), int_ext_edit_options,
-                        index=safe_index(int_ext_edit_options, sc["int_ext"] or "غير محدد"),
-                        format_func=fmt_int_ext,
-                    )
-                with col2:
-                    esc_day_night = st.selectbox(
-                        t("التوقيت"), day_night_edit_options,
-                        index=safe_index(day_night_edit_options, sc["day_night"] or "غير محدد"),
-                        format_func=fmt_day_night,
-                    )
-                    esc_location = st.selectbox(
-                        t("المكان"), loc_edit_options,
-                        index=safe_index(loc_edit_options, id_to_loc_label.get(sc["location_variant_id"], "بدون تحديد")),
-                        format_func=t,
-                    )
-                with col3:
-                    esc_weather = st.text_input(
-                        t("الطقس"), value=sc["weather"] or "",
-                        placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"),
-                    )
-                esc_notes = st.text_area(t("ملاحظات المشهد العامة"), value=sc["notes"] or "", height=180)
+        # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
+        # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
+        # 16 ثانية لكل rerun على الإنتاج).
+        _lazy_exp = exp_col.expander(title, key=f"exp_scene_{sc['id']}", on_change="rerun")
+        with _lazy_exp:
+            if _lazy_exp.open:
+                with st.form(f"edit_scene_{sc['id']}"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        esc_number = st.number_input(t("رقم المشهد"), min_value=1, step=1, value=sc["scene_number"])
+                        esc_int_ext = st.selectbox(
+                            t("داخلي/خارجي"), int_ext_edit_options,
+                            index=safe_index(int_ext_edit_options, sc["int_ext"] or "غير محدد"),
+                            format_func=fmt_int_ext,
+                        )
+                    with col2:
+                        esc_day_night = st.selectbox(
+                            t("التوقيت"), day_night_edit_options,
+                            index=safe_index(day_night_edit_options, sc["day_night"] or "غير محدد"),
+                            format_func=fmt_day_night,
+                        )
+                        esc_location = st.selectbox(
+                            t("المكان"), loc_edit_options,
+                            index=safe_index(loc_edit_options, id_to_loc_label.get(sc["location_variant_id"], "بدون تحديد")),
+                            format_func=t,
+                        )
+                    with col3:
+                        esc_weather = st.text_input(
+                            t("الطقس"), value=sc["weather"] or "",
+                            placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"),
+                        )
+                    esc_notes = st.text_area(t("ملاحظات المشهد العامة"), value=sc["notes"] or "", height=180)
 
-                esc_current_char_ids = {
-                    r["character_id"] for r in fetch_all(
-                        "SELECT character_id FROM scene_characters WHERE scene_id=?", (sc["id"],)
+                    esc_current_char_ids = {
+                        r["character_id"] for r in fetch_all(
+                            "SELECT character_id FROM scene_characters WHERE scene_id=?", (sc["id"],)
+                        )
+                    }
+                    esc_current_char_names = [n for n, cid in char_map_for_scene.items() if cid in esc_current_char_ids]
+                    esc_characters = multiselect(
+                        t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()),
+                        default=esc_current_char_names,
                     )
-                }
-                esc_current_char_names = [n for n, cid in char_map_for_scene.items() if cid in esc_current_char_ids]
-                esc_characters = multiselect(
-                    t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()),
-                    default=esc_current_char_names,
-                )
-                esc_current_prop_ids = {
-                    r["prop_id"] for r in fetch_all(
-                        "SELECT prop_id FROM scene_props WHERE scene_id=?", (sc["id"],)
+                    esc_current_prop_ids = {
+                        r["prop_id"] for r in fetch_all(
+                            "SELECT prop_id FROM scene_props WHERE scene_id=?", (sc["id"],)
+                        )
+                    }
+                    esc_current_prop_names = [n for n, pid in prop_map_for_scene.items() if pid in esc_current_prop_ids]
+                    esc_props = multiselect(
+                        t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()),
+                        default=esc_current_prop_names,
                     )
-                }
-                esc_current_prop_names = [n for n, pid in prop_map_for_scene.items() if pid in esc_current_prop_ids]
-                esc_props = multiselect(
-                    t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()),
-                    default=esc_current_prop_names,
-                )
 
-                ssave_col, sdel_col = st.columns(2)
-                with ssave_col:
-                    save_sc = st.form_submit_button(t("💾 حفظ التعديل"))
-                with sdel_col:
-                    del_sc = st.form_submit_button(t("🗑️ حذف المشهد (وكل لقطاته)"))
-            if save_sc:
-                new_int_ext = None if esc_int_ext == "غير محدد" else esc_int_ext
-                new_day_night = None if esc_day_night == "غير محدد" else esc_day_night
-                new_loc_id = loc_variant_map.get(esc_location)
-                if esc_number != sc["scene_number"]:
-                    colliding = fetch_all(
-                        "SELECT id FROM scenes WHERE project_id=? AND scene_number=? AND id != ?",
-                        (project_id, esc_number, sc["id"]),
+                    ssave_col, sdel_col = st.columns(2)
+                    with ssave_col:
+                        save_sc = st.form_submit_button(t("💾 حفظ التعديل"))
+                    with sdel_col:
+                        del_sc = st.form_submit_button(t("🗑️ حذف المشهد (وكل لقطاته)"))
+                if save_sc:
+                    new_int_ext = None if esc_int_ext == "غير محدد" else esc_int_ext
+                    new_day_night = None if esc_day_night == "غير محدد" else esc_day_night
+                    new_loc_id = loc_variant_map.get(esc_location)
+                    if esc_number != sc["scene_number"]:
+                        colliding = fetch_all(
+                            "SELECT id FROM scenes WHERE project_id=? AND scene_number=? AND id != ?",
+                            (project_id, esc_number, sc["id"]),
+                        )
+                        if colliding:
+                            shift_scene_numbers(project_id, esc_number, exclude_scene_id=sc["id"])
+                            st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
+                    run_query(
+                        "UPDATE scenes SET scene_number=?, int_ext=?, day_night=?, weather=?, location_variant_id=?, notes=? WHERE id=?",
+                        (esc_number, new_int_ext, new_day_night, esc_weather, new_loc_id, esc_notes, sc["id"]),
                     )
-                    if colliding:
-                        shift_scene_numbers(project_id, esc_number, exclude_scene_id=sc["id"])
-                        st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
-                run_query(
-                    "UPDATE scenes SET scene_number=?, int_ext=?, day_night=?, weather=?, location_variant_id=?, notes=? WHERE id=?",
-                    (esc_number, new_int_ext, new_day_night, esc_weather, new_loc_id, esc_notes, sc["id"]),
-                )
-                run_query("DELETE FROM scene_characters WHERE scene_id=?", (sc["id"],))
-                for _cname in esc_characters:
-                    run_query("INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)",
-                               (sc["id"], char_map_for_scene[_cname]))
-                run_query("DELETE FROM scene_props WHERE scene_id=?", (sc["id"],))
-                for _pname in esc_props:
-                    run_query("INSERT OR IGNORE INTO scene_props (scene_id, prop_id) VALUES (?,?)",
-                               (sc["id"], prop_map_for_scene[_pname]))
-                bump_version(project_id)
-                mark_saved(f"scene_{sc['id']}")
-                st.rerun()
-            if del_sc:
-                run_query("DELETE FROM scenes WHERE id=?", (sc["id"],))
-                bump_version(project_id)
-                st.success(t("تم حذف المشهد"))
-                st.rerun()
-            show_saved_badge(f"scene_{sc['id']}")
+                    run_query("DELETE FROM scene_characters WHERE scene_id=?", (sc["id"],))
+                    for _cname in esc_characters:
+                        run_query("INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)",
+                                   (sc["id"], char_map_for_scene[_cname]))
+                    run_query("DELETE FROM scene_props WHERE scene_id=?", (sc["id"],))
+                    for _pname in esc_props:
+                        run_query("INSERT OR IGNORE INTO scene_props (scene_id, prop_id) VALUES (?,?)",
+                                   (sc["id"], prop_map_for_scene[_pname]))
+                    bump_version(project_id)
+                    mark_saved(f"scene_{sc['id']}")
+                    st.rerun()
+                if del_sc:
+                    run_query("DELETE FROM scenes WHERE id=?", (sc["id"],))
+                    bump_version(project_id)
+                    st.success(t("تم حذف المشهد"))
+                    st.rerun()
+                show_saved_badge(f"scene_{sc['id']}")
 
     if selected_scene_ids_for_bulk_delete:
         with st.container(key=f"bulk_delete_scenes_{project_id}"):
@@ -2455,196 +2637,232 @@ with tab_breakdown:
         shots = fetch_all("SELECT * FROM shots WHERE scene_id=? ORDER BY shot_number", (scene_id,))
         for sh in shots:
             status_icon = "🔵" if sh["confirmed"] else "🟡"
-            with st.expander(f"{status_icon} {t('لقطة')} {sh['shot_number']} — {ltr(t(sh['shot_size']))} / {ltr(t(sh['camera_movement']))}", key=f"exp_shot_{sh['id']}"):
-                current_looks = fetch_all(
-                    "SELECT look_id, has_dialogue FROM shot_characters WHERE shot_id=?", (sh["id"],)
-                )
-                current_dialogue_by_look_id = {r["look_id"]: bool(r["has_dialogue"]) for r in current_looks}
-                current_look_ids = set(current_dialogue_by_look_id.keys())
-                current_labels = [label for label, lid in look_map.items() if lid in current_look_ids]
-                current_prop_ids = {
-                    r["prop_id"] for r in fetch_all("SELECT prop_id FROM shot_props WHERE shot_id=?", (sh["id"],))
-                }
-                current_prop_labels = [name for name, pid in prop_map.items() if pid in current_prop_ids]
-
-                with st.form(f"edit_shot_{sh['id']}"):
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        esh_number = st.number_input(t("رقم اللقطة"), min_value=1, step=1, value=sh["shot_number"])
-                        esh_size = st.selectbox(t("حجم الكادر"), SHOT_SIZE_OPTIONS,
-                                                 index=safe_index(SHOT_SIZE_OPTIONS, sh["shot_size"]), format_func=t)
-                    with col2:
-                        esh_movement = st.selectbox(t("حركة الكاميرا"), CAMERA_MOVEMENT_OPTIONS,
-                                                     index=safe_index(CAMERA_MOVEMENT_OPTIONS, sh["camera_movement"]), format_func=t)
-                        esh_angle = st.selectbox(t("زاوية الكاميرا"), CAMERA_ANGLE_OPTIONS,
-                                                  index=safe_index(CAMERA_ANGLE_OPTIONS, sh["camera_angle"]), format_func=t)
-                    with col3:
-                        esh_duration = st.number_input(
-                            t("المدة (ثانية)"), min_value=1.0, max_value=30.0,
-                            value=float(sh["duration_seconds"] or 5.0), step=0.5,
-                        )
-                        esh_emotion = st.slider(t("قوة المشاعر"), 1, 5, value=sh["emotion_intensity"] or 3)
-
-                    ecol4, ecol5 = st.columns(2)
-                    with ecol4:
-                        esh_day_night = st.selectbox(
-                            t("النهار/الليل"), DAY_NIGHT_OPTIONS,
-                            index=safe_index(DAY_NIGHT_OPTIONS, sh["day_night"]),
-                            format_func=fmt_day_night,
-                        )
-                    with ecol5:
-                        esh_weather = st.text_input(
-                            t("حالة الطقس"), value=sh["weather"] or "",
-                            placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"),
-                        )
-
-                    esh_action = st.text_area(
-                        t("وصف الحركة داخل اللقطة"), value=sh["action_description"] or "", height=100,
-                        placeholder=t("مثال: أحمد بيدخل الأوضة وبيقفل الباب وراه، سارة واقفة جنب الشباك بتبص برة"),
+            # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
+            # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
+            # 16 ثانية لكل rerun على الإنتاج).
+            _lazy_exp = st.expander(f"{status_icon} {t('لقطة')} {sh['shot_number']} — {ltr(t(sh['shot_size']))} / {ltr(t(sh['camera_movement']))}", key=f"exp_shot_{sh['id']}", on_change="rerun")
+            with _lazy_exp:
+                if _lazy_exp.open:
+                    current_looks = fetch_all(
+                        "SELECT look_id, has_dialogue FROM shot_characters WHERE shot_id=?", (sh["id"],)
                     )
-                    esh_emotion_label = st.text_input(
-                        t("وصف المشاعر"), value=sh["emotion_label"] or "", placeholder=t("مثال: أحمد حزين، سارة غير مهتمة"),
-                    )
-                    esh_edit_available_lines = unused_dialogue_lines(
-                        current_scene_row["notes"], scene_id, fetch_all, exclude_shot_id=sh["id"]
-                    )
-                    if esh_edit_available_lines:
-                        esh_current_dialogue_lines = [
-                            l.strip() for l in (sh["dialogue_text"] or "").split("\n") if l.strip()
-                        ]
-                        st.caption(t(
-                            "دول سطور الحوار اللي لسه في حوار المشهد ومتحطوش في لقطة تانية - اختار بس اللي موجود في "
-                            "اللقطة دي (سيبها من غير اختيار لو اللقطة من غير حوار)."
-                        ))
-                        esh_selected_dialogue = multiselect(
-                            t("سطور الحوار المتاحة من حوار المشهد"), esh_edit_available_lines,
-                            default=[l for l in esh_current_dialogue_lines if l in esh_edit_available_lines],
+                    current_dialogue_by_look_id = {r["look_id"]: bool(r["has_dialogue"]) for r in current_looks}
+                    current_look_ids = set(current_dialogue_by_look_id.keys())
+                    current_labels = [label for label, lid in look_map.items() if lid in current_look_ids]
+                    current_prop_ids = {
+                        r["prop_id"] for r in fetch_all("SELECT prop_id FROM shot_props WHERE shot_id=?", (sh["id"],))
+                    }
+                    current_prop_labels = [name for name, pid in prop_map.items() if pid in current_prop_ids]
+
+                    with st.form(f"edit_shot_{sh['id']}"):
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            esh_number = st.number_input(t("رقم اللقطة"), min_value=1, step=1, value=sh["shot_number"])
+                            esh_size = st.selectbox(t("حجم الكادر"), SHOT_SIZE_OPTIONS,
+                                                     index=safe_index(SHOT_SIZE_OPTIONS, sh["shot_size"]), format_func=t)
+                        with col2:
+                            esh_movement = st.selectbox(t("حركة الكاميرا"), CAMERA_MOVEMENT_OPTIONS,
+                                                         index=safe_index(CAMERA_MOVEMENT_OPTIONS, sh["camera_movement"]), format_func=t)
+                            esh_angle = st.selectbox(t("زاوية الكاميرا"), CAMERA_ANGLE_OPTIONS,
+                                                      index=safe_index(CAMERA_ANGLE_OPTIONS, sh["camera_angle"]), format_func=t)
+                        with col3:
+                            esh_duration = st.number_input(
+                                t("المدة (ثانية)"), min_value=1.0, max_value=30.0,
+                                value=float(sh["duration_seconds"] or 5.0), step=0.5,
+                            )
+                            esh_emotion = st.slider(t("قوة المشاعر"), 1, 5, value=sh["emotion_intensity"] or 3)
+
+                        ecol4, ecol5 = st.columns(2)
+                        with ecol4:
+                            esh_day_night = st.selectbox(
+                                t("النهار/الليل"), DAY_NIGHT_OPTIONS,
+                                index=safe_index(DAY_NIGHT_OPTIONS, sh["day_night"]),
+                                format_func=fmt_day_night,
+                            )
+                        with ecol5:
+                            esh_weather = st.text_input(
+                                t("حالة الطقس"), value=sh["weather"] or "",
+                                placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"),
+                            )
+
+                        esh_action = st.text_area(
+                            t("وصف الحركة داخل اللقطة"), value=sh["action_description"] or "", height=100,
+                            placeholder=t("مثال: أحمد بيدخل الأوضة وبيقفل الباب وراه، سارة واقفة جنب الشباك بتبص برة"),
                         )
-                        esh_dialogue = "\n".join(esh_selected_dialogue)
-                        with st.expander(t("أو اكتب/عدّل الحوار يدويًا بدل الاختيار")):
-                            esh_dialogue_manual = st.text_area(
-                                t("الحوار (لو موجود)"), value="", height=100,
+                        esh_emotion_label = st.text_input(
+                            t("وصف المشاعر"), value=sh["emotion_label"] or "", placeholder=t("مثال: أحمد حزين، سارة غير مهتمة"),
+                        )
+                        esh_edit_available_lines = unused_dialogue_lines(
+                            current_scene_row["notes"], scene_id, fetch_all, exclude_shot_id=sh["id"]
+                        )
+                        if esh_edit_available_lines:
+                            esh_current_dialogue_lines = [
+                                l.strip() for l in (sh["dialogue_text"] or "").split("\n") if l.strip()
+                            ]
+                            st.caption(t(
+                                "دول سطور الحوار اللي لسه في حوار المشهد ومتحطوش في لقطة تانية - اختار بس اللي موجود في "
+                                "اللقطة دي (سيبها من غير اختيار لو اللقطة من غير حوار)."
+                            ))
+                            esh_selected_dialogue = multiselect(
+                                t("سطور الحوار المتاحة من حوار المشهد"), esh_edit_available_lines,
+                                default=[l for l in esh_current_dialogue_lines if l in esh_edit_available_lines],
+                            )
+                            esh_dialogue = "\n".join(esh_selected_dialogue)
+                            with st.expander(t("أو اكتب/عدّل الحوار يدويًا بدل الاختيار")):
+                                esh_dialogue_manual = st.text_area(
+                                    t("الحوار (لو موجود)"), value="", height=100,
+                                    placeholder=t("مثال: أحمد (حزين): إزيك يا سارة؟\nسارة (غير مبالية): تمام والحمد لله."),
+                                )
+                                if esh_dialogue_manual.strip():
+                                    esh_dialogue = esh_dialogue_manual
+                        else:
+                            esh_dialogue = st.text_area(
+                                t("الحوار (لو موجود)"), value=sh["dialogue_text"] or "", height=150,
                                 placeholder=t("مثال: أحمد (حزين): إزيك يا سارة؟\nسارة (غير مبالية): تمام والحمد لله."),
                             )
-                            if esh_dialogue_manual.strip():
-                                esh_dialogue = esh_dialogue_manual
-                    else:
-                        esh_dialogue = st.text_area(
-                            t("الحوار (لو موجود)"), value=sh["dialogue_text"] or "", height=150,
-                            placeholder=t("مثال: أحمد (حزين): إزيك يا سارة؟\nسارة (غير مبالية): تمام والحمد لله."),
+                        esh_style = st.text_area(
+                            t("ملاحظات النمط البصري / المرجع"), value=sh["visual_style_notes"] or "", height=120,
+                            placeholder=t("مثال: إضاءة دافية، ألوان بيج وبني، حركة كاميرا هادئة"),
                         )
-                    esh_style = st.text_area(
-                        t("ملاحظات النمط البصري / المرجع"), value=sh["visual_style_notes"] or "", height=120,
-                        placeholder=t("مثال: إضاءة دافية، ألوان بيج وبني، حركة كاميرا هادئة"),
-                    )
-                    esh_music = st.checkbox(t("تضمين موسيقى في التوليد نفسه؟ (غير مستحسن)"), value=bool(sh["include_music"]))
+                        esh_music = st.checkbox(t("تضمين موسيقى في التوليد نفسه؟ (غير مستحسن)"), value=bool(sh["include_music"]))
 
-                    st.markdown(f"**{t('الشخصيات الموجودة في اللقطة')}**")
-                    esh_selected_looks = multiselect(
-                        t("اختر مظهر كل شخصية ظاهرة"), list(look_map.keys()), default=current_labels
-                    )
-                    esh_dialogue_flags = {}
-                    if esh_selected_looks:
-                        st.caption(t("لكل شخصية، حدد لو ليها حوار في اللقطة دي (سيبها فاضية لو الشخصية موجودة بس ساكتة)"))
-                        for _label in esh_selected_looks:
-                            _default = current_dialogue_by_look_id.get(look_map[_label], True)
-                            esh_dialogue_flags[_label] = st.checkbox(
-                                f"{_label} — {t('لها حوار في اللقطة دي؟')}", value=_default,
-                                key=f"edit_shot_dialogue_{sh['id']}_{_label}",
+                        st.markdown(f"**{t('الشخصيات الموجودة في اللقطة')}**")
+                        esh_selected_looks = multiselect(
+                            t("اختر مظهر كل شخصية ظاهرة"), list(look_map.keys()), default=current_labels
+                        )
+                        esh_dialogue_flags = {}
+                        if esh_selected_looks:
+                            st.caption(t("لكل شخصية، حدد لو ليها حوار في اللقطة دي (سيبها فاضية لو الشخصية موجودة بس ساكتة)"))
+                            for _label in esh_selected_looks:
+                                _default = current_dialogue_by_look_id.get(look_map[_label], True)
+                                esh_dialogue_flags[_label] = st.checkbox(
+                                    f"{_label} — {t('لها حوار في اللقطة دي؟')}", value=_default,
+                                    key=f"edit_shot_dialogue_{sh['id']}_{_label}",
+                                )
+
+                        st.markdown(f"**{t('الإكسسوارات الموجودة في اللقطة')}**")
+                        esh_selected_props = multiselect(
+                            t("اختر الإكسسوارات الظاهرة في اللقطة"), list(prop_map.keys()), default=current_prop_labels
+                        )
+
+                        esh_confirmed = st.checkbox(t("🔵 تمت المراجعة والموافقة على كل بيانات اللقطة"), value=bool(sh["confirmed"]))
+
+                        if sh["storyboard_image_path"]:
+                            existing_storyboard = image_abs_path(sh["storyboard_image_path"])
+                            if existing_storyboard:
+                                st.image(existing_storyboard, width=260)
+                        esh_storyboard = st.file_uploader(
+                            t("تغيير صورة الستوري بورد المرجعية"), type=IMAGE_TYPES, key=f"shot_storyboard_{sh['id']}"
+                        )
+
+                        hsave_col, hdel_col = st.columns(2)
+                        with hsave_col:
+                            save_sh = st.form_submit_button(t("💾 حفظ التعديل"))
+                        with hdel_col:
+                            del_sh = st.form_submit_button(t("🗑️ حذف اللقطة"))
+
+                    if save_sh:
+                        if esh_number != sh["shot_number"]:
+                            colliding_shot = fetch_all(
+                                "SELECT id FROM shots WHERE scene_id=? AND shot_number=? AND id != ?",
+                                (sh["scene_id"], esh_number, sh["id"]),
                             )
-
-                    st.markdown(f"**{t('الإكسسوارات الموجودة في اللقطة')}**")
-                    esh_selected_props = multiselect(
-                        t("اختر الإكسسوارات الظاهرة في اللقطة"), list(prop_map.keys()), default=current_prop_labels
-                    )
-
-                    esh_confirmed = st.checkbox(t("🔵 تمت المراجعة والموافقة على كل بيانات اللقطة"), value=bool(sh["confirmed"]))
-
-                    if sh["storyboard_image_path"]:
-                        existing_storyboard = image_abs_path(sh["storyboard_image_path"])
-                        if existing_storyboard:
-                            st.image(existing_storyboard, width=260)
-                    esh_storyboard = st.file_uploader(
-                        t("تغيير صورة الستوري بورد المرجعية"), type=IMAGE_TYPES, key=f"shot_storyboard_{sh['id']}"
-                    )
-
-                    hsave_col, hdel_col = st.columns(2)
-                    with hsave_col:
-                        save_sh = st.form_submit_button(t("💾 حفظ التعديل"))
-                    with hdel_col:
-                        del_sh = st.form_submit_button(t("🗑️ حذف اللقطة"))
-
-                if save_sh:
-                    if esh_number != sh["shot_number"]:
-                        colliding_shot = fetch_all(
-                            "SELECT id FROM shots WHERE scene_id=? AND shot_number=? AND id != ?",
-                            (sh["scene_id"], esh_number, sh["id"]),
+                            if colliding_shot:
+                                shift_shot_numbers(sh["scene_id"], esh_number, exclude_shot_id=sh["id"])
+                                st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
+                        new_storyboard_path = sh["storyboard_image_path"]
+                        if esh_storyboard is not None:
+                            new_storyboard_path = save_uploaded_image(esh_storyboard, f"shots/{sh['id']}")
+                        run_query(
+                            """UPDATE shots SET shot_number=?, shot_size=?, camera_movement=?, camera_angle=?,
+                            duration_seconds=?, day_night=?, weather=?, action_description=?,
+                            emotion_intensity=?, emotion_label=?, dialogue_text=?,
+                            visual_style_notes=?, include_music=?, confirmed=?, storyboard_image_path=? WHERE id=?""",
+                            (esh_number, esh_size, esh_movement, esh_angle, esh_duration,
+                             esh_day_night, esh_weather, esh_action, esh_emotion,
+                             esh_emotion_label, esh_dialogue, esh_style, int(esh_music), int(esh_confirmed),
+                             new_storyboard_path, sh["id"]),
                         )
-                        if colliding_shot:
-                            shift_shot_numbers(sh["scene_id"], esh_number, exclude_shot_id=sh["id"])
-                            st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
-                    new_storyboard_path = sh["storyboard_image_path"]
-                    if esh_storyboard is not None:
-                        new_storyboard_path = save_uploaded_image(esh_storyboard, f"shots/{sh['id']}")
-                    run_query(
-                        """UPDATE shots SET shot_number=?, shot_size=?, camera_movement=?, camera_angle=?,
-                        duration_seconds=?, day_night=?, weather=?, action_description=?,
-                        emotion_intensity=?, emotion_label=?, dialogue_text=?,
-                        visual_style_notes=?, include_music=?, confirmed=?, storyboard_image_path=? WHERE id=?""",
-                        (esh_number, esh_size, esh_movement, esh_angle, esh_duration,
-                         esh_day_night, esh_weather, esh_action, esh_emotion,
-                         esh_emotion_label, esh_dialogue, esh_style, int(esh_music), int(esh_confirmed),
-                         new_storyboard_path, sh["id"]),
-                    )
-                    run_query("DELETE FROM shot_characters WHERE shot_id=?", (sh["id"],))
-                    for label in esh_selected_looks:
-                        run_query("INSERT INTO shot_characters (shot_id, look_id, has_dialogue) VALUES (?,?,?)",
-                                   (sh["id"], look_map[label], int(esh_dialogue_flags.get(label, True))))
-                    run_query("DELETE FROM shot_props WHERE shot_id=?", (sh["id"],))
-                    for prop_label in esh_selected_props:
-                        run_query("INSERT INTO shot_props (shot_id, prop_id) VALUES (?,?)",
-                                   (sh["id"], prop_map[prop_label]))
-                    bump_version(project_id)
-                    mark_saved(f"shot_{sh['id']}")
-                    st.rerun()
-                if del_sh:
-                    run_query("DELETE FROM shots WHERE id=?", (sh["id"],))
-                    bump_version(project_id)
-                    delete_image_file(sh["storyboard_image_path"])
-                    st.success(t("تم حذف اللقطة"))
-                    st.rerun()
-                show_saved_badge(f"shot_{sh['id']}")
+                        run_query("DELETE FROM shot_characters WHERE shot_id=?", (sh["id"],))
+                        for label in esh_selected_looks:
+                            run_query("INSERT INTO shot_characters (shot_id, look_id, has_dialogue) VALUES (?,?,?)",
+                                       (sh["id"], look_map[label], int(esh_dialogue_flags.get(label, True))))
+                        run_query("DELETE FROM shot_props WHERE shot_id=?", (sh["id"],))
+                        for prop_label in esh_selected_props:
+                            run_query("INSERT INTO shot_props (shot_id, prop_id) VALUES (?,?)",
+                                       (sh["id"], prop_map[prop_label]))
+                        bump_version(project_id)
+                        mark_saved(f"shot_{sh['id']}")
+                        st.rerun()
+                    if del_sh:
+                        run_query("DELETE FROM shots WHERE id=?", (sh["id"],))
+                        bump_version(project_id)
+                        delete_image_file(sh["storyboard_image_path"])
+                        st.success(t("تم حذف اللقطة"))
+                        st.rerun()
+                    show_saved_badge(f"shot_{sh['id']}")
 
 # ---------------- تبويب لوحة المتابعة ----------------
 with tab_dashboard:
     st.subheader(tr("sub_dashboard"))
 
+    # «إيه اللي ناقص» قبل أزرار التصدير. العنوان بيوعد بنظرة عامة، والتبويب
+    # كان أزرار تحميل بس — فمدير الإنتاج مكانش عنده مكان يشوف فيه إيه اللي
+    # لسه مش جاهز قبل ما يطبع الكشوفات.
+    if _scene_count > 0:
+        _gaps = [
+            (t("مشاهد من غير لقطات"), fetch_all(
+                "SELECT s.* FROM scenes s WHERE s.project_id=? AND NOT EXISTS "
+                "(SELECT 1 FROM shots sh WHERE sh.scene_id=s.id) ORDER BY s.scene_number", (project_id,)),
+             lambda r: f"{t('مشهد')} {ltr(scene_label(r))}"),
+            (t("مشاهد من غير شخصيات"), fetch_all(
+                "SELECT s.* FROM scenes s WHERE s.project_id=? AND NOT EXISTS "
+                "(SELECT 1 FROM scene_characters x WHERE x.scene_id=s.id) ORDER BY s.scene_number", (project_id,)),
+             lambda r: f"{t('مشهد')} {ltr(scene_label(r))}"),
+            (t("أماكن من غير صورة مرجعية"), fetch_all(
+                "SELECT name FROM locations WHERE project_id=? AND COALESCE(reference_image_path,'')='' "
+                "ORDER BY name", (project_id,)),
+             lambda r: r["name"]),
+            (t("شخصيات من غير صورة مرجعية"), fetch_all(
+                "SELECT name FROM characters WHERE project_id=? AND COALESCE(reference_image_path,'')='' "
+                "ORDER BY name", (project_id,)),
+             lambda r: r["name"]),
+            (t("لقطات لسه متراجعتش"), fetch_all(
+                "SELECT s.scene_number, s.scene_suffix, sh.shot_number FROM shots sh "
+                "JOIN scenes s ON s.id=sh.scene_id WHERE s.project_id=? AND COALESCE(sh.confirmed,0)=0 "
+                "ORDER BY s.scene_number, sh.shot_number", (project_id,)),
+             lambda r: f"{t('مشهد')} {ltr(scene_label(r))} / {t('لقطة')} {ltr(r['shot_number'])}"),
+        ]
+        st.markdown(f"#### {t('إيه اللي لسه ناقص')}")
+        _open = [(label, rows, fmt) for label, rows, fmt in _gaps if rows]
+        if not _open:
+            st.success(t("مفيش حاجة ناقصة — كل المشاهد ليها لقطات وشخصيات، وكل حاجة ليها صورة ومتراجعة."))
+        for label, rows, fmt in _open:
+            with st.expander(f"{label} — {ltr(len(rows))}"):
+                _shown = rows[:60]
+                st.markdown(" · ".join(fmt(r) for r in _shown)
+                            + (f" … (+{ltr(len(rows) - len(_shown))})" if len(rows) > len(_shown) else ""))
+        st.divider()
+
     if _scene_count > 0:
         st.markdown(f"#### {t('📄 تصدير تفريغ اللقطات')}")
         st.caption(t("ملف تفريغ كامل قابل للطباعة، بفورمات سينمائي احترافي."))
 
-        # مهم جدًا: بناء ملفات التصدير (خصوصًا الـ PDF) عملية بطيئة، وتبويبات
-        # Streamlit كلها بتتنفذ في كل مرة الصفحة تتحدث (حتى التبويبات المقفولة
-        # وقت اللمحة)، فلو استدعينا build_shot_list_* من غير أي حماية، هيتكرر
-        # التصدير الكامل مع أي حركة في أي مكان في البرنامج - وده كان بيسبب
-        # التهنيج/التجمد اللي حصل. الحل: نخزن النتيجة في session_state ونعيد
-        # التصدير بس لو عدد المشاهد/اللقطات/المؤكدة اتغير فعلاً.
-        _export_cache_key = (project_id, _loc_count, _char_count, _scene_count, _shot_count, _confirmed_count)
-        if st.session_state.get("_export_cache_key") != _export_cache_key:
-            st.session_state["_export_excel_bytes"] = build_shot_list_excel(project, project_id, fetch_all)
-            st.session_state["_export_word_bytes"] = build_shot_list_word(project, project_id, fetch_all)
-            st.session_state["_export_pdf_bytes"] = build_shot_list_pdf(project, project_id, fetch_all)
-            st.session_state["_export_characters_bytes"] = build_characters_sheet_excel(project, project_id, fetch_all)
-            st.session_state["_export_general_breakdown_bytes"] = build_general_breakdown_excel(project, project_id, fetch_all)
-            st.session_state["_export_locations_bytes"] = build_locations_sheet_excel(project, project_id, fetch_all)
-            st.session_state["_export_props_bytes"] = build_props_sheet_excel(project, project_id, fetch_all)
-            st.session_state["_export_cache_key"] = _export_cache_key
+        # الملفات بتتبني لما حد يدوس تحميل، من آخر بيانات، في thread منفصل
+        # (download_button بياخد دالة). قبل كده كانت بتتبني مسبقًا وتتخزن بمفتاح
+        # من *أعداد* الصفوف بس — فتعديل محتوى (اسم شخصية، مكان مشهد، حوار) من
+        # غير ما العدد يتغير كان بيطلّع ملف قديم، وكان فيه زرار «تحديث الملفات»
+        # بيطلب من المستخدم يفتكر يدوس عليه. وكمان السبعة كانوا بيتبنوا مع أول
+        # rerun بعد أي تغيير عدد، حتى لو محدش فاتح التقارير.
+        def _lazy(build):
+            return lambda: build(project, project_id, fetch_all)
+
 
         exp_col1, exp_col2, exp_col3, exp_col4 = st.columns(4)
         with exp_col1:
             st.download_button(
                 tr("btn_export_excel"),
-                data=st.session_state["_export_excel_bytes"],
+                data=_lazy(build_shot_list_excel),
                 file_name=f"{project['name']}_تفريغ_اللقطات.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_excel_{project_id}",
@@ -2652,7 +2870,7 @@ with tab_dashboard:
         with exp_col2:
             st.download_button(
                 tr("btn_export_word"),
-                data=st.session_state["_export_word_bytes"],
+                data=_lazy(build_shot_list_word),
                 file_name=f"{project['name']}_تفريغ_اللقطات.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 key=f"dl_word_{project_id}",
@@ -2660,16 +2878,11 @@ with tab_dashboard:
         with exp_col3:
             st.download_button(
                 tr("btn_export_pdf"),
-                data=st.session_state["_export_pdf_bytes"],
+                data=_lazy(build_shot_list_pdf),
                 file_name=f"{project['name']}_تفريغ_اللقطات.pdf",
                 mime="application/pdf",
                 key=f"dl_pdf_{project_id}",
             )
-        with exp_col4:
-            if st.button(t("🔄 تحديث الملفات"), key=f"refresh_export_{project_id}",
-                         help=t("لو عدّلت محتوى لقطة موجودة (حوار، وصف...) من غير ما تضيف أو تمسح لقطات، دوس هنا عشان الملفات تتحدث بآخر بياناتك.")):
-                st.session_state["_export_cache_key"] = None
-                st.rerun()
 
         st.markdown(f"#### {t('📋 تقارير الإنتاج القياسية')}")
         st.caption(t(
@@ -2681,7 +2894,7 @@ with tab_dashboard:
         with rep_col1:
             st.download_button(
                 t("⬇️ كشف الشخصيات"),
-                data=st.session_state["_export_characters_bytes"],
+                data=_lazy(build_characters_sheet_excel),
                 file_name=f"{project['name']}_كشف_الشخصيات.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_characters_sheet_{project_id}",
@@ -2689,7 +2902,7 @@ with tab_dashboard:
         with rep_col2:
             st.download_button(
                 t("⬇️ التفريغ العام"),
-                data=st.session_state["_export_general_breakdown_bytes"],
+                data=_lazy(build_general_breakdown_excel),
                 file_name=f"{project['name']}_التفريغ_العام.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_general_breakdown_{project_id}",
@@ -2697,7 +2910,7 @@ with tab_dashboard:
         with rep_col3:
             st.download_button(
                 t("⬇️ كشف أماكن التصوير"),
-                data=st.session_state["_export_locations_bytes"],
+                data=_lazy(build_locations_sheet_excel),
                 file_name=f"{project['name']}_كشف_اماكن_التصوير.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_locations_sheet_{project_id}",
@@ -2705,7 +2918,7 @@ with tab_dashboard:
         with rep_col4:
             st.download_button(
                 t("⬇️ كشف الإكسسوار"),
-                data=st.session_state["_export_props_bytes"],
+                data=_lazy(build_props_sheet_excel),
                 file_name=f"{project['name']}_كشف_الإكسسوار.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_props_sheet_{project_id}",

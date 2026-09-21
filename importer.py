@@ -5,6 +5,11 @@
 """
 
 
+# اسم الحالة الافتراضية لأي مكان. على مستوى الموديول عشان app.py بيحتاجه يشيله
+# من العرض (مش كل مشهد يتكتب «... - الشكل الأساسي»).
+DEFAULT_VARIANT = 'الشكل الأساسي'
+
+
 def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
     summary = {
         'scenes_added': 0,
@@ -69,8 +74,6 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
     # سنين. داخلي/خارجي ونهار/ليل بتاعة المشهد مش المكان، ومتخزنة على المشهد
     # نفسه. كنا بنعمل حالة لكل تركيبة منهم («داخلي - نهار»، «داخلي - ليل»...)
     # فالمكان الواحد كان بيطلع بأربع حالات مالهاش أي معنى درامي.
-    DEFAULT_VARIANT = 'الشكل الأساسي'
-
     def get_or_create_variant(location_id, variant_hint=None):
         variant_name = variant_hint or DEFAULT_VARIANT
         key = (location_id, variant_name)
