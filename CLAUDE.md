@@ -1,8 +1,20 @@
 # CimaFast Studio
 
-Arabic-first (RTL) film/TV pre-production manager built on Streamlit. Users are
-Egyptian film crew, not developers: the UI language is Arabic, English is a
-secondary toggle.
+**A software product: an Arabic-first (RTL) ERP for film makers.** Production
+companies and crews use it to manage *their* film and series projects — script
+import and AI analysis, breakdown, shots, scheduling, official reports. We build
+the system; the projects in its database are users' data, to be used as evidence
+of how the product is used, never as a production for us to manage. Build for
+many companies, many projects, many users. The product roadmap is
+`PRODUCT-PLAN.md`.
+
+Users are film makers, not developers: the UI language is Arabic, English is a
+secondary toggle. Built on Streamlit today, with new screens (the shooting
+schedule, `board/`) on Starlette sharing the data layer in `repo.py`.
+
+**All fixes and updates are deployed to /v1** (https://cimafast.io/v1/, this
+checkout when it is `/srv/cimafast-v1`). Production changes only with the owner's
+explicit approval of that deploy.
 
 ## Stack
 
@@ -56,11 +68,20 @@ Repo: **https://github.com/onkpictures-osama/cimafast** (public — everything
 committed is world-readable). `gh` is authenticated on this box and the git
 credential helper is configured, so `git push` works without prompting.
 
-`/srv/cimafast` is both the git working tree and the directory systemd serves
-from. Editing a file here changes production on the next restart, whether or not
-you commit — committing is for history, not for making a change live. And
-`cimafast-update` runs `git pull --ff-only`, so it aborts on a tree with modified
-tracked files. Normal loop: edit → verify → commit → push → `cimafast-update`.
+Two checkouts of this repo serve two environments:
+
+| Checkout | Branch | Serves | Role |
+|---|---|---|---|
+| `/srv/cimafast-v1` | `preview` | https://cimafast.io/v1/ (+ `/v1/board/`), DB copy | **where all work is built and deployed** |
+| `/srv/cimafast` | `main` | https://cimafast.io, live data | production — changes only on owner approval |
+
+Streamlit re-reads `app.py` on every session, so a file edited in a served
+checkout is live at once. Never edit `/srv/cimafast`. Normal loop: edit in
+`/srv/cimafast-v1` → `systemctl restart cimafast-v1` (and `cimafast-board-v1` for
+`board/` or `repo.py`) → verify in a browser (`cimafast-smoke`, `pw-python`) →
+commit on `preview`. An owner-approved production deploy is `cimafast-update`
+only; see `.claude/agents/chief-engineer.md` for how to ship a single change
+without shipping everything on the preview.
 
 ## Tests
 

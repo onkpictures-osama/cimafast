@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B1220">
+  <title>الفريق — CimaFast Studio</title>
+  <link rel="stylesheet" href="../static/board.css">
+  <link rel="stylesheet" href="../static/team.css">
+</head>
+<body class="team">
+  <header class="bar">
+    <div class="bar__title">
+      <a class="back" href="../../" title="الرجوع لـ CimaFast Studio">‹ CimaFast</a>
+      <h1>الفريق</h1>
+    </div>
+    {% if companies %}
+    <label class="field">
+      <span>الشركة</span>
+      <select id="company">
+        {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <span class="user">{{ user }}</span>
+  </header>
+
+  <main class="team__main">
+    <!-- كلمة السر المؤقتة بتظهر هنا مرة واحدة بس -->
+    <section id="secret" class="card card--secret" hidden>
+      <h2>كلمة السر المؤقتة</h2>
+      <p>ابعتها للشخص ده بنفسك (مش في جروب). هتظهر المرة دي بس، وهيتطلب منه يغيّرها أول ما يدخل.</p>
+      <p class="secret__line"><span id="secret-user"></span> — <code id="secret-pw" dir="ltr"></code>
+        <button type="button" class="btn" id="secret-copy">نسخ</button>
+        <button type="button" class="btn" id="secret-close">تمام، بعتها</button></p>
+    </section>
+
+    {% if companies %}
+    <section class="card">
+      <div class="card__head">
+        <h2>أعضاء الشركة</h2>
+        {% if can_view_audit %}<a class="btn" href="../activity/">🧾 سجل النشاط</a>{% endif %}
+        <form id="rename" class="inline admin-only" hidden>
+          <input name="name" placeholder="اسم الشركة" aria-label="اسم الشركة" required>
+          <button class="btn">تغيير الاسم</button>
+        </form>
+      </div>
+      <table class="people">
+        <thead><tr><th>الاسم</th><th>المستخدم</th><th>المسمى</th><th>الدور</th><th>آخر دخول</th><th class="admin-only" hidden></th></tr></thead>
+        <tbody id="members"></tbody>
+      </table>
+      <p id="not-admin" class="muted" hidden>مدير الشركة بس هو اللي يضيف ناس أو يغيّر أدوارهم.</p>
+    </section>
+
+    <section class="card admin-only" hidden>
+      <h2>إضافة شخص للفريق</h2>
+      <form id="add" class="grid">
+        <label class="field"><span>اسم المستخدم (إنجليزي)</span><input name="username" dir="ltr" required pattern="[A-Za-z0-9._\-]+"></label>
+        <label class="field"><span>الاسم</span><input name="display_name"></label>
+        <label class="field"><span>المسمى الوظيفي</span><input name="job_title" placeholder="مدير تصوير، منتج منفذ…"></label>
+        <label class="field"><span>الإيميل</span><input name="email" type="email" dir="ltr"></label>
+        <label class="field"><span>الدور</span>
+          <select name="role">{% for r, label in roles %}<option value="{{ r }}" {% if r == 'department' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <button class="btn btn--primary">إضافة</button>
+      </form>
+    </section>
+    {% else %}
+    <section class="card"><p>حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك.</p></section>
+    {% endif %}
+
+    {% if is_operator %}
+    <section class="card">
+      <h2>شركة جديدة على المنصة</h2>
+      <p class="muted">للمشغّل بس. الشركة بتبدأ فاضية، وأول مستخدم فيها بيبقى مديرها.</p>
+      <form id="new-company" class="grid">
+        <label class="field"><span>اسم الشركة</span><input name="name" required></label>
+        <label class="field"><span>مستخدم المدير (إنجليزي)</span><input name="admin_username" dir="ltr" required pattern="[A-Za-z0-9._\-]+"></label>
+        <label class="field"><span>اسم المدير</span><input name="admin_display_name"></label>
+        <label class="field"><span>إيميل المدير</span><input name="admin_email" type="email" dir="ltr"></label>
+        <button class="btn btn--primary">إنشاء الشركة</button>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="card">
+      <h2>حسابي — تغيير كلمة السر</h2>
+      <form id="my-password" class="grid">
+        <label class="field"><span>كلمة السر الحالية</span><input name="old" type="password" autocomplete="current-password" required></label>
+        <label class="field"><span>كلمة السر الجديدة (١٠ حروف على الأقل)</span><input name="new" type="password" autocomplete="new-password" minlength="10" required></label>
+        <button class="btn">تغيير</button>
+      </form>
+    </section>
+  </main>
+
+  <template id="role-options">{% for r, label in roles %}<option value="{{ r }}">{{ label }}</option>{% endfor %}</template>
+  <script>window.ROLE_LABELS = {{ roles | tojson }};</script>
+  <script src="../static/team.js"></script>
+</body>
+</html>

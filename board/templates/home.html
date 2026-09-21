@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B1220">
+  <title>الرئيسية — CimaFast Studio</title>
+  <link rel="stylesheet" href="{{ static }}board.css">
+  <link rel="stylesheet" href="{{ static }}home.css">
+</head>
+<body class="home">
+  <header class="bar">
+    <div class="bar__title">
+      <h1>🎬 CimaFast</h1>
+      <span class="who">
+        <strong>{{ me.display_name or user }}</strong>
+        {% if me.job_title %}<span class="muted">· {{ me.job_title }}</span>{% endif %}
+        <span class="chip">{{ role_label }}</span>
+      </span>
+    </div>
+    <nav class="bar__nav" aria-label="روابط سريعة">
+      <a class="btn" href="{{ board }}team/">👥 {{ "إدارة الفريق" if can_manage_team else "الفريق وحسابي" }}</a>
+      {# رابط فيه شاشة، عشان /v1/ من غير رابط بيرجّع على الرئيسية #}
+      <a class="btn" href="{{ focus.open_href if focus else app ~ '?tab=import' }}">🎬 التطبيق</a>
+    </nav>
+  </header>
+
+  <main class="home__main">
+    <section class="search" role="search">
+      <label for="q" class="sr-only">ابحث في مشاريعك</label>
+      <input id="q" type="search" placeholder="🔍 ابحث في كل مشاريعك: شخصية، مكان، إكسسوار، رقم مشهد…" autocomplete="off">
+      <ul id="results" class="results" hidden></ul>
+    </section>
+
+    {% if continue %}
+    <a class="continue" href="{{ continue.href }}">
+      <span class="continue__label">كمّل من مكان ما وقفت</span>
+      <strong>{{ continue.project }}</strong>
+      <span class="continue__go">افتح ←</span>
+    </a>
+    {% endif %}
+
+    <div class="home__cols">
+      <section class="panel" aria-labelledby="h-needs">
+        <h2 id="h-needs">محتاجك</h2>
+        {% if needs %}
+        <ul class="needs">
+          {% for n in needs %}
+          <li><a href="{{ n.href }}"><span class="needs__n">{{ n.count }}</span>
+            <span class="needs__t">{{ n.text }}</span>
+            <span class="needs__p">{{ n.project }}</span></a></li>
+          {% endfor %}
+        </ul>
+        {% elif cards %}
+        <p class="muted">مفيش حاجة مستنياك دلوقتي في مشاريعك. 👌</p>
+        {% else %}
+        <p class="muted">لما يبقى عندك مشاريع، اللي محتاج شغلك هيظهر هنا.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel" aria-labelledby="h-projects">
+        <div class="panel__head">
+          <h2 id="h-projects">مشاريعي <span class="muted">({{ cards|length }})</span></h2>
+          {% if creatable %}<button class="btn btn--primary" id="new-toggle" aria-expanded="false">＋ مشروع جديد</button>{% endif %}
+        </div>
+        {% if creatable %}
+        <form id="new-project" class="new" hidden>
+          <label class="field"><span>اسم المشروع</span><input name="name" required placeholder="مثال: عروسة البحر"></label>
+          <label class="field"><span>النوع</span>
+            <select name="project_type"><option>فيلم</option><option>مسلسل</option><option>إعلان</option><option>فيديو قصير</option></select></label>
+          {% if creatable|length > 1 %}
+          <label class="field"><span>الشركة</span>
+            <select name="company_id">{% for c in creatable %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+          {% else %}<input type="hidden" name="company_id" value="{{ creatable[0].id }}">{% endif %}
+          <button class="btn btn--primary">إنشاء وابدأ بالسيناريو</button>
+          <p id="new-status" class="status" role="status"></p>
+        </form>
+        {% endif %}
+        {% if cards %}
+        <div class="cards">
+          {% for c in cards %}
+          <article class="card">
+            <header>
+              <h3><a href="{{ c.open_href }}">{{ c.name }}</a></h3>
+              <span class="muted">{{ c.type }}{% if companies|length > 1 %} · {{ c.company }}{% endif %}</span>
+            </header>
+            <div class="prog" role="img" aria-label="المرحلة {{ c.progress.step }} من {{ c.progress.of }}: {{ c.progress.label }}">
+              {% for d in c.progress.done %}<span class="prog__seg prog__seg--{{ 'done' if d else ('current' if loop.index0 == c.progress.current else 'todo') }}"></span>{% endfor %}
+            </div>
+            <p class="card__stage">المرحلة {{ c.progress.step }} من {{ c.progress.of }} · {{ c.progress.label }}</p>
+            <p class="card__stats">{{ c.overview.scenes }} مشهد · {{ c.overview.locations }} مكان · {{ c.overview.characters }} شخصية · {{ c.overview.shots }} لقطة</p>
+            <a class="card__next" href="{{ c.next_href }}">الخطوة الجاية: {{ c.next_text }} ←</a>
+            <footer>
+              <a class="btn" href="{{ c.open_href }}">افتح</a>
+              <a class="btn" href="{{ c.board_href }}">🗓️ الجدول</a>
+              <a class="btn" href="{{ c.reports_href }}">📊 التقارير</a>
+            </footer>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">{% if creatable %}ابدأ بمشروع جديد — الزرار فوق.{% else %}مفيش مشاريع في شركتك لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع.{% endif %}</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="h-tools">
+      <h2 id="h-tools">الأدوات {% if focus %}<span class="muted">— لمشروع «{{ focus.name }}»</span>{% endif %}</h2>
+      <div class="tools">
+        {% for group, items in tools %}
+        <div class="tools__group">
+          <h3>{{ group }}</h3>
+          {% for tool in items %}
+          {% if tool.href %}<a class="tool" href="{{ tool.href }}">{% else %}<span class="tool tool--off" aria-disabled="true">{% endif %}
+            <span class="tool__icon" aria-hidden="true">{{ tool.icon }}</span>
+            <span><strong>{{ tool.title }}</strong><small>{{ tool.desc }}</small></span>
+          {% if tool.href %}</a>{% else %}</span>{% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+  <script src="{{ static }}home.js"></script>
+</body>
+</html>

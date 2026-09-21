@@ -13,6 +13,9 @@ import os
 import re
 import sqlite3
 
+import audit
+import permissions
+
 DB_PATH = os.environ.get("STUDIO_DB_PATH") or os.path.join(
     os.path.dirname(__file__), "studio.db"
 )
@@ -48,6 +51,7 @@ else:
 _ON_CONFLICT_TARGETS = {
     "scene_characters": "(scene_id, character_id)",
     "scene_props": "(scene_id, prop_id)",
+    "memberships": "(company_id, user_id)",
 }
 _INSERT_IGNORE_RE = re.compile(r"INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)", re.IGNORECASE)
 
@@ -72,8 +76,14 @@ def _adapt_query(query):
 def get_connection():
     if USE_POSTGRES:
         return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL: القراية مبتستناش الكتابة. في الوضع القديم (delete) أي حفظ من أي مستخدم
+    # كان بيقفل قاعدة البيانات كلها على الباقيين لحد ما يخلص. الإعداد ده بيتخزن
+    # في الملف نفسه، فالنداء بعد أول مرة مبيعملش حاجة.
+    # ‎busy_timeout‎: لو في كتابة تانية شغالة، استنى بدل ما ترمي "database is locked".
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 10000")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -96,6 +106,7 @@ def run_query(query, params=()):
     """بينفذ INSERT/UPDATE/DELETE، وبيرجع الـ id بتاع الصف اللي اتضاف لو
     كان السؤال INSERT (زي lastrowid بتاعة SQLite، بس بطريقة تشتغل مع
     Postgres برضو عن طريق RETURNING id)."""
+    permissions.require("edit")          # F2: المشاهد بس مايكتبش، من أي شاشة
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -103,6 +114,9 @@ def run_query(query, params=()):
         is_insert = q.strip().upper().startswith("INSERT")
         if USE_POSTGRES and is_insert and "RETURNING" not in q.upper():
             q = q.rstrip().rstrip(";") + " RETURNING id"
+        # F3: السجل بيتقري الحالة القديمة قبل التنفيذ وبيتكتب بعده على نفس
+        # الاتصال — يعني جوه نفس الـ transaction بتاعت التغيير.
+        _watch = audit.watch(cur, query, params)
         cur.execute(q, params)
         last_id = None
         if USE_POSTGRES:
@@ -112,6 +126,7 @@ def run_query(query, params=()):
                     last_id = row["id"] if isinstance(row, dict) else row[0]
         else:
             last_id = cur.lastrowid
+        audit.record(cur, _watch, last_id)
         conn.commit()
         return last_id
     finally:
@@ -152,7 +167,8 @@ def init_db():
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
             base_description TEXT,
-            parent_location_id INTEGER REFERENCES locations(id)
+            parent_location_id INTEGER REFERENCES locations(id),
+            maps_url TEXT
         );
 
         CREATE TABLE IF NOT EXISTS location_variants (
@@ -291,6 +307,97 @@ def init_db():
             prop_id INTEGER NOT NULL REFERENCES props(id) ON DELETE CASCADE,
             UNIQUE(scene_id, prop_id)
         );
+
+        -- جدول التصوير (الـ stripboard): أيام تصوير، وكل مشهد في يوم واحد بالكتير.
+        CREATE TABLE IF NOT EXISTS shooting_days (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            day_number INTEGER NOT NULL,
+            shoot_date TEXT,
+            notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS shooting_day_scenes (
+            id SERIAL PRIMARY KEY,
+            day_id INTEGER NOT NULL REFERENCES shooting_days(id) ON DELETE CASCADE,
+            scene_id INTEGER NOT NULL UNIQUE REFERENCES scenes(id) ON DELETE CASCADE,
+            position INTEGER NOT NULL DEFAULT 0
+        );
+
+        -- F1: الشركات والمستخدمين وعضوية كل مستخدم في كل شركة. CimaFast نظام ERP
+        -- بتستخدمه شركات إنتاج كتير؛ كل مشروع تبع شركة، وكل مستخدم بيشوف مشاريع
+        -- الشركات اللي هو عضو فيها بس.
+        CREATE TABLE IF NOT EXISTS companies (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name TEXT,
+            email TEXT,
+            job_title TEXT,
+            is_operator INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            must_change_password INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS memberships (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role TEXT NOT NULL DEFAULT 'department',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            UNIQUE(company_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS user_profile (
+            username TEXT PRIMARY KEY,
+            last_project_id INTEGER,
+            last_tab TEXT,
+            updated_at TEXT
+        );
+
+        -- F3: سجل التدقيق وأحداث الاستخدام (audit.py). من غير مفاتيح خارجية عن
+        -- قصد: السجل لازم يفضل موجود حتى لو المشروع أو الشركة اتمسحوا — ده
+        -- بالظبط الوقت اللي بيتسأل فيه "مين مسح ده".
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id SERIAL PRIMARY KEY,
+            at TEXT NOT NULL,
+            username TEXT,
+            company_id INTEGER,
+            project_id INTEGER,
+            entity TEXT NOT NULL,
+            entity_id INTEGER,
+            action TEXT NOT NULL,
+            summary TEXT,
+            changes TEXT,
+            source TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_company_at ON audit_log (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log (entity, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_username ON audit_log (username, at DESC);
+
+        CREATE TABLE IF NOT EXISTS usage_events (
+            id SERIAL PRIMARY KEY,
+            at TEXT NOT NULL,
+            username TEXT,
+            company_id INTEGER,
+            project_id INTEGER,
+            event TEXT NOT NULL,
+            target TEXT,
+            detail TEXT,
+            source TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_company_at ON usage_events (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_usage_event_at ON usage_events (event, at DESC);
         """)
     else:
         c.executescript("""
@@ -311,6 +418,7 @@ def init_db():
             name TEXT NOT NULL,
             base_description TEXT,
             parent_location_id INTEGER,
+            maps_url TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
             FOREIGN KEY (parent_location_id) REFERENCES locations(id)
         );
@@ -473,6 +581,104 @@ def init_db():
             FOREIGN KEY (prop_id) REFERENCES props(id) ON DELETE CASCADE,
             UNIQUE(scene_id, prop_id)
         );
+
+        -- جدول التصوير (الـ stripboard): أيام تصوير، وكل مشهد في يوم واحد بالكتير.
+        CREATE TABLE IF NOT EXISTS shooting_days (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            day_number INTEGER NOT NULL,
+            shoot_date TEXT,
+            notes TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS shooting_day_scenes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            day_id INTEGER NOT NULL,
+            scene_id INTEGER NOT NULL UNIQUE,
+            position INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (day_id) REFERENCES shooting_days(id) ON DELETE CASCADE,
+            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+        );
+
+        -- F1: الشركات والمستخدمين وعضوية كل مستخدم في كل شركة. CimaFast نظام ERP
+        -- بتستخدمه شركات إنتاج كتير؛ كل مشروع تبع شركة، وكل مستخدم بيشوف مشاريع
+        -- الشركات اللي هو عضو فيها بس.
+        CREATE TABLE IF NOT EXISTS companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            display_name TEXT,
+            email TEXT,
+            job_title TEXT,
+            is_operator INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            must_change_password INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS memberships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL DEFAULT 'department',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(company_id, user_id)
+        );
+
+        -- الصفحة الرئيسية: "كمّل من مكان ما وقفت" (آخر مشروع وتبويب لكل مستخدم)
+        CREATE TABLE IF NOT EXISTS user_profile (
+            username TEXT PRIMARY KEY,
+            last_project_id INTEGER,
+            last_tab TEXT,
+            updated_at TEXT
+        );
+
+        -- F3: سجل التدقيق وأحداث الاستخدام (audit.py). من غير مفاتيح خارجية عن
+        -- قصد: السجل لازم يفضل موجود حتى لو المشروع أو الشركة اتمسحوا — ده
+        -- بالظبط الوقت اللي بيتسأل فيه "مين مسح ده".
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at TEXT NOT NULL,                 -- ISO-8601 بتوقيت UTC
+            username TEXT,                    -- مين عمل الحركة (NULL = النظام نفسه)
+            company_id INTEGER,               -- العزل بين الشركات (F1)
+            project_id INTEGER,
+            entity TEXT NOT NULL,             -- اسم الجدول، أو auth / team
+            entity_id INTEGER,
+            action TEXT NOT NULL,             -- create / update / delete / login / role_change …
+            summary TEXT,                     -- سطر عربي جاهز للعرض
+            changes TEXT,                     -- JSON: القديم والجديد
+            source TEXT                       -- app / board / system
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_company_at ON audit_log (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log (entity, entity_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_username ON audit_log (username, at DESC);
+
+        -- تحليلات الاستخدام: أخف وأكتر عددًا، وبتتقري مجمّعة مش صف صف.
+        CREATE TABLE IF NOT EXISTS usage_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at TEXT NOT NULL,
+            username TEXT,
+            company_id INTEGER,
+            project_id INTEGER,
+            event TEXT NOT NULL,              -- login / screen / export / ai / search
+            target TEXT,                      -- التبويب أو نوع الملف أو اسم الشاشة
+            detail TEXT,                      -- JSON اختياري
+            source TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_usage_company_at ON usage_events (company_id, at DESC);
+        CREATE INDEX IF NOT EXISTS idx_usage_event_at ON usage_events (event, at DESC);
         """)
     conn.commit()
     _migrate_schema(conn)
@@ -483,6 +689,9 @@ def init_db():
 # قاعدة بيانات قديمة موجودة عند المستخدم من غير ما تأثر على بياناته
 _MIGRATIONS = {
     "projects": [
+        # F1: كل مشروع تبع شركة. المشاريع القديمة بتتربط بالشركة الافتراضية في
+        # accounts.migrate_accounts() أول ما البرنامج يشتغل.
+        ("company_id", "INTEGER"),
         ("owner_name", "TEXT"),
         ("owner_role", "TEXT"),
         ("data_version", "INTEGER DEFAULT 1"),
@@ -492,6 +701,9 @@ _MIGRATIONS = {
         # صورة للمكان نفسه، مستقلة عن صور حالاته: مرفوعة أو من الكاميرا أو
         # متولّدة بالذكاء الاصطناعي.
         ("reference_image_path", "TEXT"),
+        # لينك الموقع الجغرافي: Google Maps أو Waze أو أي خريطة تانية. نص حر
+        # عن قصد — اليوزر بيلزق اللينك اللي عنده، مش بنقيّده بخدمة واحدة.
+        ("maps_url", "TEXT"),
     ],
     # حرف المشهد المقسوم (35A / 35B). scene_number فضل رقم صحيح عن قصد:
     # فيه حسابات بتعتمد عليه (scene_number + 1 وقت الإدراج) وكانت هتتكسر لو
@@ -564,6 +776,15 @@ def _existing_columns(conn, table):
     return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
 
 
+# فهارس على أعمدة اتضافت بعدين — لازم تتعمل بعد _MIGRATIONS مش مع إنشاء الجداول،
+# لأن العمود نفسه لسه مش موجود في قاعدة قديمة وقت الإنشاء.
+_INDEXES = [
+    # كل قراءة مشاريع بتفلتر بالشركة (accounts.projects_for)، فده الفهرس اللي
+    # العزل بين الشركات بيقف عليه.
+    ("idx_projects_company", "projects (company_id)"),
+]
+
+
 def _migrate_schema(conn):
     for table, columns in _MIGRATIONS.items():
         existing = _existing_columns(conn, table)
@@ -574,6 +795,12 @@ def _migrate_schema(conn):
                     cur.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
                 else:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
+    for name, target in _INDEXES:
+        sql = f"CREATE INDEX IF NOT EXISTS {name} ON {target}"
+        if USE_POSTGRES:
+            conn.cursor().execute(sql)
+        else:
+            conn.execute(sql)
     conn.commit()
 
 

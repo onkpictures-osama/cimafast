@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0B1220">
+  <title>سجل النشاط — CimaFast Studio</title>
+  <link rel="stylesheet" href="../static/board.css">
+  <link rel="stylesheet" href="../static/team.css">
+  <link rel="stylesheet" href="../static/activity.css">
+</head>
+<body class="team">
+  <header class="bar">
+    <div class="bar__title">
+      <a class="back" href="../../" title="الرجوع لـ CimaFast Studio">‹ CimaFast</a>
+      <h1>سجل النشاط</h1>
+    </div>
+    {% if companies %}
+    <label class="field">
+      <span>الشركة</span>
+      <select id="company">
+        {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <span class="user">{{ user }}</span>
+  </header>
+
+  <main class="team__main">
+    {% if denied %}
+    <section class="card"><p>سجل النشاط لمدير الشركة بس. لو محتاج تشوفه، كلّم مدير الشركة بتاعتك.</p></section>
+    {% else %}
+
+    <!-- تبنّي المنتج: الناس بتستخدم إيه فعلًا -->
+    <section class="card">
+      <div class="card__head">
+        <h2>الاستخدام</h2>
+        <label class="field inline">
+          <span>آخر</span>
+          <select id="days">
+            <option value="7">٧ أيام</option>
+            <option value="30" selected>٣٠ يوم</option>
+            <option value="90">٩٠ يوم</option>
+          </select>
+        </label>
+      </div>
+      <p id="usage-head" class="muted">…</p>
+      <table class="people" id="usage-table">
+        <thead><tr><th>الحدث</th><th>التفصيل</th><th>مرات</th><th>ناس</th></tr></thead>
+        <tbody id="usage"></tbody>
+      </table>
+    </section>
+
+    <!-- المساءلة: مين غيّر إيه -->
+    <section class="card">
+      <div class="card__head">
+        <h2>التغييرات</h2>
+        <form id="filters" class="inline filters">
+          <label class="field"><span>المستخدم</span><select name="user"><option value="">الكل</option></select></label>
+          <label class="field"><span>النوع</span><select name="entity"><option value="">الكل</option></select></label>
+          <label class="field"><span>الحركة</span><select name="action"><option value="">الكل</option></select></label>
+          <label class="field"><span>بحث</span><input name="q" placeholder="اسم مشهد، مكان…"></label>
+          <button class="btn">تصفية</button>
+        </form>
+      </div>
+      <table class="people">
+        <thead><tr><th>إمتى</th><th>مين</th><th>إيه</th><th>المشروع</th><th>التفاصيل</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p id="empty" class="muted" hidden>مفيش نشاط مسجّل بالفلاتر دي.</p>
+    </section>
+    {% endif %}
+  </main>
+
+  <script src="../static/activity.js"></script>
+</body>
+</html>
