@@ -13,6 +13,7 @@ from auth import (
 )
 from database import (
     scene_label,
+    next_free_number,
     init_db, FIELD_HELP,
     fetch_all, run_query, run_delete,
     CAMERA_MOVEMENT_OPTIONS, SHOT_SIZE_OPTIONS, CAMERA_ANGLE_OPTIONS,
@@ -41,7 +42,7 @@ st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide"
 # الشكل: النسخة الافتراضية classic، و‎?theme=glass‎ بيشغّل التصميم الجديد.
 # كل الـ CSS بقى في حزمة theme/ — مكان واحد بدل تلاتة.
 _theme_variant = theme.resolve_variant(st)
-theme.inject_base(st, _theme_variant)
+theme.inject_base(st, _theme_variant, lang=st.session_state.get("ui_lang", "ar"))
 
 
 def _render_locked_screen():
@@ -247,6 +248,8 @@ def tr(key):
 # قاموس ترجمة مباشر: النص العربي نفسه هو المفتاح، وقيمته الترجمة الإنجليزية.
 # بيغطي كل تسميات الحقول والأزرار والرسايل جوه كل الفورمات في البرنامج.
 TRANSLATIONS = {
+    "اختار واحد أو أكتر": "Choose one or more",
+    "الحلقات": "Episodes",
     # عام
     "غير محدد": "Not specified", "بدون تحديد": "None selected",
     "بدون - مكان رئيسي": "None - main location", "اختياري": "optional",
@@ -572,6 +575,17 @@ def t(text):
     return TRANSLATIONS.get(text, text)
 
 
+def multiselect(*args, **kwargs):
+    """st.multiselect بنص فاضي عربي.
+
+    Streamlit بيكتب "Choose options" بالإنجليزي جوه أي multiselect فاضي، وده
+    كان بيطلع في نص الواجهة العربي في 11 مكان. كل النداءات بتعدي من هنا بدل
+    ما كل واحد يفتكر يحط placeholder لوحده.
+    """
+    kwargs.setdefault("placeholder", t("اختار واحد أو أكتر"))
+    return st.multiselect(*args, **kwargs)
+
+
 def fmt_int_ext(value):
     """عرض ثنائي اللغة دايمًا لداخلي/خارجي (مصطلح سينمائي عالمي)، إلا لو
     القيمة 'غير محدد' فبتتبع لغة الواجهة العادية."""
@@ -831,7 +845,9 @@ if st.session_state.get("parsed_script_project_id") != project_id:
 
 # Episodes section (للمسلسلات)
 if project["project_type"] == "مسلسل":
-    with st.sidebar.expander("🎬 الحلقات | Episodes"):
+    # العنوان كان نص ثنائي ثابت (عربي + إنجليزي) مبيعديش على t() — وفي الواجهة
+    # الإنجليزي الكلمة العربية كانت بتترسم مكسّرة جوه سطر LTR.
+    with st.sidebar.expander(f"🎬 {t('الحلقات')}"):
         episodes = fetch_all("SELECT * FROM episodes WHERE project_id=? ORDER BY episode_number", (project_id,))
         
         st.subheader(t("إنشاء حلقة جديدة"))
@@ -1173,7 +1189,7 @@ def _render_analysis_dashboard(scenes):
 
     with tabs[0]:
         for sc in scenes:
-            st.subheader(f"{t('مشهد')} {scene_label(sc)}")
+            st.subheader(f"{t('مشهد')} {ltr(scene_label(sc))}")
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.caption(f"**{t('النوع')}**: {fmt_int_ext(sc.get('int_ext', 'غير محدد'))}")
@@ -1440,7 +1456,7 @@ with tab_import:
         kept_characters_by_scene = {}
         for idx, sc in enumerate(scenes):
             title = (
-                f"{t('مشهد')} {scene_label(sc)} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
+                f"{t('مشهد')} {ltr(scene_label(sc))} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
                 f"{fmt_day_night(sc['day_night'] or 'غير محدد')} — {sc['location_name'] or t('مكان غير محدد')}"
             )
             with st.expander(title):
@@ -1451,7 +1467,7 @@ with tab_import:
                 if exclude:
                     excluded_scene_indices.add(idx)
                 if sc["characters"]:
-                    kept_characters_by_scene[idx] = st.multiselect(
+                    kept_characters_by_scene[idx] = multiselect(
                         t("الشخصيات المكتشفة — شيل أي حاجة مش اسم شخصية فعلي (زي نوع الفيلم أو التاريخ أو المكان)"),
                         options=sc["characters"], default=sc["characters"], key=f"chars_{idx}",
                     )
@@ -2040,7 +2056,10 @@ with tab_scenes:
     with st.form(f"add_scene_{project_id}"):
         col1, col2, col3 = st.columns(3)
         with col1:
-            sc_number = st.number_input(t("رقم المشهد"), min_value=1, step=1)
+            sc_number = st.number_input(
+                t("رقم المشهد"), min_value=1, step=1,
+                value=next_free_number(r["scene_number"] for r in fetch_all(
+                    "SELECT scene_number FROM scenes WHERE project_id=?", (project_id,))))
             sc_int_ext = st.selectbox(t("داخلي/خارجي"), INT_EXT_OPTIONS, format_func=fmt_int_ext, key="scene_int_ext")
         with col2:
             sc_day_night = st.selectbox(t("التوقيت"), DAY_NIGHT_OPTIONS, format_func=fmt_day_night, key="scene_day_night")
@@ -2061,10 +2080,10 @@ with tab_scenes:
         sc_notes = st.text_area(t("ملاحظات المشهد العامة"), height=150)
         all_chars_for_scene = fetch_all("SELECT id, name FROM characters WHERE project_id=? ORDER BY id", (project_id,))
         char_map_for_scene = {c["name"]: c["id"] for c in all_chars_for_scene}
-        sc_characters = st.multiselect(t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()))
+        sc_characters = multiselect(t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()))
         all_props_for_scene = fetch_all("SELECT id, name FROM props WHERE project_id=? ORDER BY id", (project_id,))
         prop_map_for_scene = {p["name"]: p["id"] for p in all_props_for_scene}
-        sc_props = st.multiselect(t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()))
+        sc_props = multiselect(t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()))
         if st.form_submit_button(t("إضافة مشهد")):
             loc_id = loc_variant_map.get(sc_location)
             existing_scene_numbers_now = {
@@ -2099,7 +2118,7 @@ with tab_scenes:
     selected_scene_ids_for_bulk_delete = []
     for sc in scenes:
         title = (
-            f"{t('مشهد')} {scene_label(sc)} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
+            f"{t('مشهد')} {ltr(scene_label(sc))} — {ltr(fmt_int_ext(sc['int_ext'] or 'غير محدد'))} / "
             f"{fmt_day_night(sc['day_night'] or 'غير محدد')}"
         )
         cb_col, exp_col = st.columns([0.05, 0.95])
@@ -2141,7 +2160,7 @@ with tab_scenes:
                     )
                 }
                 esc_current_char_names = [n for n, cid in char_map_for_scene.items() if cid in esc_current_char_ids]
-                esc_characters = st.multiselect(
+                esc_characters = multiselect(
                     t("الشخصيات الموجودة في المشهد"), list(char_map_for_scene.keys()),
                     default=esc_current_char_names,
                 )
@@ -2151,7 +2170,7 @@ with tab_scenes:
                     )
                 }
                 esc_current_prop_names = [n for n, pid in prop_map_for_scene.items() if pid in esc_current_prop_ids]
-                esc_props = st.multiselect(
+                esc_props = multiselect(
                     t("الإكسسوارات الموجودة في المشهد"), list(prop_map_for_scene.keys()),
                     default=esc_current_prop_names,
                 )
@@ -2213,7 +2232,7 @@ with tab_breakdown:
     if not scenes:
         st.info(t("لازم تضيف مشهد واحد على الأقل من تبويب السكريبت أولًا"))
     else:
-        scene_map = {f"{t('مشهد')} {scene_label(s)}": s["id"] for s in scenes}
+        scene_map = {f"{t('مشهد')} {ltr(scene_label(s))}": s["id"] for s in scenes}
         sel_scene = st.selectbox(t("اختر المشهد"), list(scene_map.keys()))
         scene_id = scene_map[sel_scene]
         current_scene_row = fetch_all("SELECT notes, day_night FROM scenes WHERE id=?", (scene_id,))[0]
@@ -2222,7 +2241,10 @@ with tab_breakdown:
         with st.form(f"add_shot_{scene_id}"):
             col1, col2, col3 = st.columns(3)
             with col1:
-                sh_number = st.number_input(t("رقم اللقطة"), min_value=1, step=1)
+                sh_number = st.number_input(
+                    t("رقم اللقطة"), min_value=1, step=1,
+                    value=next_free_number(r["shot_number"] for r in fetch_all(
+                        "SELECT shot_number FROM shots WHERE scene_id=?", (scene_id,))))
                 sh_size = st.selectbox(t("حجم الكادر"), SHOT_SIZE_OPTIONS, format_func=t, help=FIELD_HELP["shot_size"])
             with col2:
                 sh_movement = st.selectbox(t("حركة الكاميرا"), CAMERA_MOVEMENT_OPTIONS, format_func=t, help=FIELD_HELP["camera_movement"])
@@ -2252,7 +2274,7 @@ with tab_breakdown:
                     "دول سطور الحوار اللي لسه في حوار المشهد ومتحطوش في لقطة تانية - اختار بس اللي موجود في "
                     "اللقطة دي (سيبها من غير اختيار لو اللقطة من غير حوار)."
                 ))
-                sh_selected_dialogue = st.multiselect(t("سطور الحوار المتاحة من حوار المشهد"), available_dialogue_lines)
+                sh_selected_dialogue = multiselect(t("سطور الحوار المتاحة من حوار المشهد"), available_dialogue_lines)
                 sh_dialogue = "\n".join(sh_selected_dialogue)
                 with st.expander(t("أو اكتب/عدّل الحوار يدويًا بدل الاختيار")):
                     sh_dialogue_manual = st.text_area(
@@ -2279,7 +2301,7 @@ with tab_breakdown:
                 WHERE ch.project_id = ?
             """, (project_id,))
             look_map = {r["label"]: r["id"] for r in all_looks}
-            selected_looks = st.multiselect(t("اختر مظهر كل شخصية ظاهرة"), list(look_map.keys()))
+            selected_looks = multiselect(t("اختر مظهر كل شخصية ظاهرة"), list(look_map.keys()))
             dialogue_flags = {}
             if selected_looks:
                 st.caption(t("لكل شخصية، حدد لو ليها حوار في اللقطة دي (سيبها فاضية لو الشخصية موجودة بس ساكتة)"))
@@ -2291,7 +2313,7 @@ with tab_breakdown:
             st.markdown(f"**{t('الإكسسوارات الموجودة في اللقطة')}**")
             all_props = fetch_all("SELECT id, name FROM props WHERE project_id=? ORDER BY id", (project_id,))
             prop_map = {r["name"]: r["id"] for r in all_props}
-            selected_props = st.multiselect(t("اختر الإكسسوارات الظاهرة في اللقطة"), list(prop_map.keys()))
+            selected_props = multiselect(t("اختر الإكسسوارات الظاهرة في اللقطة"), list(prop_map.keys()))
 
             sh_confirmed = st.checkbox(t("🔵 تمت المراجعة والموافقة على كل بيانات اللقطة"), help=FIELD_HELP["confirmed"])
             sh_storyboard = st.file_uploader(t("صورة ستوري بورد مرجعية (اختياري)"), type=IMAGE_TYPES, key="new_shot_storyboard")
@@ -2391,7 +2413,7 @@ with tab_breakdown:
                             "دول سطور الحوار اللي لسه في حوار المشهد ومتحطوش في لقطة تانية - اختار بس اللي موجود في "
                             "اللقطة دي (سيبها من غير اختيار لو اللقطة من غير حوار)."
                         ))
-                        esh_selected_dialogue = st.multiselect(
+                        esh_selected_dialogue = multiselect(
                             t("سطور الحوار المتاحة من حوار المشهد"), esh_edit_available_lines,
                             default=[l for l in esh_current_dialogue_lines if l in esh_edit_available_lines],
                         )
@@ -2415,7 +2437,7 @@ with tab_breakdown:
                     esh_music = st.checkbox(t("تضمين موسيقى في التوليد نفسه؟ (غير مستحسن)"), value=bool(sh["include_music"]))
 
                     st.markdown(f"**{t('الشخصيات الموجودة في اللقطة')}**")
-                    esh_selected_looks = st.multiselect(
+                    esh_selected_looks = multiselect(
                         t("اختر مظهر كل شخصية ظاهرة"), list(look_map.keys()), default=current_labels
                     )
                     esh_dialogue_flags = {}
@@ -2429,7 +2451,7 @@ with tab_breakdown:
                             )
 
                     st.markdown(f"**{t('الإكسسوارات الموجودة في اللقطة')}**")
-                    esh_selected_props = st.multiselect(
+                    esh_selected_props = multiselect(
                         t("اختر الإكسسوارات الظاهرة في اللقطة"), list(prop_map.keys()), default=current_prop_labels
                     )
 
@@ -2618,4 +2640,4 @@ with tab_dashboard:
 
         for s in all_shots:
             icon = "🔵" if s["confirmed"] else f"🟡 {t('محتاجة مراجعة')}"
-            st.write(f"{t('مشهد')} {scene_label(s)} / {t('لقطة')} {s['shot_number']} — {ltr(t(s['shot_size']))} — {icon}")
+            st.write(f"{t('مشهد')} {ltr(scene_label(s))} / {t('لقطة')} {s['shot_number']} — {ltr(t(s['shot_size']))} — {icon}")

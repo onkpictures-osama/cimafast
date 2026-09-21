@@ -34,7 +34,7 @@ def _emit(st, css):
     st.markdown("<style>\n%s\n</style>" % css, unsafe_allow_html=True)
 
 
-def inject_base(st, variant=CLASSIC):
+def inject_base(st, variant=CLASSIC, lang="ar"):
     """الستايل الجلوبال — بيتحقن قبل بوابة الدخول، فلازم يبقى مستقل عن
     اللغة (لسه مش عارفين اختيار المستخدم في المرحلة دي).
 
@@ -46,6 +46,37 @@ def inject_base(st, variant=CLASSIC):
         parts.append(glass.base_css())
         parts.append(glass.login_css())
     _emit(st, "\n".join(parts))
+    _document_attrs(st, lang)
+
+
+# لون شريط العنوان في الموبايل — نفس backgroundColor في config.toml
+THEME_COLOR = "#0B1220"
+
+
+def _document_attrs(st, lang):
+    """بيظبط ‎lang‎ على ‎<html>‎ وبيحط ‎theme-color‎.
+
+    Streamlit بيسيب ‎<html lang="en">‎ ثابت، فقارئ الشاشة كان بيقرا العربي
+    بصوت إنجليزي، والمتصفح بيختار قواعد التقطيع والخطوط على إنه إنجليزي.
+
+    ‎dir‎ متحطش على ‎<html>‎ عن قصد: التخطيط كله مبني على إن الجذر LTR
+    واتجاه العربي بيتطبق على العناصر نفسها (‎[dir=rtl]‎ في ‎classic.py‎).
+    قلب الجذر كان هيعكس الشريط الجانبي وكل صف flex مرتين.
+
+    ‎st.html‎ بالسكريبت بيشتغل في الصفحة نفسها من غير iframe. القيمة بتتحط في
+    كل rerun، فلما اللغة تتغير ‎lang‎ بيتبعها.
+    """
+    lang = "en" if lang == "en" else "ar"
+    st.html(
+        "<script data-cf-doc>(function(){"
+        f"var d=document.documentElement;if(d.lang!=='{lang}')d.lang='{lang}';"
+        "var m=document.querySelector('meta[name=theme-color]');"
+        "if(!m){m=document.createElement('meta');m.name='theme-color';"
+        "document.head.appendChild(m);}"
+        f"m.content='{THEME_COLOR}';"
+        "})();</script>",
+        unsafe_allow_javascript=True,
+    )
 
 
 def inject_login(st, variant=CLASSIC):

@@ -8,6 +8,17 @@
 """
 
 BASE_CSS = r'''
+    /* The app is dark-only (config.toml base = "dark"), but the page never said
+       so, and browsers drew scrollbars, autofill and native pickers in light
+       mode on top of it. */
+    :root { color-scheme: dark; }
+
+    /* The document-attributes script (inject._document_attrs) is zero-height,
+       but it still sits in Streamlit's flex column and takes a full 1rem gap
+       - it pushed every page down 16px. Out of the flow entirely; the script
+       has already run by the time this applies. */
+    .stElementContainer:has(script[data-cf-doc]) { display: none; }
+
     /* Global RTL/LTR styling */
     * { box-sizing: border-box; }
     

@@ -541,6 +541,16 @@ def scene_label(scene):
     return f"{number}{suffix or ''}"
 
 
+def next_free_number(numbers):
+    """الرقم اللي المفروض يقترحه فورم الإضافة: أكبر رقم موجود + 1.
+
+    الفورم كان بيبدأ من 1 دايمًا، ففي مشروع فيه 165 مشهد أي إضافة سريعة كانت
+    بتطلع مشهد 1 مكرر. الحروف (35A) مش بتأثر — الرقم الصحيح بس هو اللي بيتعد.
+    """
+    values = [int(n) for n in numbers if n is not None]
+    return max(values) + 1 if values else 1
+
+
 def _existing_columns(conn, table):
     if USE_POSTGRES:
         cur = conn.cursor()
