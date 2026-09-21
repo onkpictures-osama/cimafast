@@ -1551,7 +1551,13 @@ with tab_import:
                 st.rerun()
         with col_b:
             if st.button(t("🗑️ إلغاء ومسح النتائج")):
+                # لازم نأرشف الجوب هنا كمان. مسح الحالة لوحده مش كفاية: أول
+                # ما الصفحة تعيد التشغيل، الاسترجاع بيلاقي نفس التحليل المكتمل
+                # ويرجّعه على الشاشة — فالزرار يبان كأنه مش شغال.
+                _dismissed = st.session_state.get("ai_job_id")
                 _clear_analysis_state()
+                if _dismissed:
+                    ai_jobs.mark_imported(_dismissed)
                 st.rerun()
 
 # ---------------- تبويب الأماكن ----------------
