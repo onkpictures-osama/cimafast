@@ -26,6 +26,34 @@ flipping it. Nothing in here changes the default path.
 This table is updated as each phase lands. A row saying _not yet committed_ means
 exactly that.
 
+## Where to see it
+
+Published at **https://cimafast.io/v1/** — a second Streamlit (`cimafast-v1.service`,
+port 8502, `STREAMLIT_SERVER_BASE_URL_PATH=v1`) with `CIMAFAST_THEME=glass`, behind
+a `handle /v1*` block in the Caddyfile. Production on `/` is untouched and still
+serves classic to all twelve users; nothing about the flag's default changed.
+
+The preview runs on **its own copy of the database** at
+`/var/lib/cimafast-v1/studio.db`, taken through the SQLite backup API. Real
+scenes and characters to look at, but clicking around in the preview cannot
+reach production data, and two Streamlit processes are never writing one SQLite
+file. The unit's `ReadWritePaths` deliberately omits `/var/lib/cimafast`.
+
+Refresh the preview's data from live:
+
+```bash
+python3 /opt/cimafast-backup/snapshot_db.py \
+    /var/lib/cimafast/studio.db /var/lib/cimafast-v1/studio.db
+systemctl restart cimafast-v1
+```
+
+`?theme=classic` still works on `/v1` for comparing side by side, because
+`flag.py` reads the query param before the environment variable.
+
+Note the file watcher is off in both units, so **a new commit does not reach
+`/v1` until `systemctl restart cimafast-v1`**. If the preview looks a phase
+behind, that is why.
+
 Unrelated work that got committed in the same window, kept separate on purpose:
 
 | Commit | What it is |
