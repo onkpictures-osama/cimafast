@@ -1490,7 +1490,12 @@ with tab_import:
                 # موجود أصلًا — فكان بيرمي KeyError **بعد** ما البيانات
                 # تتسجل فعلًا، فالمستخدم يشوف خطأ والنتيجة لسه على الشاشة
                 # ويفتكر إن مفيش حاجة اتضافت.
+                # لازم نعلّم التحليل إنه اتستورد، وإلا الاسترجاع بيرجّعه
+                # على الشاشة في نفس اللحظة وكأن مفيش حاجة حصلت
+                _done_job = st.session_state.get("ai_job_id")
                 _clear_analysis_state()
+                if _done_job:
+                    ai_jobs.mark_imported(_done_job)
                 st.rerun()
         with col_b:
             if st.button(t("🗑️ إلغاء ومسح النتائج")):

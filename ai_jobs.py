@@ -104,6 +104,12 @@ def start(markdown_text, project_id, filename, known_characters=None, max_cost_u
                         known_characters=known_characters, max_cost_usd=max_cost_usd)
 
 
+def mark_imported(job_id):
+    """بنعمل كده بعد ما المشاهد تتضاف فعلًا، عشان التحليل ما يرجعش تاني
+    على الشاشة ويغري المستخدم إنه يستورده مرتين."""
+    spool.archive(job_id)
+
+
 def status(job_id):
     return spool.read_status(job_id)
 
