@@ -37,6 +37,7 @@ sys.path.insert(0, str(ROOT))
 import accounts  # noqa: E402
 import auth  # noqa: E402
 import database  # noqa: E402
+import permissions  # noqa: E402
 import repo  # noqa: E402
 
 SECRETS_PATH = Path(os.environ.get("CIMAFAST_SECRETS", "/etc/cimafast/secrets.toml"))
@@ -111,6 +112,12 @@ def _project_id(request, body=None, user=None):
     user = user or current_user(request)
     if not repo.project(pid) or not user or not accounts.can_access_project(user, pid):
         return None, JSONResponse({"error": "no such project"}, status_code=404)
+    # F2: الدور في شركة المشروع بيحكم الطلب ده كله (repo بيرفض الكتابة لو مش مسموح)،
+    # وأي طلب مش GET لازم يكون من حد يقدر يعدّل.
+    role = accounts.project_role(user, pid)
+    permissions.act_as(role)
+    if request.method != "GET" and not permissions.can(role, "edit"):
+        return None, JSONResponse({"error": permissions.MESSAGES["edit"]}, status_code=403)
     return pid, None
 
 
@@ -135,7 +142,8 @@ async def api_board(request: Request):
         return err
     b = repo.board(pid)
     return JSONResponse({"project": repo.project(pid)["name"], "scenes": b["scenes"],
-                         "days": b["days"], "unscheduled": b["unscheduled"]})
+                         "days": b["days"], "unscheduled": b["unscheduled"],
+                         "can_edit": permissions.can(permissions.current_role(), "edit")})
 
 
 async def api_save(request: Request):

@@ -50,6 +50,8 @@ def build_prompt(location_name, base_description="", state_name="", state_descri
 
 def generate_image(prompt, api_key, model=None):
     """بترجع (bytes, امتداد الملف). بترمي ImageGenError برسالة عربي واضحة."""
+    import permissions
+    permissions.require("run_ai")         # قبل ما نصرف على الـ API، مش بعد
     if not api_key:
         raise ImageGenError("توليد الصور مش متفعّل على السيرفر (مفيش مفتاح OpenRouter).")
     body = json.dumps({

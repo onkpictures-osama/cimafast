@@ -110,6 +110,7 @@
       const date = el("input", "day__date");
       date.type = "date";
       date.value = day.shoot_date || "";
+      date.disabled = !data.can_edit;
       date.setAttribute("aria-label", `تاريخ ${title}`);
       date.addEventListener("change", () =>
         api("PATCH", `api/days/${dayId}`, { project_id: projectId, shoot_date: date.value, notes: day.notes })
@@ -124,6 +125,8 @@
   }
 
   function render() {
+    // مشاهدة فقط: الجدول بيتقري بس — السيرفر بيرفض أي تعديل برضو
+    document.body.classList.toggle("readonly", !data.can_edit);
     sortables.forEach(s => s.destroy());
     sortables = [];
     const board = $("#board");
@@ -133,7 +136,7 @@
                                                  sceneIds: d.scene_ids, day: d })));
     board.querySelectorAll(".day__list").forEach(list => {
       sortables.push(new Sortable(list, {
-        group: "board", animation: 120, direction: "vertical",
+        group: "board", animation: 120, direction: "vertical", disabled: !data.can_edit,
         ghostClass: "sortable-ghost", chosenClass: "sortable-chosen",
         onEnd: e => { if (e.from !== e.to || e.oldIndex !== e.newIndex) scheduleSave(); },
       }));

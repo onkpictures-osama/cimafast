@@ -14,6 +14,7 @@ import sys
 import time
 
 sys.path.insert(0, "/opt/cimafast-ai")
+import permissions  # noqa: E402
 import spool  # noqa: E402
 
 SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:مشهد|المشهد|سين|السين|SCENE|SC|م)\s*(?:رقم\s*)?[:\-–—/.]?\s*\d+',
@@ -106,6 +107,7 @@ def latest_completed(project_id, within_hours=48):
 
 
 def start(markdown_text, project_id, filename, known_characters=None, max_cost_usd=None):
+    permissions.require("run_ai")
     if active_job(project_id):
         raise RuntimeError("فيه تحليل شغال بالفعل لنفس المشروع.")
     if max_cost_usd is None:

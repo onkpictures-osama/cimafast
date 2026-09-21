@@ -68,6 +68,14 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   Anyone can delete any project. → Company admin, producer, production manager,
   department head, viewer; destructive actions need the right role. *Done when* a
   viewer cannot change data and only an admin can delete a project.
+  ✅ **On /v1 2026-09-21.** One rule table (`permissions.py`) checked by the data
+  layer itself, so every write from every screen and the board API passes through
+  it. Viewers browse and export only (the board is read-only, and script analysis
+  and image generation are refused before any money is spent); department heads,
+  production managers and producers edit; producers and production managers also
+  create projects; only the company admin deletes a project or manages the team.
+  Verified in a browser for viewer and department head. Next refinement: department
+  heads limited to their own department's data.
 - **F3 Audit trail and usage events** [infrastructure]
   Nobody can see who changed what, or which features are used. → An append-only
   log of changes (who, what, when, before/after) and of key usage events (login,

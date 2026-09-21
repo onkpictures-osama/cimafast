@@ -13,6 +13,8 @@ import os
 import re
 import sqlite3
 
+import permissions
+
 DB_PATH = os.environ.get("STUDIO_DB_PATH") or os.path.join(
     os.path.dirname(__file__), "studio.db"
 )
@@ -103,6 +105,7 @@ def run_query(query, params=()):
     """بينفذ INSERT/UPDATE/DELETE، وبيرجع الـ id بتاع الصف اللي اتضاف لو
     كان السؤال INSERT (زي lastrowid بتاعة SQLite، بس بطريقة تشتغل مع
     Postgres برضو عن طريق RETURNING id)."""
+    permissions.require("edit")          # F2: المشاهد بس مايكتبش، من أي شاشة
     conn = get_connection()
     try:
         cur = conn.cursor()

@@ -103,7 +103,8 @@ def test_app_is_split_into_views():
     app = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
     assert len(app.splitlines()) < 900, len(app.splitlines())
     for view in ("import_tab", "locations", "characters", "props", "scenes", "shots", "reports"):
-        assert f"views.{view}.render(" in app, view
+        # F2: rendered through _render(views.X, ...) so a refused write shows a message
+        assert f"views.{view}.render(" in app or f"_render(views.{view}," in app, view
         assert "def render(" in _view(view), view
 
 

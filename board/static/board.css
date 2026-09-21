@@ -121,3 +121,8 @@ select, input { font: inherit; color: var(--text); background: var(--surface); b
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* مشاهدة فقط (F2): مفيش أزرار تعديل ولا سحب */
+.readonly #suggest, .readonly #add-day, .readonly .day__del,
+.readonly label.field--inline { display: none; }
+.readonly .strip { cursor: default; }

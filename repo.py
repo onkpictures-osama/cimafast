@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from contextlib import contextmanager
 
+import permissions
 from database import _adapt_query, fetch_all, get_connection, run_query, scene_label
 from search import normalize
 
@@ -24,6 +25,7 @@ NIGHT_VALUES = {"ليل"}              # فجر وغروب بيتصوروا في
 @contextmanager
 def _tx():
     """اتصال واحد وtransaction واحدة: يا كله يتحفظ يا ولا حاجة."""
+    permissions.require("edit")
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -364,6 +366,7 @@ def episodes_of_project(*params):
 
 
 def delete_project(*params):
+    permissions.require("delete_project")
     return run_query('DELETE FROM projects WHERE id=?', params)
 
 

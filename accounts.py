@@ -20,9 +20,20 @@ import datetime as dt
 import secrets as _secrets
 import string
 
+import contextlib
+
 import auth
+import permissions
 from database import fetch_all
-from repo import _tx
+from repo import _tx as _repo_tx
+
+
+@contextlib.contextmanager
+def _tx():
+    """كل دالة هنا بتفحص صلاحياتها بنفسها (أدمن، المستخدم نفسه، المشغّل)، فكتاباتها
+    ماتتقفلش بقاعدة "المشاهد مايكتبش" — المشاهد لازم يقدر يغيّر كلمة سره."""
+    with permissions.system(), _repo_tx() as ex:
+        yield ex
 
 # الأدوار، من الأوسع للأضيق. الفرض (مين يقدر يمسح إيه) بند F2؛ هنا بنسجلها بس.
 ROLES = ("admin", "producer", "manager", "department", "viewer")
@@ -161,6 +172,12 @@ def projects_for(username, company_id=None):
     return fetch_all(f"SELECT * FROM projects WHERE company_id IN ({marks}) ORDER BY id DESC", tuple(allowed))
 
 
+def project_role(username, project_id):
+    """دور المستخدم في الشركة اللي المشروع تبعها، أو None لو مالوش دخل بيه."""
+    p = _one("SELECT company_id FROM projects WHERE id=?", (project_id,))
+    return role_in(username, p["company_id"]) if p else None
+
+
 def can_access_project(username, project_id):
     p = _one("SELECT company_id FROM projects WHERE id=?", (project_id,))
     return bool(p) and role_in(username, p["company_id"]) is not None
@@ -169,13 +186,17 @@ def can_access_project(username, project_id):
 def create_project(actor, company_id, name, project_type, resolution, orientation, aspect_ratio):
     """مشروع جديد في شركة معيّنة. قبل F1 المشروع كان بيتعمل من غير شركة وكل الناس
     تشوفه؛ دلوقتي بيتسجّل تبع الشركة اللي المستخدم شغال فيها."""
-    if role_in(actor, company_id) is None:
+    role = role_in(actor, company_id)
+    if role is None:
         raise AccessDenied("مش عضو في الشركة دي")
+    if not permissions.can(role, "create_project"):
+        raise permissions.Denied("create_project")
     from database import run_query
-    return run_query(
-        "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
-        "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
-        (name, project_type, resolution, orientation, aspect_ratio, company_id))
+    with permissions.system():
+        return run_query(
+            "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
+            "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, project_type, resolution, orientation, aspect_ratio, company_id))
 
 
 # --- إدارة الفريق (مدير الشركة أو المشغّل) -------------------------------------------------

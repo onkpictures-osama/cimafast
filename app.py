@@ -14,6 +14,7 @@ from ui import ltr, mark_saved, safe_index, show_saved_badge
 import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
 import repo
 import accounts
+import permissions
 
 st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
 
@@ -153,9 +154,21 @@ def _check_login():
 def _logout():
     """خروج: بنمسح مفاتيح الدخول بس وسايبين باقي حالة الجلسة زي ما هي عشان
     المستخدم ميخسرش اختياراته لو رجع دخل تاني."""
-    for key in ("_authenticated", "_auth_user", "_login_attempts"):
+    for key in ("_authenticated", "_auth_user", "_login_attempts", "_cf_role"):
         st.session_state.pop(key, None)
     st.session_state["_just_logged_out"] = True
+
+
+def _session_role():
+    """F2: دور المستخدم في الشركة المختارة. Streamlit بيشغّل كل rerun في thread
+    جديد، فالدور بيتقري من session_state مش من متغيّر في الـ thread."""
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+    if get_script_run_ctx(suppress_warning=True) is None:
+        return None
+    return st.session_state.get("_cf_role")
+
+
+permissions.set_resolver(_session_role)
 
 
 @st.cache_resource
@@ -342,6 +355,12 @@ else:
     _company = _my_companies[0]
     st.sidebar.caption(f"🏢 {_company['name']}")
 company_id = _company["id"]
+# F2: من هنا لحد آخر الـ run (والـ callbacks في الـ run الجاي) كل كتابة بتتفحص بالدور ده
+_role = _company["role"]
+st.session_state["_cf_role"] = _role
+_can_edit = permissions.can(_role, "edit")
+if not _can_edit:
+    st.sidebar.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
 # صفحة الفريق (الأعضاء والأدوار وكلمات السر) في الواجهة الجديدة جنب جدول التصوير
 if os.environ.get("CIMAFAST_BOARD_URL"):
     _team_label = t("إدارة الفريق") if _company["role"] in ("admin", "operator") else t("الفريق وحسابي")
@@ -350,22 +369,26 @@ if os.environ.get("CIMAFAST_BOARD_URL"):
 projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
-with st.sidebar.expander(tr("new_project")):
-    new_name = st.text_input(t("اسم المشروع"), placeholder=t("مثال: عروسة البحر"))
-    new_type = st.selectbox(t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"], format_func=t, help=FIELD_HELP["project_type"])
-    new_res = st.selectbox(t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"], help=FIELD_HELP["default_resolution"])
-    new_orient = st.selectbox(t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"], format_func=t, help=FIELD_HELP["default_orientation"])
-    new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], index=0)
-    if st.button(t("إنشاء المشروع")):
-        if new_name.strip():
-            accounts.create_project(_current_user, company_id, new_name, new_type, new_res, new_orient, new_ratio)
-            st.success(t("تم إنشاء المشروع"))
-            st.rerun()
-        else:
-            st.warning(t("اكتب اسم المشروع أولًا"))
+if permissions.can(_role, "create_project"):
+    with st.sidebar.expander(tr("new_project")):
+        new_name = st.text_input(t("اسم المشروع"), placeholder=t("مثال: عروسة البحر"))
+        new_type = st.selectbox(t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"], format_func=t, help=FIELD_HELP["project_type"])
+        new_res = st.selectbox(t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"], help=FIELD_HELP["default_resolution"])
+        new_orient = st.selectbox(t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"], format_func=t, help=FIELD_HELP["default_orientation"])
+        new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], index=0)
+        if st.button(t("إنشاء المشروع")):
+            if new_name.strip():
+                accounts.create_project(_current_user, company_id, new_name, new_type, new_res, new_orient, new_ratio)
+                st.success(t("تم إنشاء المشروع"))
+                st.rerun()
+            else:
+                st.warning(t("اكتب اسم المشروع أولًا"))
 
 if not projects:
-    st.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
+    if permissions.can(_role, "create_project"):
+        st.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
+    else:
+        st.info(t("مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع."))
     st.stop()
 
 selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
@@ -402,7 +425,7 @@ if project["project_type"] == "مسلسل":
         new_ep_title = st.text_input(t("عنوان الحلقة"), key=f"new_ep_title_{project_id}")
         new_ep_desc = st.text_area(t("وصف الحلقة"), key=f"new_ep_desc_{project_id}")
         
-        if st.button(t("إضافة حلقة"), key=f"add_ep_btn_{project_id}"):
+        if st.button(t("إضافة حلقة"), key=f"add_ep_btn_{project_id}", disabled=not _can_edit):
             if new_ep_title.strip():
                 repo.add_episode(project_id, int(new_ep_num), new_ep_title, new_ep_desc)
                 st.success(t("تم إضافة الحلقة"))
@@ -425,56 +448,59 @@ if project["project_type"] == "مسلسل":
                         st.write(f"**الوصف:** {ep['description']}")
                     
                     # Delete button
-                    if st.button(t("حذف الحلقة"), key=f"del_ep_{ep['id']}"):
+                    if st.button(t("حذف الحلقة"), key=f"del_ep_{ep['id']}", disabled=not _can_edit):
                         repo.delete_episode(ep['id'])
                         st.success(t("تم حذف الحلقة"))
                         st.rerun()
 
-with st.sidebar.expander(tr("edit_delete_project")):
-    # ملحوظة مهمة: كل الـ keys هنا لازم تتربط برقم المشروع (project_id) —
-    # لو الـ key ثابت، Streamlit بيفتكر قيمة قديمة من مشروع تاني كان متفتح
-    # قبل كده، وده ممكن يأدي لحفظ أو حتى مسح المشروع الغلط بالغلط.
-    e_proj_name = st.text_input(t("اسم المشروع"), value=project["name"], key=f"edit_proj_name_{project_id}")
-    e_proj_type = st.selectbox(
-        t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"],
-        index=safe_index(["فيلم", "مسلسل", "إعلان", "فيديو قصير"], project["project_type"]),
-        format_func=t,
-        key=f"edit_proj_type_{project_id}",
-    )
-    e_proj_res = st.selectbox(
-        t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"],
-        index=safe_index(["720p", "1080p", "2K", "4K"], project["default_resolution"]),
-        key=f"edit_proj_res_{project_id}",
-    )
-    e_proj_orient = st.selectbox(
-        t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"],
-        index=safe_index(["أفقي", "رأسي", "مربع"], project["default_orientation"]),
-        format_func=t,
-        key=f"edit_proj_orient_{project_id}",
-    )
-    e_proj_ratio = st.selectbox(
-        t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"],
-        index=safe_index(["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], project["default_aspect_ratio"]),
-        key=f"edit_proj_ratio_{project_id}",
-    )
-    if st.button(t("💾 حفظ تعديل المشروع"), key=f"save_proj_btn_{project_id}"):
-        if e_proj_name.strip():
-            repo.update_project_settings(e_proj_name, e_proj_type, e_proj_res, e_proj_orient, e_proj_ratio, project_id)
-            st.success(t("تم تعديل بيانات المشروع"))
-            st.rerun()
-        else:
-            st.warning(t("اسم المشروع مينفعش يبقى فاضي"))
+if _can_edit:
+    with st.sidebar.expander(tr("edit_delete_project")):
+        # ملحوظة مهمة: كل الـ keys هنا لازم تتربط برقم المشروع (project_id) —
+        # لو الـ key ثابت، Streamlit بيفتكر قيمة قديمة من مشروع تاني كان متفتح
+        # قبل كده، وده ممكن يأدي لحفظ أو حتى مسح المشروع الغلط بالغلط.
+        e_proj_name = st.text_input(t("اسم المشروع"), value=project["name"], key=f"edit_proj_name_{project_id}")
+        e_proj_type = st.selectbox(
+            t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"],
+            index=safe_index(["فيلم", "مسلسل", "إعلان", "فيديو قصير"], project["project_type"]),
+            format_func=t,
+            key=f"edit_proj_type_{project_id}",
+        )
+        e_proj_res = st.selectbox(
+            t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"],
+            index=safe_index(["720p", "1080p", "2K", "4K"], project["default_resolution"]),
+            key=f"edit_proj_res_{project_id}",
+        )
+        e_proj_orient = st.selectbox(
+            t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"],
+            index=safe_index(["أفقي", "رأسي", "مربع"], project["default_orientation"]),
+            format_func=t,
+            key=f"edit_proj_orient_{project_id}",
+        )
+        e_proj_ratio = st.selectbox(
+            t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"],
+            index=safe_index(["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], project["default_aspect_ratio"]),
+            key=f"edit_proj_ratio_{project_id}",
+        )
+        if st.button(t("💾 حفظ تعديل المشروع"), key=f"save_proj_btn_{project_id}"):
+            if e_proj_name.strip():
+                repo.update_project_settings(e_proj_name, e_proj_type, e_proj_res, e_proj_orient, e_proj_ratio, project_id)
+                st.success(t("تم تعديل بيانات المشروع"))
+                st.rerun()
+            else:
+                st.warning(t("اسم المشروع مينفعش يبقى فاضي"))
 
-    st.markdown("---")
-    st.caption(t("⚠️ حذف المشروع بيمسح كل الأماكن والشخصيات والمشاهد واللقطات بتاعته نهائيًا."))
-    confirm_delete_project = st.checkbox(
-        f"{t('متأكد إني عايز أمسح مشروع')} \"{project['name']}\" {t('وكل بياناته')}",
-        key=f"confirm_delete_project_{project_id}",
-    )
-    if st.button(t("🗑️ حذف المشروع نهائيًا"), disabled=not confirm_delete_project, key=f"delete_proj_btn_{project_id}"):
-        repo.delete_project(project_id)
-        st.success(t("تم حذف المشروع"))
-        st.rerun()
+        # F2: الحذف لمدير الشركة بس (repo.delete_project بيرفض أي حد تاني برضو)
+        if permissions.can(_role, "delete_project"):
+            st.markdown("---")
+            st.caption(t("⚠️ حذف المشروع بيمسح كل الأماكن والشخصيات والمشاهد واللقطات بتاعته نهائيًا."))
+            confirm_delete_project = st.checkbox(
+                f"{t('متأكد إني عايز أمسح مشروع')} \"{project['name']}\" {t('وكل بياناته')}",
+                key=f"confirm_delete_project_{project_id}",
+            )
+            if st.button(t("🗑️ حذف المشروع نهائيًا"), disabled=not confirm_delete_project, key=f"delete_proj_btn_{project_id}"):
+                repo.delete_project(project_id)
+                st.success(t("تم حذف المشروع"))
+                st.rerun()
 
 if project["owner_name"]:
     _owner_line = f"👤 {project['owner_name']}"
@@ -596,17 +622,29 @@ tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
 
 # ---------------- التبويبات ----------------
 # كل تبويب في views/<اسم>.py. الترتيب هنا هو ترتيب st.tabs فوق.
+# F2: لو مشاهد داس على زرار تعديل، طبقة البيانات بترفض وهنا بنوريله رسالة
+# مفهومة بدل traceback. التبويب نفسه بيكمل عادي في الـ rerun الجاي.
+def _render(view, **kwargs):
+    try:
+        view.render(**kwargs)
+    except permissions.Denied as exc:
+        st.warning(t(str(exc)))
+
+
 with tab_import:
-    views.import_tab.render(project_id=project_id)
+    if permissions.can(_role, "run_ai"):
+        _render(views.import_tab, project_id=project_id)
+    else:
+        st.info(t("استيراد السكريبت وتحليله لأعضاء الفريق اللي عندهم صلاحية تعديل. حسابك مشاهدة فقط."))
 with tab_locations:
-    views.locations.render(project_id=project_id)
+    _render(views.locations, project_id=project_id)
 with tab_characters:
-    views.characters.render(project_id=project_id)
+    _render(views.characters, project_id=project_id)
 with tab_props:
-    views.props.render(project_id=project_id)
+    _render(views.props, project_id=project_id)
 with tab_scenes:
-    views.scenes.render(project=project, project_id=project_id, _is_ar=_is_ar)
+    _render(views.scenes, project=project, project_id=project_id, _is_ar=_is_ar)
 with tab_breakdown:
-    views.shots.render(project_id=project_id)
+    _render(views.shots, project_id=project_id)
 with tab_dashboard:
-    views.reports.render(project=project, project_id=project_id, _char_count=_char_count, _loc_count=_loc_count, _scene_count=_scene_count, _shot_count=_shot_count)
+    _render(views.reports, project=project, project_id=project_id, _char_count=_char_count, _loc_count=_loc_count, _scene_count=_scene_count, _shot_count=_shot_count)
