@@ -1026,6 +1026,41 @@ tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
 # ---------------- تبويب استيراد السكريبت ----------------
 
 
+_ANALYSIS_RTL_CSS = """
+<style>
+/* نتائج التحليل كلها عربي: أسماء شخصيات وأماكن وإكسسوارات وملاحظات.
+   Streamlit بيرندر الجداول والمقاييس والـ expander من الشمال لليمين
+   افتراضيًا، فالأسماء العربية كانت بتتعرض بمحاذاة غلط وعلامات الترقيم
+   بتقع في الناحية الغلط. الستايل ده متربط بمفتاح الكونتينر عشان يأثر
+   على منطقة التحليل بس ومايلخبطش باقي الصفحة. */
+.st-key-cf_analysis, .st-key-cf_compare { direction: rtl; text-align: right; }
+.st-key-cf_analysis p, .st-key-cf_compare p,
+.st-key-cf_analysis li, .st-key-cf_compare li,
+.st-key-cf_analysis h2, .st-key-cf_analysis h3,
+.st-key-cf_compare h2, .st-key-cf_compare h3 { direction: rtl; text-align: right; }
+.st-key-cf_analysis [data-testid="stCaptionContainer"],
+.st-key-cf_compare [data-testid="stCaptionContainer"] { direction: rtl; text-align: right; }
+.st-key-cf_analysis [data-testid="stMetric"],
+.st-key-cf_compare [data-testid="stMetric"] { direction: rtl; text-align: right; }
+.st-key-cf_analysis [data-testid="stExpander"] summary,
+.st-key-cf_compare [data-testid="stExpander"] summary { direction: rtl; text-align: right; }
+/* الجدول: الهيدر والخلايا لازم يتقلبوا مع بعض */
+.st-key-cf_compare [data-testid="stDataFrame"] { direction: rtl; }
+.st-key-cf_compare [data-testid="stDataFrame"] [role="columnheader"],
+.st-key-cf_compare [data-testid="stDataFrame"] [role="gridcell"] {
+    direction: rtl; text-align: right;
+}
+/* الأرقام والكود يفضلوا LTR جوه نص عربي */
+.st-key-cf_analysis code, .st-key-cf_compare code { direction: ltr; unicode-bidi: embed; }
+</style>
+"""
+
+
+def _analysis_rtl_css():
+    """بيحقن الستايل مرة واحدة في كل تشغيل للصفحة."""
+    st.markdown(_ANALYSIS_RTL_CSS, unsafe_allow_html=True)
+
+
 def _clear_analysis_state():
     """بيمسح أي نتيجة تحليل من الجلسة — السريعة واللي من الذكاء الاصطناعي —
     من غير ما يفترض إن مفتاح معيّن موجود."""
@@ -1380,7 +1415,9 @@ with tab_import:
     _fast_parsed = st.session_state.get("parsed_script")
     _ai_parsed = st.session_state.get("ai_parsed_script")
     if _fast_parsed and _ai_parsed:
-        _render_source_picker(_fast_parsed, _ai_parsed)
+        _analysis_rtl_css()
+        with st.container(key="cf_compare"):
+            _render_source_picker(_fast_parsed, _ai_parsed)
         _choice = st.radio(
             t("اختار التحليل اللي هيتستورد:"),
             [t("🤖 الذكاء الاصطناعي"), t("🔍 التحليل السريع")],
@@ -1390,7 +1427,9 @@ with tab_import:
         parsed = _ai_parsed or _fast_parsed
     if not parsed and st.session_state.get("last_analysis"):
         # بعد ما المشاهد تتضاف، التحليل يفضل متاح بدل ما يختفي
-        _render_analysis_dashboard(st.session_state["last_analysis"])
+        _analysis_rtl_css()
+        with st.container(key="cf_analysis"):
+            _render_analysis_dashboard(st.session_state["last_analysis"])
     if parsed:
         scenes = parsed["scenes"]
         for w in parsed["warnings"]:
@@ -1436,7 +1475,9 @@ with tab_import:
             preview_scenes.append(sc_view)
 
         merge_map = {}
-        _render_analysis_dashboard(preview_scenes)
+        _analysis_rtl_css()
+        with st.container(key="cf_analysis"):
+            _render_analysis_dashboard(preview_scenes)
 
         similar_groups = find_similar_name_groups(preview_scenes)
         if similar_groups:
