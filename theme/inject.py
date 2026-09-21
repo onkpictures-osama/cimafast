@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from . import classic, glass
+from . import classic, glass, mobile
 from .flag import CLASSIC, GLASS
 
 
@@ -99,6 +99,9 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     parts = [classic.MAIN_CSS]
     if variant == GLASS:
         parts.append(glass.main_css(dir_))
+    # موبايل: طبقة CSS ثابتة جوه @media، بتتطبق لوحدها لما عرض الشاشة يضيق —
+    # على أي متغيّر (classic أو glass) ومن غير أي فلاج أو منطق بايثون إضافي.
+    parts.append(mobile.mobile_css())
     _emit(st, _template("\n".join(parts), dir_, align, rowdir))
     if variant == GLASS:
         glass.inject_runtime(st)
