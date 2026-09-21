@@ -33,10 +33,18 @@ SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:مشهد|المشهد|سين|ا�
 # الأرقام دي محسوبة بعدد **الحروف** مش البايتات. أول نسخة حسبت المعامل من
 # حجم الملف بالبايت وطبّقته على عدد الحروف — والعربي بياخد أكتر من بايت
 # للحرف (قسنا 1.82x)، فالتقدير طلع أقل من الحقيقة بحوالي الثلث.
-BASE_COST_USD = 0.152         # القايمة المرجعية بتتدفع مرة واحدة
-COST_PER_CHAR_USD = 0.00008019
+# الأرقام اتقاسِت على opus. المالك حوّل التحليل لـ sonnet، وسعره تقريبًا خُمس
+# سعر opus، فبنعدّل التقدير بنفس النسبة. ده تقدير مؤقت لحد ما نقيس تشغيلة
+# حقيقية بـ sonnet — كل job بيسجّل تكلفته الفعلية في meta.cost_usd، فالمعايرة
+# الصح تتاخد من هناك بدل التخمين.
+_OPUS_BASE_USD = 0.152        # القايمة المرجعية بتتدفع مرة واحدة
+_OPUS_PER_CHAR_USD = 0.00008019
+SONNET_PRICE_RATIO = 0.2
+
+BASE_COST_USD = round(_OPUS_BASE_USD * SONNET_PRICE_RATIO, 4)
+COST_PER_CHAR_USD = _OPUS_PER_CHAR_USD * SONNET_PRICE_RATIO
 CHARS_PER_SCENE = 458         # من نفس القياس: 5,948 حرف / 13 مشهد
-MIN_ESTIMATE_USD = 0.20
+MIN_ESTIMATE_USD = 0.05
 CEILING_MULTIPLIER = 2.0      # سقف المصروف = ضعف التقدير
 TERMINAL = spool.TERMINAL
 

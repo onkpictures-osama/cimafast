@@ -495,6 +495,12 @@ _MIGRATIONS = {
     # بقى نص. الحرف بيتخزن لوحده والعرض بيجمعهم.
     "scenes": [
         ("scene_suffix", "TEXT"),
+        # حقول البرومبت الجديد (2026-09-21). من غيرها الـ AI بيرجّعها
+        # وبتتقري صح وبعدين بتترمي عند الاستيراد لأن مفيش مكان تتخزن فيه.
+        ("episode_number", "INTEGER"),
+        ("look_change_notes", "TEXT"),
+        ("suggested_shot_size", "TEXT"),
+        ("suggested_camera_movement", "TEXT"),
     ],
     "location_variants": [
         ("reference_image_path", "TEXT"),

@@ -130,10 +130,14 @@ def import_parsed_scenes(project_id, scenes, fetch_all, run_query):
         new_scene_id = run_query(
             """INSERT INTO scenes
             (project_id, scene_number, scene_suffix, int_ext, day_night, weather,
-             location_variant_id, notes)
-            VALUES (?,?,?,?,?,?,?,?)""",
+             location_variant_id, notes, episode_number, look_change_notes,
+             suggested_shot_size, suggested_camera_movement)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (project_id, sc['scene_number'], _suffix, sc['int_ext'], sc['day_night'],
-             sc.get('weather'), location_variant_id, sc.get('notes', '')),
+             sc.get('weather'), location_variant_id, sc.get('notes', ''),
+             sc.get('episode_number'), sc.get('look_change_notes') or None,
+             sc.get('suggested_shot_size') or None,
+             sc.get('suggested_camera_movement') or None),
         )
         existing_scene_keys.add(_key)
         summary['scenes_added'] += 1
