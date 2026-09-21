@@ -75,7 +75,8 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   → A home page: my companies and projects (with progress and next step), my
   tools grouped by production phase, what needs me by role, continue where I left
   off, search across my projects. *Done when* a new user reaches their first
-  useful action from the home page without help.
+  useful action from the home page without help. **Build plan:
+  `HOME-PAGE-PLAN.md`** (covers H1 and H2).
 - **H2 Deep links** [chief-engineer] — `?project=` and `?tab=` so every card,
   notification and agent post opens the exact screen (supported by `st.tabs(default=)`).
 - **H3 Onboarding** [production] — a sample project and a guided first import,
