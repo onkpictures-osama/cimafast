@@ -45,6 +45,9 @@ def inject_base(st, variant=CLASSIC, lang="ar"):
     if variant == GLASS:
         parts.append(glass.base_css())
         parts.append(glass.login_css())
+    # موبايل هنا كمان: شاشة الدخول أول حاجة اليوزر بيلمسها على الموبايل،
+    # فلازم تاخد نفس قواعد الـ touch target زي باقي الشاشات (inject_main).
+    parts.append(mobile.mobile_css())
     _emit(st, "\n".join(parts))
     _document_attrs(st, lang)
 

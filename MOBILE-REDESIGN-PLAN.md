@@ -58,24 +58,59 @@ shots tabs.
 
 ## Phases
 
-0. **Safety net + touch targets** — `theme/mobile.py` wired into
-   `theme/inject.py`; buttons/inputs/selects hit the 44px minimum. Proven
-   with the visual harness to be a no-op above 480px and on 4/5 phone
-   screens; the 5th shows only the expected few-px reflow from taller
-   buttons. *(this session)*
+0. **Safety net + touch targets** — `theme/mobile.py` wired into both
+   `inject_base` (login screen) and `inject_main` (everything after);
+   buttons/inputs/selects hit the 44px minimum. Verified with the visual
+   harness: 0.000% diff at tablet (834px, checked both viewport-only and via
+   a clean stash/unstash before-after pair) and desktop (1440px); on phone
+   (390px), the login screen now visibly changes (inputs/button grow to
+   44px — this was missing before an owner-requested independent review
+   caught it, see below) and the rest of the screens change only by the
+   few-px reflow from taller buttons. *(this session)*
 1. **Navigation** — tab bar legible without a hidden/cut-off tab; sidebar
    collapse behavior confirmed sane (Streamlit's native collapse already
-   triggers on narrow viewports — verify, don't rebuild).
+   triggers below its own `breakpoints.md` (768px) — verify against real
+   phone use, don't rebuild).
 2. **Forms, tables, image pickers** — single-column stacking confirmed on
-   every tab (locations, characters, scenes, shots, reports), wide dataframes
-   get a horizontal-scroll container instead of squeezing columns unreadable.
+   every tab (locations, characters, scenes, shots, reports). Confirm before
+   promising a fix for wide `st.dataframe` grids or anything inside an
+   `st.components.v1.html` iframe (e.g. `views/import_tab.py`) — injected page
+   CSS cannot reach into either, so those two need a different approach (or
+   get explicitly descoped) rather than the same CSS layer.
 3. **Typography & density pass** — base font-size/line-height/row-height
    tuned for a phone held at arm's length, re-run the contrast audit.
 4. **Full verification** — phone-viewport visual pass across every screen in
-   `tests/visual`, zero diff confirmed at tablet/desktop for all of them.
+   `tests/visual`, zero diff confirmed at tablet/desktop for all of them, run
+   once under `--theme classic` and once under `--theme glass` (the harness
+   was only ever run against `classic` before this pass).
 
 ## Breakpoint
 
-`max-width: 480px` — comfortably below the harness's `tablet` viewport
-(834px), so phones get the rules and tablets don't, matching "mobile
-screens" literally rather than "anything not desktop."
+`max-width: 767px` — matches Streamlit's own internal mobile switch exactly:
+its frontend bundle defines `breakpoints.md = 768px` and treats
+`innerWidth < md` as `isMobile` (`utils.BVKswTgl.js`, confirmed by reading the
+shipped JS, not guessed). Below 768px, Streamlit itself already collapses the
+sidebar to an overlay and stacks columns — this plan's CSS should kick in for
+that exact same range, not some independently-chosen number. (Phase 0
+shipped first with an arbitrary `480px` guess; corrected once the real
+constant was found — 767px is still comfortably below the harness's `tablet`
+viewport at 834px, so the "zero diff at tablet" limit still holds, reverified
+above.)
+
+## Known gaps (owner asked for an independent review; findings below)
+
+An independent review of Phase 0 surfaced three real issues, two fixed in
+this pass and one left as an open design question for Phase 1+:
+
+- **Fixed:** the mobile CSS was only wired into `inject_main`, so the login
+  screen — the first thing a phone user touches — got none of it. Now wired
+  into `inject_base` too.
+- **Fixed:** the breakpoint (480px) didn't match Streamlit's own mobile
+  switch (768px), leaving a band of viewport widths in Streamlit's mobile
+  layout without this app's touch-target rules. Corrected above.
+- **Open for Phase 1:** wrapping `stTabs` in CSS to fix the overflow risks
+  misplacing Streamlit's JS-positioned active-tab underline — needs a visual
+  check specifically for that, not just "does the tab show." Also open: CSS
+  is injected via `st.markdown` after the script body runs, so a slow mobile
+  connection can show an unstyled flash before it applies — not addressed
+  yet, and out of scope unless it proves visible in practice.
