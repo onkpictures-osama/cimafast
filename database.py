@@ -162,7 +162,8 @@ def init_db():
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
             base_description TEXT,
-            parent_location_id INTEGER REFERENCES locations(id)
+            parent_location_id INTEGER REFERENCES locations(id),
+            maps_url TEXT
         );
 
         CREATE TABLE IF NOT EXISTS location_variants (
@@ -371,6 +372,7 @@ def init_db():
             name TEXT NOT NULL,
             base_description TEXT,
             parent_location_id INTEGER,
+            maps_url TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
             FOREIGN KEY (parent_location_id) REFERENCES locations(id)
         );
@@ -610,6 +612,9 @@ _MIGRATIONS = {
         # صورة للمكان نفسه، مستقلة عن صور حالاته: مرفوعة أو من الكاميرا أو
         # متولّدة بالذكاء الاصطناعي.
         ("reference_image_path", "TEXT"),
+        # لينك الموقع الجغرافي: Google Maps أو Waze أو أي خريطة تانية. نص حر
+        # عن قصد — اليوزر بيلزق اللينك اللي عنده، مش بنقيّده بخدمة واحدة.
+        ("maps_url", "TEXT"),
     ],
     # حرف المشهد المقسوم (35A / 35B). scene_number فضل رقم صحيح عن قصد:
     # فيه حسابات بتعتمد عليه (scene_number + 1 وقت الإدراج) وكانت هتتكسر لو

@@ -10,6 +10,11 @@ secrets.toml
 .streamlit/secrets.toml
 venv/
 .venv/
+# البريفيو بيشارك الـ venv بتاع الإنتاج عن طريق symlink، والقاعدة اللي فوق
+# بتمسك المجلدات بس — من غير السطر ده اللينك بيبان كملف مش متتبع وممكن
+# يتضاف بالغلط
+venv
+.venv
 uploads/
 *.db
 *.sqlite3

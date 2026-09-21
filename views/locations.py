@@ -9,6 +9,18 @@ from ui import guarded_delete
 import repo
 
 
+def _clean_maps_url(raw):
+    """لينك الخريطة نص حر: أي خدمة (Google Maps، Waze، Apple Maps). بنشيل
+    المسافات بس، ولو اليوزر لزق لينك من غير http بنحطها عشان الزرار يفتح صح.
+    فاضي = مفيش لينك (وده بيشيل الزرار من الشاشة)."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    if not raw.lower().startswith(("http://", "https://")):
+        raw = "https://" + raw
+    return raw
+
+
 def render(project_id):
     st.subheader(tr("sub_locations"))
 
@@ -24,7 +36,10 @@ def render(project_id):
             "لو عندك مكان رئيسي وجواه أماكن فرعية (زي شقة حسام وجواها غرفة نوم)، "
             "أضف المكان الرئيسي الأول، وبعدين أضف المكان الفرعي واختار له 'تابع لمكان رئيسي'."
         ))
-        with st.form(f"add_location_{project_id}"):
+        # clear_on_submit زي فورم إضافة الحالة تحت: من غيره الحقول بتفضل
+        # بقيمتها بعد الحفظ، فالمكان اللي بعده بياخد لينك الخريطة بتاع اللي
+        # قبله من غير ما حد ياخد باله — عنوان غلط لمكان تصوير حقيقي.
+        with st.form(f"add_location_{project_id}", clear_on_submit=True):
             loc_name = st.text_input(t("اسم المكان"), placeholder=t("مثال: شقة حسام"))
             parent_add_options = ["بدون - مكان رئيسي"] + [l["name"] for l in locations]
             loc_parent = st.selectbox(t("تابع لمكان رئيسي؟"), parent_add_options, format_func=t)
@@ -32,12 +47,16 @@ def render(project_id):
                 t("وصف عام ثابت للمكان"),
                 placeholder=t("مثال: شقة قديمة في حي شعبي، جدرانها بيج فاتح، فيها أثاث خشبي تقيل"),
             )
+            loc_maps = st.text_input(
+                t("رابط الموقع على الخريطة (اختياري)"),
+                placeholder=t("الصق رابط Google Maps أو أي رابط خريطة تاني"),
+            )
             if st.form_submit_button(t("إضافة مكان")):
                 if loc_name.strip():
                     parent_id = None
                     if loc_parent != "بدون - مكان رئيسي":
                         parent_id = {l["name"]: l["id"] for l in locations}.get(loc_parent)
-                    repo.add_location(project_id, loc_name, loc_desc, parent_id)
+                    repo.add_location(project_id, loc_name, loc_desc, parent_id, _clean_maps_url(loc_maps))
                     st.rerun()
     if not locations:
         st.caption(t("مفيش أماكن مضافة لسه"))
@@ -56,6 +75,11 @@ def render(project_id):
         _lazy_exp = st.expander(f"{indent}📍 {l['name']}", key=f"exp_loc_{l['id']}", on_change="rerun")
         with _lazy_exp:
             if _lazy_exp.open:
+                # اللينك أول حاجة في المكان: اللي بيدوّر عليه بيبقى واقف في
+                # الشارع. ولو مفيش لينك مبنعرضش زرار مطفي — شاشة نضيفة أحسن.
+                if l.get("maps_url"):
+                    st.link_button(t("📍 افتح على الخريطة"), l["maps_url"])
+
                 st.markdown(f"**{t('🖼️ صورة المكان')}**")
 
                 def _save_loc_image(rel, _id=l["id"]):
@@ -84,6 +108,12 @@ def render(project_id):
                         t("وصف عام ثابت للمكان"), value=l["base_description"] or "",
                         placeholder=t("مثال: شقة قديمة في حي شعبي، جدرانها بيج فاتح، فيها أثاث خشبي تقيل"),
                     )
+                    e_loc_maps = st.text_input(
+                        t("رابط الموقع على الخريطة (اختياري)"),
+                        value=l.get("maps_url") or "",
+                        placeholder=t("الصق رابط Google Maps أو أي رابط خريطة تاني"),
+                        key=f"loc_maps_{l['id']}",
+                    )
                     save_col, del_col = st.columns(2)
                     with save_col:
                         save_loc = st.form_submit_button(t("💾 حفظ التعديل"))
@@ -94,7 +124,7 @@ def render(project_id):
                         new_parent_id = None
                         if e_loc_parent != "بدون - مكان رئيسي":
                             new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
-                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, l["id"])
+                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, _clean_maps_url(e_loc_maps), l["id"])
                         mark_saved(f"loc_{l['id']}")
                         st.rerun()
                     else:

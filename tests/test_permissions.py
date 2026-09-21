@@ -74,7 +74,7 @@ def test_a_viewer_cannot_change_any_data():
     pid = _project("مشروع للمشاهدة")
     with acting_as("viewer"):
         assert repo.project(pid)                                       # reading is fine
-        _raises(Denied, repo.add_location, pid, "شقة", "", None)       # single write
+        _raises(Denied, repo.add_location, pid, "شقة", "", None, None)  # single write
         _raises(Denied, repo.add_day, pid)                             # board write
         _raises(Denied, repo.save_layout, pid, [])                     # transaction write
         _raises(Denied, database.run_query, "UPDATE projects SET name='x' WHERE id=?", (pid,))
@@ -97,7 +97,7 @@ def test_only_an_admin_deletes_a_project():
 def test_department_heads_edit_project_data():
     pid = _project("مشروع للأقسام")
     with acting_as("department"):
-        repo.add_location(pid, "شقة البطل", "", None)
+        repo.add_location(pid, "شقة البطل", "", None, None)
         repo.add_day(pid)
     assert database.fetch_all("SELECT COUNT(*) AS n FROM locations WHERE project_id=?", (pid,))[0]["n"] == 1
 

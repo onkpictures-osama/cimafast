@@ -493,7 +493,7 @@ def states_of_location(*params):
 
 
 def add_location(*params):
-    return run_query('INSERT INTO locations (project_id, name, base_description, parent_location_id) VALUES (?,?,?,?)', params)
+    return run_query('INSERT INTO locations (project_id, name, base_description, parent_location_id, maps_url) VALUES (?,?,?,?,?)', params)
 
 
 def set_location_image(*params):
@@ -505,7 +505,7 @@ def delete_location(*params):
 
 
 def update_location(*params):
-    return run_query('UPDATE locations SET name=?, base_description=?, parent_location_id=? WHERE id=?', params)
+    return run_query('UPDATE locations SET name=?, base_description=?, parent_location_id=?, maps_url=? WHERE id=?', params)
 
 
 def update_location_state(*params):
