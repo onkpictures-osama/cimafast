@@ -84,9 +84,9 @@ def render(project_id):
                         st.write(t("عاوز تفتح الموقع الجغرافي ولا تعدله؟"))
                         open_col, edit_col = st.columns(2)
                         with open_col:
-                            st.link_button(t("🗺️ فتح"), l["maps_url"], use_container_width=True)
+                            st.link_button(t("🗺️ فتح"), l["maps_url"], width="stretch")
                         with edit_col:
-                            if st.button(t("✏️ تعديل"), key=f"loc_maps_edit_btn_{l['id']}", use_container_width=True):
+                            if st.button(t("✏️ تعديل"), key=f"loc_maps_edit_btn_{l['id']}", width="stretch"):
                                 st.session_state[_editing_key] = True
                                 st.rerun()
                     else:
