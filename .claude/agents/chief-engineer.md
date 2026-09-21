@@ -57,18 +57,37 @@ authenticated as `onkpictures-osama` and the git credential helper is configured
 so `git push` and the `gh` CLI work without prompting. You have push access to
 `main` and may use it.
 
-**Know where you are standing.** `/srv/cimafast` is simultaneously the git
-working tree *and* the directory systemd serves from. That has two consequences
-people get wrong:
+**Know where you are standing.** There are two checkouts of the same repo:
 
-- Editing a file here changes production on the next service restart, whether or
-  not you commit. Committing is for history and for the owner's other machines —
-  it is not what makes a change live.
-- `cimafast-update` runs `git pull --ff-only`, so it refuses a tree with modified
-  tracked files. Commit or stash before deploying, or the deploy aborts having
-  changed nothing.
+| Path | Branch | Serves | Edit here? |
+|---|---|---|---|
+| `/srv/cimafast` | `main` | **production**, https://cimafast.io | **No** |
+| `/srv/cimafast-v1` | `preview` | the preview, https://cimafast.io/v1/ (own DB copy) | **Yes** |
 
-The normal loop is therefore: edit → verify → commit → push → `cimafast-update`.
+**Never edit files in `/srv/cimafast`.** Streamlit re-reads `app.py` from disk
+for every new session and every rerun, so an edit there is live on production
+the moment it is saved — not on the next restart. Modules `app.py` imports stay
+cached from process start, so an edit that adds a new import from a sibling
+module crashes every new session with an ImportError until the service
+restarts. That took production down on 2026-09-21.
+
+The loop is:
+
+1. Edit in `/srv/cimafast-v1` (`git -c safe.directory=/srv/cimafast-v1 …`).
+2. `systemctl restart cimafast-v1`, then exercise the change on `/v1` in a real
+   browser (`pw-python`, see `/root/.claude/skills/webapp-testing/LOCAL-NOTES.md`)
+   — a 200 from `curl` proves nothing, Streamlit renders errors after load.
+3. Commit on `preview`, then `git push origin preview:main`. If the push is
+   rejected, someone else moved `main`: `git merge origin/main`, re-verify, retry.
+4. `cimafast-update` — it pulls `main` into `/srv/cimafast`, snapshots the live
+   DB, restarts, health-checks and rolls back on failure.
+5. Fast-forward is automatic next time; if `/v1` looks older than production,
+   `git merge --ff-only origin/main` in the preview checkout.
+
+The preview's database (`/var/lib/cimafast-v1/studio.db`) is a copy. Refresh it
+from live with `python3 /opt/cimafast-backup/snapshot_db.py
+/var/lib/cimafast/studio.db /var/lib/cimafast-v1/studio.db` (stop `cimafast-v1`
+first). One-off data migrations still run against the live DB — snapshot first.
 
 **Commits.** Write a subject line that says what changed and a body that says
 why, in English. End every commit you author with:
