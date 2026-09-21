@@ -16,7 +16,7 @@ import time
 sys.path.insert(0, "/opt/cimafast-ai")
 import spool  # noqa: E402
 
-SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*\d+',
+SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*|م\s*/\s*)\d+',
                              re.IGNORECASE | re.MULTILINE)
 
 # التقدير بيتحسب من حجم النص مش من عدد العناوين.
@@ -37,15 +37,17 @@ SCENE_HEADER_RE = re.compile(r'^\s*(?:##\s*)?(?:مشهد|المشهد|سين|ا�
 # سعر opus، فبنعدّل التقدير بنفس النسبة. ده تقدير مؤقت لحد ما نقيس تشغيلة
 # حقيقية بـ sonnet — كل job بيسجّل تكلفته الفعلية في meta.cost_usd، فالمعايرة
 # الصح تتاخد من هناك بدل التخمين.
-_OPUS_BASE_USD = 0.152        # القايمة المرجعية بتتدفع مرة واحدة
-_OPUS_PER_CHAR_USD = 0.00008019
-SONNET_PRICE_RATIO = 0.2
-
-BASE_COST_USD = round(_OPUS_BASE_USD * SONNET_PRICE_RATIO, 4)
-COST_PER_CHAR_USD = _OPUS_PER_CHAR_USD * SONNET_PRICE_RATIO
+# معاير من تشغيلة sonnet حقيقية (2026-09-21): سكريبت 7,744 حرف، القايمة
+# المرجعية لوحدها كلفت $0.0654، وقُصّت مرحلة التحليل عند $0.2346 وهي لسه
+# شغالة — يعني التقدير القديم (نسبة سعر مفترضة) كان أقل من الواقع بكتير.
+# البرومبت بيطلب الحوار كامل من غير اختصار، فالمخرجات تقريبًا بحجم السكريبت
+# والمخرجات هي الغالية. بنقدّر ~$0.05 لكل 1000 حرف كنقطة بداية محافظة.
+BASE_COST_USD = 0.03
+COST_PER_CHAR_USD = 0.00005
 CHARS_PER_SCENE = 458         # من نفس القياس: 5,948 حرف / 13 مشهد
 MIN_ESTIMATE_USD = 0.05
-CEILING_MULTIPLIER = 2.0      # سقف المصروف = ضعف التقدير
+CEILING_MULTIPLIER = 2.5      # سقف أوسع: سقف ضيق بيقطع التحليل في نصه
+                              # ويضيّع اللي اتصرف كله من غير نتيجة
 TERMINAL = spool.TERMINAL
 
 

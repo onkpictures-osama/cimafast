@@ -34,7 +34,12 @@ try:
 except ImportError:
     PdfReader = None
 
-SCENE_HEADER_RE = re.compile(r'^\s*(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*(\d+)', re.IGNORECASE)
+# كمان بندعم الاختصار المصري الشائع: "م /1 ل/د" (م = مشهد، ل/ن = ليل/نهار،
+# د/خ = داخلي/خارجي). سكريبت حقيقي للمالك كان مكتوب كده بالكامل والبرنامج
+# مكانش شايف فيه ولا مشهد واحد، فالترقيم كله كان بيتاخد من الـ AI بدل الملف.
+# بنطلب الشرطة مع الحرف الواحد عشان ما نلقطش سطور تانية بتبدأ بـ م.
+SCENE_HEADER_RE = re.compile(
+    r'^\s*(?:(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*|م\s*/\s*)(\d+)', re.IGNORECASE)
 NUMERIC_HEADER_RE = re.compile(r'^\s*(\d+)\s*[\.\-–—\)]\s*(.+)$')
 INT_RE = re.compile(r'داخلي|(?<![A-Za-z])INT\.?(?![A-Za-z])', re.IGNORECASE)
 EXT_RE = re.compile(r'خارجي|(?<![A-Za-z])EXT\.?(?![A-Za-z])', re.IGNORECASE)

@@ -193,6 +193,43 @@ def test_screenplay_detector():
     check("empty input does not crash", looks_like_screenplay([])[0] == 0.0)
 
 
+
+# ------------------------------------- compact Egyptian scene headers
+def test_compact_scene_header_format():
+    """Real scripts head scenes as "م /1 ل/د", not "مشهد 1".
+
+    A short film of the owner's was written entirely this way and the parser
+    found zero scenes in it. Everything downstream then went wrong: the
+    screenplay detector scored it 0.0, chunking fell back to splitting on size,
+    and the AI had no numbers to copy so it assigned its own - which is exactly
+    the "numbering is wrong" complaint.
+    """
+    from script_parser import SCENE_HEADER_RE, looks_like_screenplay
+    from script_md import to_markdown
+
+    for line, expected in [("م /1 ل/د", "1"), ("م/12 ن/خ", "12"),
+                           ("م / 7 ل/د", "7"), ("مشهد 3 - داخلي", "3")]:
+        m = SCENE_HEADER_RE.match(line)
+        check(f"matches {line!r} -> scene {expected}",
+              m is not None and m.group(1) == expected,
+              f"got {m.group(1) if m else None}")
+
+    for line in ("مصر القاهرة 2026", "من 5 سنين", "مدة الفيلم 12 دقيقة"):
+        check(f"does not false-match {line!r}", SCENE_HEADER_RE.match(line) is None)
+
+    script = ["م /1 ل/د", "غرفة نوم", ".. نرى رجلا", "الأب", "قوم بقى",
+              "م /2 ن/خ", "الشارع", ".. يخرج مسرعا"]
+    conf, ev = looks_like_screenplay(script)
+    check("compact-format script is recognised as a screenplay", conf >= 0.5,
+          f"score={conf} evidence={ev}")
+
+    md, _ = to_markdown(script)
+    check("codes expand to words for the model", "ليل - داخلي" in md, md.splitlines()[0])
+    check("day/exterior expands too", "نهار - خارجي" in md)
+    check("original numbering preserved in the markdown",
+          "## مشهد 1" in md and "## مشهد 2" in md)
+
+
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("Drama analyzer regression suite")
@@ -201,7 +238,8 @@ if __name__ == "__main__":
                test_silent_excludes_speakers, test_silent_finds_non_speaker,
                test_silent_ignores_absent, test_silent_name_boundaries,
                test_end_to_end, test_cross_scene_roster,
-               test_docx_scene_tables_are_extracted, test_screenplay_detector]:
+               test_docx_scene_tables_are_extracted, test_screenplay_detector,
+               test_compact_scene_header_format]:
         fn()
     passed, total = sum(results), len(results)
     print("\n" + "=" * 60)

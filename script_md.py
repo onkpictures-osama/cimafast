@@ -14,7 +14,7 @@
 import re
 from collections import Counter
 
-SCENE_HEADER_RE = re.compile(r'^\s*(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*(\d+)(.*)$', re.IGNORECASE)
+SCENE_HEADER_RE = re.compile(r'^\s*(?:(?:مشهد|المشهد|سين|السين)\s*[:\-–—]?\s*|م\s*/\s*)(\d+)(.*)$', re.IGNORECASE)
 DIALOGUE_RE = re.compile(r'^\s*([؀-ۿA-Za-z][؀-ۿ\sA-Za-z\.]{0,24}?)\s*[:：]\s*(.+)$')
 
 # أرقام صفحات بكل الأشكال الشائعة
@@ -26,6 +26,23 @@ RULE_RE = re.compile(r'^[\s\-–—_=\*\.\u0640\u2500-\u257F]{3,}$')
 
 REPEAT_MIN = 5          # سطر بيتكرر كتير أوي = ترويسة صفحة، مش حوار
 REPEAT_MAX_LEN = 60
+
+
+# اختصارات رأس المشهد المصري: ل/د = ليل/داخلي، ن/خ = نهار/خارجي ... إلخ.
+# بنفكّها لكلمات عشان الـ AI (وأي حد بيقرا الماركداون) يفهمها من غير تخمين.
+_CODE_WORDS = {'ل': 'ليل', 'ن': 'نهار', 'د': 'داخلي', 'خ': 'خارجي',
+               'غ': 'غروب', 'ف': 'فجر'}
+_CODE_PAIR_RE = re.compile(r'^([لنغف])\s*/\s*([دخ])$|^([دخ])\s*/\s*([لنغف])$')
+
+
+def _expand_header_codes(rest):
+    """بيحوّل "ل/د" لـ "ليل - داخلي". لو مش كود معروف بيسيبه زي ما هو."""
+    text = (rest or '').strip()
+    m = _CODE_PAIR_RE.match(text)
+    if not m:
+        return text
+    parts = [g for g in m.groups() if g]
+    return ' - '.join(_CODE_WORDS[p] for p in parts)
 
 
 def _is_furniture(line):
@@ -108,7 +125,7 @@ def to_markdown(lines):
 
         m = SCENE_HEADER_RE.match(s)
         if m:
-            rest = re.sub(r'^[\s:\-–—]+', '', m.group(2)).strip()
+            rest = _expand_header_codes(re.sub(r'^[\s:\-–—]+', '', m.group(2)))
             if out:
                 out.append("")
             out.append(f"## مشهد {m.group(1)}" + (f" — {rest}" if rest else ""))
