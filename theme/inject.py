@@ -96,6 +96,37 @@ def inject_login(st, variant=CLASSIC):
     return None
 
 
+def _header_logo_css():
+    """اللوجو (الماستر، سطح غامق) في هيدر Streamlit الثابت — فاضي خالص
+    من غير ده، خصوصًا على الموبايل لما الشريط الجانبي يبقى مقفول ومفيش
+    أي براند ظاهر فوق المحتوى الرئيسي. ‎background-image‎ مش ‎<img>‎ لأن
+    الهيدر عنصر Streamlit جاهز مش حاوية بنتحكم في محتواها من بايثون."""
+    height = 30
+    width = round(height * brand._MASTER_W / brand._MASTER_H)
+    src = brand.data_uri("cimafast-lockup-dark-transparent.png")
+    # الكل ‎!important‎: زجاج الهيدر (glass.py، درجة المادة) وأرضيته
+    # (‎_ground_rules‎) بيحطوا ‎background: … !important‎ (اختصار)، وده بيمسح
+    # ‎background-image‎ ضمنيًا لو من غير ‎!important‎ برضه. والسيليكتور
+    # مكرّر (‎[data-testid="stHeader"]‎ مرتين) عشان الخاصية تبقى أعلى من
+    # نفس سيليكتور الأرضية، مش متساوية معاه — Streamlit بيعيد حقن نفس
+    # ستايل الأرضية أكتر من مرة عبر الـ reruns، فترتيب الظهور في الـ DOM
+    # مش مضمون، والاعتماد عليه وحده مش كفاية.
+    sel = 'header[data-testid="stHeader"][data-testid="stHeader"]'
+    return f"""
+    {sel} {{
+        background-image: url("{src}") !important;
+        background-repeat: no-repeat !important;
+        /* يمين الهيدر (RTL) بس بعيد عن زرار فتح/قفل الشريط الجانبي، اللي
+           واقف في أقصى الحافة. */
+        background-position: right 64px center !important;
+        background-size: {width}px {height}px !important;
+    }}
+    @media (max-width: 640px) {{
+        {sel} {{ background-position: right 56px center !important; }}
+    }}
+    """
+
+
 def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reverse"):
     """الستايل الكبير بعد الدخول — بياخد اتجاه اللغة الحالي.
 
@@ -103,7 +134,7 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     فالقوالب ‎__DIR__‎ / ‎__ALIGN__‎ / ‎__ROWDIR__‎ بتتبدل في النسختين
     بنفس الطريقة.
     """
-    parts = [classic.MAIN_CSS]
+    parts = [classic.MAIN_CSS, _header_logo_css()]
     if variant == GLASS:
         parts.append(glass.main_css(dir_))
     # موبايل: طبقة CSS ثابتة جوه @media، بتتطبق لوحدها لما عرض الشاشة يضيق —
