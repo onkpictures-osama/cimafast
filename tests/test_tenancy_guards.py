@@ -9,12 +9,16 @@ test_accounts.py؛ الملف ده بيقفل الطرق اللي كانت لس�
 2. تبنّي المشاريع اليتيمة نقل مرة واحدة، مش قاعدة شغالة للأبد بتدّي أقدم شركة
    أي مشروع من غير company_id.
 3. مسح مشروع بيتأكد إن المشروع تبع شركة المستخدم، مش بس إنه أدمن في شركة ما.
+4. أي كتابة على مشهد/لقطة/شخصية/مكان/إكسسوار بتفلتر بالمشروع في الـ SQL نفسه،
+   مش بس لأن الشاشة جابت الرقم من قايمة مفلترة.
 
 قاعدة بيانات مؤقتة — عمرها ما بتلمس الإنتاج.
 """
 from __future__ import annotations
 
+import ast
 import os
+import re
 import sys
 import tempfile
 
@@ -77,6 +81,53 @@ def test_no_select_star_from_projects_without_a_filter():
             code = line.split("#")[0]
             if "FROM projects" in code and "WHERE" not in code:
                 raise AssertionError(f"repo.py:{i} بيقرا من projects من غير WHERE: {line.strip()}")
+
+
+# --- 1ب. مفيش كتابة على بيانات المشروع من غير project_id --------------------------
+
+# الجداول اللي كل صف فيها تبع مشروع واحد. أي UPDATE/DELETE عليها لازم يربط
+# المشروع في شرط WHERE — يا بعمود project_id على طول، يا بـ subquery على أبوه
+# (اللقطات عن طريق scenes، المظاهر عن طريق characters، وهكذا).
+SCOPED_TABLES = {
+    "scenes", "shots", "characters", "character_looks",
+    "locations", "location_variants", "props", "episodes",
+}
+# جداول الربط: مالهاش بيانات خاصة بيها، بس ربط صف بصف من مشروع تاني هو نفسه
+# تسريب. هنا حتى الـ INSERT لازم يتأكد إن الطرفين في المشروع.
+LINK_TABLES = {"scene_characters", "scene_props", "shot_characters", "shot_props"}
+
+_UPDATE_DELETE_RE = re.compile(r"\b(?:UPDATE|DELETE\s+FROM)\s+([a-z_]+)", re.IGNORECASE)
+_INSERT_RE = re.compile(r"\bINSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+([a-z_]+)", re.IGNORECASE)
+
+
+def _sql_literals(path):
+    """كل نص مكتوب في الملف مع رقم سطره. Python بيلزق النصوص المتجاورة قبل
+    التحليل، فاستعلام متقسّم على كذا سطر بيوصل هنا قطعة واحدة."""
+    with open(path, encoding="utf-8") as fh:
+        source = fh.read()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            yield node.lineno, node.value
+
+
+@test
+def test_no_write_to_project_data_without_a_project_filter():
+    """الحارس اللي التذكرة دي اتكتبت عشانه.
+
+    قبل كده update_scene/delete_shot/delete_character... كانوا بيفلتروا بـ id
+    لوحده. العزل كان قايم على إن كل شاشة بتجيب الـ id من استعلام مفلتر
+    بالمشروع — صح النهارده، بس مفيش حاجة كانت بتمنع شاشة جديدة تاخد id من
+    الطلب. دلوقتي الشرط في الـ SQL نفسه، والحارس ده بيمنع رجوعه.
+    """
+    for lineno, sql in _sql_literals(os.path.join(ROOT, "repo.py")):
+        hits = [(m.group(1).lower(), "UPDATE/DELETE") for m in _UPDATE_DELETE_RE.finditer(sql)]
+        hits += [(m.group(1).lower(), "INSERT") for m in _INSERT_RE.finditer(sql)]
+        for table, verb in hits:
+            guarded = table in LINK_TABLES or (verb == "UPDATE/DELETE" and table in SCOPED_TABLES)
+            if guarded and "project_id" not in sql:
+                raise AssertionError(
+                    f"repo.py:{lineno} {verb} على {table} من غير project_id في الشرط: "
+                    f"{' '.join(sql.split())[:110]}")
 
 
 # --- 2. المشاريع اليتيمة ----------------------------------------------------------
@@ -155,6 +206,62 @@ def test_an_admin_deletes_their_own_companys_project():
     mine = _project("مشروع للمسح", a_id)
     accounts.delete_project("melzayat", mine)
     assert repo.project(mine) is None
+
+
+# --- 3ب. الكتابة برقم مشروع غلط مابتعملش حاجة ---------------------------------------
+
+def _scene(pid, number=1):
+    database.run_query("INSERT INTO scenes (project_id, scene_number) VALUES (?, ?)", (pid, number))
+    return database.fetch_all("SELECT MAX(id) AS id FROM scenes")[0]["id"]
+
+
+def _character(pid, name="شخصية"):
+    database.run_query("INSERT INTO characters (project_id, name) VALUES (?, ?)", (pid, name))
+    return database.fetch_all("SELECT MAX(id) AS id FROM characters")[0]["id"]
+
+
+@test
+def test_a_write_with_the_wrong_project_id_changes_nothing():
+    """الدفاع في العمق: حتى لو شاشة بعتت رقم مشهد من مشروع تاني، مفيش صف بيتلمس."""
+    mine, theirs = _project("مشروعي"), _project("مشروعهم")
+    sid = _scene(theirs, 7)
+
+    repo.update_scene(mine, 99, "INT", "نهار", "", None, "اتغيّر", sid)
+    row = database.fetch_all("SELECT scene_number, notes FROM scenes WHERE id=?", (sid,))[0]
+    assert row["scene_number"] == 7 and not row["notes"], "مشهد مشروع تاني اتعدّل"
+
+    repo.delete_scene(mine, sid)
+    assert database.fetch_all("SELECT id FROM scenes WHERE id=?", (sid,)), "مشهد مشروع تاني اتمسح"
+
+    # وبرقم المشروع الصح بيشتغل عادي — الحارس مش بيكسر الاستخدام الطبيعي
+    repo.delete_scene(theirs, sid)
+    assert not database.fetch_all("SELECT id FROM scenes WHERE id=?", (sid,))
+
+
+@test
+def test_a_character_is_never_linked_to_a_scene_in_another_project():
+    mine, theirs = _project("ربط - مشروعي"), _project("ربط - مشروعهم")
+    sid = _scene(mine, 1)
+    outsider = _character(theirs, "شخصية شركة تانية")
+    insider = _character(mine, "شخصية بتاعتي")
+
+    repo.link_character_to_scene(mine, sid, outsider)
+    assert not database.fetch_all("SELECT 1 FROM scene_characters WHERE scene_id=? AND character_id=?",
+                                  (sid, outsider)), "شخصية من مشروع تاني اتربطت بمشهد"
+
+    repo.link_character_to_scene(mine, sid, insider)
+    assert database.fetch_all("SELECT 1 FROM scene_characters WHERE scene_id=? AND character_id=?",
+                              (sid, insider)), "الربط الطبيعي وقع"
+
+
+@test
+def test_deleting_a_character_needs_its_own_project():
+    mine, theirs = _project("حذف - مشروعي"), _project("حذف - مشروعهم")
+    cid = _character(theirs, "بطل مشروعهم")
+    repo.delete_character(mine, cid)
+    assert database.fetch_all("SELECT id FROM characters WHERE id=?", (cid,)), "شخصية مشروع تاني اتمسحت"
+    repo.delete_character(theirs, cid)
+    assert not database.fetch_all("SELECT id FROM characters WHERE id=?", (cid,))
 
 
 # --- 4. الفهرس اللي العزل بيقف عليه -------------------------------------------------

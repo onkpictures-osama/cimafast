@@ -108,17 +108,17 @@ def render(project_id):
                     s["shot_number"] for s in repo.shot_numbers_of_scene(scene_id)
                 }
                 if sh_number in existing_shot_numbers_now:
-                    shift_shot_numbers(scene_id, sh_number)
+                    shift_shot_numbers(project_id, scene_id, sh_number)
                     st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
                 shot_id = repo.add_shot(scene_id, sh_number, sh_size, sh_movement, sh_angle, sh_duration, sh_day_night, sh_weather, sh_action, sh_emotion, sh_emotion_label, sh_dialogue, sh_style, int(sh_music), int(sh_confirmed))
                 bump_version(project_id)
                 if sh_storyboard is not None:
                     storyboard_path = save_uploaded_image(sh_storyboard, f"shots/{shot_id}")
-                    repo.set_shot_storyboard(storyboard_path, shot_id)
+                    repo.set_shot_storyboard(project_id, storyboard_path, shot_id)
                 for label in selected_looks:
-                    repo.add_shot_character(shot_id, look_map[label], int(dialogue_flags.get(label, True)))
+                    repo.add_shot_character(project_id, shot_id, look_map[label], int(dialogue_flags.get(label, True)))
                 for prop_label in selected_props:
-                    repo.add_shot_prop(shot_id, prop_map[prop_label])
+                    repo.add_shot_prop(project_id, shot_id, prop_map[prop_label])
                 st.success(t("تم حفظ اللقطة"))
                 st.rerun()
 
@@ -252,23 +252,23 @@ def render(project_id):
                         if esh_number != sh["shot_number"]:
                             colliding_shot = repo.other_shot_with_number(sh["scene_id"], esh_number, sh["id"])
                             if colliding_shot:
-                                shift_shot_numbers(sh["scene_id"], esh_number, exclude_shot_id=sh["id"])
+                                shift_shot_numbers(project_id, sh["scene_id"], esh_number, exclude_shot_id=sh["id"])
                                 st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
                         new_storyboard_path = sh["storyboard_image_path"]
                         if esh_storyboard is not None:
                             new_storyboard_path = save_uploaded_image(esh_storyboard, f"shots/{sh['id']}")
-                        repo.update_shot(esh_number, esh_size, esh_movement, esh_angle, esh_duration, esh_day_night, esh_weather, esh_action, esh_emotion, esh_emotion_label, esh_dialogue, esh_style, int(esh_music), int(esh_confirmed), new_storyboard_path, sh["id"])
-                        repo.unlink_shot_characters(sh["id"])
+                        repo.update_shot(project_id, esh_number, esh_size, esh_movement, esh_angle, esh_duration, esh_day_night, esh_weather, esh_action, esh_emotion, esh_emotion_label, esh_dialogue, esh_style, int(esh_music), int(esh_confirmed), new_storyboard_path, sh["id"])
+                        repo.unlink_shot_characters(project_id, sh["id"])
                         for label in esh_selected_looks:
-                            repo.add_shot_character(sh["id"], look_map[label], int(esh_dialogue_flags.get(label, True)))
-                        repo.unlink_shot_props(sh["id"])
+                            repo.add_shot_character(project_id, sh["id"], look_map[label], int(esh_dialogue_flags.get(label, True)))
+                        repo.unlink_shot_props(project_id, sh["id"])
                         for prop_label in esh_selected_props:
-                            repo.add_shot_prop(sh["id"], prop_map[prop_label])
+                            repo.add_shot_prop(project_id, sh["id"], prop_map[prop_label])
                         bump_version(project_id)
                         mark_saved(f"shot_{sh['id']}")
                         st.rerun()
                     if del_sh:
-                        repo.delete_shot(sh["id"])
+                        repo.delete_shot(project_id, sh["id"])
                         bump_version(project_id)
                         delete_image_file(sh["storyboard_image_path"])
                         st.success(t("تم حذف اللقطة"))

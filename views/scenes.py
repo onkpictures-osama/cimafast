@@ -62,9 +62,9 @@ def render(project, project_id, _is_ar):
                     st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
                 new_scene_id = repo.add_scene(project_id, sc_episode_id, sc_number, sc_int_ext, sc_day_night, sc_weather, loc_id, sc_notes)
                 for _cname in sc_characters:
-                    repo.link_character_to_scene(new_scene_id, char_map_for_scene[_cname])
+                    repo.link_character_to_scene(project_id, new_scene_id, char_map_for_scene[_cname])
                 for _pname in sc_props:
-                    repo.link_prop_to_scene(new_scene_id, prop_map_for_scene[_pname])
+                    repo.link_prop_to_scene(project_id, new_scene_id, prop_map_for_scene[_pname])
                 bump_version(project_id)
                 st.rerun()
 
@@ -196,18 +196,18 @@ def render(project, project_id, _is_ar):
                         if colliding:
                             shift_scene_numbers(project_id, esc_number, exclude_scene_id=sc["id"])
                             st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
-                    repo.update_scene(esc_number, new_int_ext, new_day_night, esc_weather, new_loc_id, esc_notes, sc["id"])
-                    repo.unlink_scene_characters(sc["id"])
+                    repo.update_scene(project_id, esc_number, new_int_ext, new_day_night, esc_weather, new_loc_id, esc_notes, sc["id"])
+                    repo.unlink_scene_characters(project_id, sc["id"])
                     for _cname in esc_characters:
-                        repo.link_character_to_scene(sc["id"], char_map_for_scene[_cname])
-                    repo.unlink_scene_props(sc["id"])
+                        repo.link_character_to_scene(project_id, sc["id"], char_map_for_scene[_cname])
+                    repo.unlink_scene_props(project_id, sc["id"])
                     for _pname in esc_props:
-                        repo.link_prop_to_scene(sc["id"], prop_map_for_scene[_pname])
+                        repo.link_prop_to_scene(project_id, sc["id"], prop_map_for_scene[_pname])
                     bump_version(project_id)
                     mark_saved(f"scene_{sc['id']}")
                     st.rerun()
                 if del_sc:
-                    repo.delete_scene(sc["id"])
+                    repo.delete_scene(project_id, sc["id"])
                     bump_version(project_id)
                     st.success(t("تم حذف المشهد"))
                     st.rerun()
@@ -219,7 +219,7 @@ def render(project, project_id, _is_ar):
                 f"🗑️ {t('حذف')} {len(selected_scene_ids_for_bulk_delete)} {t('مشهد مختار (وكل لقطاتهم)')}",
             ):
                 for _sid in selected_scene_ids_for_bulk_delete:
-                    repo.delete_scene(_sid)
+                    repo.delete_scene(project_id, _sid)
                 bump_version(project_id)
                 st.success(t("تم حذف المشاهد المختارة"))
                 st.rerun()

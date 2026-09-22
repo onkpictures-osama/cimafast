@@ -102,11 +102,11 @@ def test_editing_can_add_then_clear_the_link():
     repo.add_location(pid, "استوديو", "", None, None)
     lid = _loc(pid, "استوديو")["id"]
 
-    repo.update_location("استوديو", "", None, _clean_maps_url("waze.com/ul?ll=1,2"), lid)
+    repo.update_location(pid, "استوديو", "", None, _clean_maps_url("waze.com/ul?ll=1,2"), lid)
     assert _loc(pid, "استوديو")["maps_url"] == "https://waze.com/ul?ll=1,2"
 
     # مسح الحقل لازم يرجّعه None عشان الزرار يختفي تاني
-    repo.update_location("استوديو", "", None, _clean_maps_url("  "), lid)
+    repo.update_location(pid, "استوديو", "", None, _clean_maps_url("  "), lid)
     assert _loc(pid, "استوديو")["maps_url"] is None
 
 
@@ -118,12 +118,12 @@ def test_set_location_maps_url_updates_only_the_link():
     repo.add_location(pid, "بار السطوح", "وصف ثابت", None, None)
     lid = _loc(pid, "بار السطوح")["id"]
 
-    repo.set_location_maps_url(_clean_maps_url("maps.app.goo.gl/roof"), lid)
+    repo.set_location_maps_url(pid, _clean_maps_url("maps.app.goo.gl/roof"), lid)
     loc = _loc(pid, "بار السطوح")
     assert loc["maps_url"] == "https://maps.app.goo.gl/roof"
     assert loc["base_description"] == "وصف ثابت"   # باقي البيانات ما اتلمستش
 
-    repo.set_location_maps_url(_clean_maps_url(""), lid)
+    repo.set_location_maps_url(pid, _clean_maps_url(""), lid)
     assert _loc(pid, "بار السطوح")["maps_url"] is None
 
 

@@ -413,6 +413,21 @@ def day_out_of_days(project_id):
 # الاستعلامات اللي كانت مكتوبة جوه شاشات Streamlit (views/*, ui.py, app.py).
 # كل دالة هنا بتشغّل نفس الـ SQL بالظبط اللي كان في الشاشة، بنفس الـ parameters —
 # النقل ميكانيكي ومتحقق منه. أي شاشة جديدة تستعمل الدوال دي أو تضيف دالة، مش SQL.
+#
+# **العزل بين المشاريع في طبقة البيانات نفسها.** أي UPDATE أو DELETE على مشهد
+# أو لقطة أو شخصية أو مكان أو إكسسوار (وحالاتهم وارتباطاتهم) بياخد project_id
+# كأول باراميتر وبيربطه في شرط WHERE — بالظبط زي update_day/delete_day فوق.
+# الجداول اللي مفيهاش project_id (shots, character_looks, location_variants،
+# وجداول الربط) بتوصل للمشروع بـ subquery على أبوها، زي ما count_shots بتعمل.
+#
+# ليه، والشاشات أصلًا بتجيب الـ id من استعلام مفلتر بالمشروع؟ عشان ده يفضل
+# صح من غير ما نعتمد على إن كل شاشة جديدة هتفضل تعمل كده. رقم غلط (باج، لينك
+# قديم، شاشة بتاخد id من الطلب) بيعدّل صفر صفوف بدل ما يلمس بيانات شركة تانية.
+#
+# الإنشاء (add_shot / add_character_look / add_location_state) سايب زي ما هو
+# عن قصد: بيرجّع الـ id بتاع الصف الجديد اللي الشاشة بتكمّل بيه، و«مفيش صف
+# اتضاف» كان هيبقى فشل صامت. الأب بتاعه جاي أصلًا من قايمة مفلترة بالمشروع.
+# جداول الربط بترجّع حاجة محدش بيستعملها، فدي اتقفلت بـ EXISTS على الطرفين.
 # ----------------------------------------------------------------------------
 
 
@@ -467,8 +482,8 @@ def add_episode(*params):
     return run_query('INSERT INTO episodes (project_id, episode_number, title, description) VALUES (?,?,?,?)', params)
 
 
-def delete_episode(*params):
-    return run_query('DELETE FROM episodes WHERE id=?', params)
+def delete_episode(project_id, *params):
+    return run_query('DELETE FROM episodes WHERE id=? AND project_id=?', params + (project_id,))
 
 
 def bump_project_data_version(*params):
@@ -483,12 +498,14 @@ def shift_scene_numbers_up(*params):
     return run_query('UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ?', params)
 
 
-def shift_shot_numbers_up_except(*params):
-    return run_query('UPDATE shots SET shot_number = shot_number + 1 WHERE scene_id=? AND shot_number >= ? AND id != ?', params)
+def shift_shot_numbers_up_except(project_id, *params):
+    return run_query('UPDATE shots SET shot_number = shot_number + 1 WHERE scene_id=? AND shot_number >= ? AND id != ? '
+                     'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))
 
 
-def shift_shot_numbers_up(*params):
-    return run_query('UPDATE shots SET shot_number = shot_number + 1 WHERE scene_id=? AND shot_number >= ?', params)
+def shift_shot_numbers_up(project_id, *params):
+    return run_query('UPDATE shots SET shot_number = shot_number + 1 WHERE scene_id=? AND shot_number >= ? '
+                     'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))
 
 
 def character_ids_of_project(*params):
@@ -515,26 +532,31 @@ def add_character_look(*params):
                         VALUES (?,?,?,?,?,?,?,?)""", params)
 
 
-def delete_character(*params):
-    return run_query('DELETE FROM characters WHERE id=?', params)
+def delete_character(project_id, *params):
+    return run_query('DELETE FROM characters WHERE id=? AND project_id=?', params + (project_id,))
 
 
-def set_character_image(*params):
-    return run_query('UPDATE characters SET reference_image_path=? WHERE id=?', params)
+def set_character_image(project_id, *params):
+    return run_query('UPDATE characters SET reference_image_path=? WHERE id=? AND project_id=?',
+                     params + (project_id,))
 
 
-def update_character(*params):
+def update_character(project_id, *params):
     return run_query("""UPDATE characters SET name=?, role_type=?, species=?, gender=?,
-                            personality_notes=?, reference_image_path=? WHERE id=?""", params)
+                            personality_notes=?, reference_image_path=?
+                        WHERE id=? AND project_id=?""", params + (project_id,))
 
 
-def update_character_look(*params):
+def update_character_look(project_id, *params):
     return run_query("""UPDATE character_looks SET look_name=?, apparent_age=?, makeup_state=?,
-                            hair_state=?, wardrobe_description=?, description=?, reference_image_path=? WHERE id=?""", params)
+                            hair_state=?, wardrobe_description=?, description=?, reference_image_path=?
+                        WHERE id=? AND character_id IN (SELECT id FROM characters WHERE project_id=?)""",
+                     params + (project_id,))
 
 
-def delete_character_look(*params):
-    return run_query('DELETE FROM character_looks WHERE id=?', params)
+def delete_character_look(project_id, *params):
+    return run_query('DELETE FROM character_looks WHERE id=? '
+                     'AND character_id IN (SELECT id FROM characters WHERE project_id=?)', params + (project_id,))
 
 
 def character_names_of_project(*params):
@@ -553,32 +575,45 @@ def add_location(*params):
     return run_query('INSERT INTO locations (project_id, name, base_description, parent_location_id, maps_url) VALUES (?,?,?,?,?)', params)
 
 
-def set_location_image(*params):
-    return run_query('UPDATE locations SET reference_image_path=? WHERE id=?', params)
+def set_location_image(project_id, *params):
+    return run_query('UPDATE locations SET reference_image_path=? WHERE id=? AND project_id=?',
+                     params + (project_id,))
 
 
-def delete_location(*params):
-    return run_query('DELETE FROM locations WHERE id=?', params)
+def delete_location(project_id, *params):
+    return run_query('DELETE FROM locations WHERE id=? AND project_id=?', params + (project_id,))
 
 
-def update_location(*params):
-    return run_query('UPDATE locations SET name=?, base_description=?, parent_location_id=?, maps_url=? WHERE id=?', params)
+def update_location(project_id, *params):
+    return run_query('UPDATE locations SET name=?, base_description=?, parent_location_id=?, maps_url=? '
+                     'WHERE id=? AND project_id=?', params + (project_id,))
 
 
-def set_location_maps_url(*params):
-    return run_query('UPDATE locations SET maps_url=? WHERE id=?', params)
+def set_location_maps_url(project_id, *params):
+    return run_query('UPDATE locations SET maps_url=? WHERE id=? AND project_id=?', params + (project_id,))
 
 
-def update_location_state(*params):
-    return run_query('UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=?', params)
+def update_location_state(project_id, variant_name, description, location_id, variant_id):
+    """تعديل حالة مكان، ونقلها لمكان تاني لو اليوزر غيّر المكان.
+
+    الاتنين لازم يكونوا في نفس المشروع: المكان اللي الحالة فيه دلوقتي، والمكان
+    اللي رايحة له. من غير الشرط التاني رقم مكان من مشروع تاني كان هياخد الحالة.
+    """
+    return run_query(
+        'UPDATE location_variants SET variant_name=?, description=?, location_id=? WHERE id=? '
+        'AND location_id IN (SELECT id FROM locations WHERE project_id=?) '
+        'AND ? IN (SELECT id FROM locations WHERE project_id=?)',
+        (variant_name, description, location_id, variant_id, project_id, location_id, project_id))
 
 
-def delete_location_state(*params):
-    return run_query('DELETE FROM location_variants WHERE id=?', params)
+def delete_location_state(project_id, *params):
+    return run_query('DELETE FROM location_variants WHERE id=? '
+                     'AND location_id IN (SELECT id FROM locations WHERE project_id=?)', params + (project_id,))
 
 
-def set_location_state_image(*params):
-    return run_query('UPDATE location_variants SET reference_image_path=? WHERE id=?', params)
+def set_location_state_image(project_id, *params):
+    return run_query('UPDATE location_variants SET reference_image_path=? WHERE id=? '
+                     'AND location_id IN (SELECT id FROM locations WHERE project_id=?)', params + (project_id,))
 
 
 def add_location_state(*params):
@@ -601,12 +636,13 @@ def add_prop(*params):
     return run_query('INSERT INTO props (project_id, name, continuity_sensitive, character_id) VALUES (?,?,?,?)', params)
 
 
-def delete_prop(*params):
-    return run_query('DELETE FROM props WHERE id=?', params)
+def delete_prop(project_id, *params):
+    return run_query('DELETE FROM props WHERE id=? AND project_id=?', params + (project_id,))
 
 
-def update_prop(*params):
-    return run_query('UPDATE props SET name=?, continuity_sensitive=?, character_id=? WHERE id=?', params)
+def update_prop(project_id, *params):
+    return run_query('UPDATE props SET name=?, continuity_sensitive=?, character_id=? WHERE id=? AND project_id=?',
+                     params + (project_id,))
 
 
 def shot_summaries_of_project(*params):
@@ -677,28 +713,41 @@ def add_scene(*params):
     return run_query('INSERT INTO scenes (project_id, episode_id, scene_number, int_ext, day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?,?)', params)
 
 
-def link_character_to_scene(*params):
-    return run_query('INSERT OR IGNORE INTO scene_characters (scene_id, character_id) VALUES (?,?)', params)
+def link_character_to_scene(project_id, scene_id, character_id):
+    """ربط شخصية بمشهد — الاتنين لازم يكونوا في المشروع ده."""
+    return run_query(
+        'INSERT OR IGNORE INTO scene_characters (scene_id, character_id) SELECT ?, ? '
+        'WHERE EXISTS (SELECT 1 FROM scenes WHERE id=? AND project_id=?) '
+        'AND EXISTS (SELECT 1 FROM characters WHERE id=? AND project_id=?)',
+        (scene_id, character_id, scene_id, project_id, character_id, project_id))
 
 
-def link_prop_to_scene(*params):
-    return run_query('INSERT OR IGNORE INTO scene_props (scene_id, prop_id) VALUES (?,?)', params)
+def link_prop_to_scene(project_id, scene_id, prop_id):
+    """ربط إكسسوار بمشهد — الاتنين لازم يكونوا في المشروع ده."""
+    return run_query(
+        'INSERT OR IGNORE INTO scene_props (scene_id, prop_id) SELECT ?, ? '
+        'WHERE EXISTS (SELECT 1 FROM scenes WHERE id=? AND project_id=?) '
+        'AND EXISTS (SELECT 1 FROM props WHERE id=? AND project_id=?)',
+        (scene_id, prop_id, scene_id, project_id, prop_id, project_id))
 
 
-def update_scene(*params):
-    return run_query('UPDATE scenes SET scene_number=?, int_ext=?, day_night=?, weather=?, location_variant_id=?, notes=? WHERE id=?', params)
+def update_scene(project_id, *params):
+    return run_query('UPDATE scenes SET scene_number=?, int_ext=?, day_night=?, weather=?, '
+                     'location_variant_id=?, notes=? WHERE id=? AND project_id=?', params + (project_id,))
 
 
-def unlink_scene_characters(*params):
-    return run_query('DELETE FROM scene_characters WHERE scene_id=?', params)
+def unlink_scene_characters(project_id, *params):
+    return run_query('DELETE FROM scene_characters WHERE scene_id=? '
+                     'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))
 
 
-def unlink_scene_props(*params):
-    return run_query('DELETE FROM scene_props WHERE scene_id=?', params)
+def unlink_scene_props(project_id, *params):
+    return run_query('DELETE FROM scene_props WHERE scene_id=? '
+                     'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))
 
 
-def delete_scene(*params):
-    return run_query('DELETE FROM scenes WHERE id=?', params)
+def delete_scene(project_id, *params):
+    return run_query('DELETE FROM scenes WHERE id=? AND project_id=?', params + (project_id,))
 
 
 def scene_numbers_of_project(*params):
@@ -741,16 +790,30 @@ def add_shot(*params):
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", params)
 
 
-def set_shot_storyboard(*params):
-    return run_query('UPDATE shots SET storyboard_image_path=? WHERE id=?', params)
+def set_shot_storyboard(project_id, *params):
+    return run_query('UPDATE shots SET storyboard_image_path=? WHERE id=? '
+                     'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))
 
 
-def add_shot_character(*params):
-    return run_query('INSERT INTO shot_characters (shot_id, look_id, has_dialogue) VALUES (?,?,?)', params)
+def add_shot_character(project_id, shot_id, look_id, has_dialogue):
+    """ربط مظهر شخصية بلقطة — اللقطة والمظهر لازم يكونوا في المشروع ده."""
+    return run_query(
+        'INSERT INTO shot_characters (shot_id, look_id, has_dialogue) SELECT ?, ?, ? '
+        'WHERE EXISTS (SELECT 1 FROM shots sh JOIN scenes s ON s.id=sh.scene_id '
+        '              WHERE sh.id=? AND s.project_id=?) '
+        'AND EXISTS (SELECT 1 FROM character_looks cl JOIN characters c ON c.id=cl.character_id '
+        '            WHERE cl.id=? AND c.project_id=?)',
+        (shot_id, look_id, has_dialogue, shot_id, project_id, look_id, project_id))
 
 
-def add_shot_prop(*params):
-    return run_query('INSERT INTO shot_props (shot_id, prop_id) VALUES (?,?)', params)
+def add_shot_prop(project_id, shot_id, prop_id):
+    """ربط إكسسوار بلقطة — اللقطة والإكسسوار لازم يكونوا في المشروع ده."""
+    return run_query(
+        'INSERT INTO shot_props (shot_id, prop_id) SELECT ?, ? '
+        'WHERE EXISTS (SELECT 1 FROM shots sh JOIN scenes s ON s.id=sh.scene_id '
+        '              WHERE sh.id=? AND s.project_id=?) '
+        'AND EXISTS (SELECT 1 FROM props WHERE id=? AND project_id=?)',
+        (shot_id, prop_id, shot_id, project_id, prop_id, project_id))
 
 
 def characters_in_shot(*params):
@@ -761,23 +824,30 @@ def shot_numbers_of_scene(*params):
     return fetch_all('SELECT shot_number FROM shots WHERE scene_id=?', params)
 
 
-def update_shot(*params):
+def update_shot(project_id, *params):
     return run_query("""UPDATE shots SET shot_number=?, shot_size=?, camera_movement=?, camera_angle=?,
                             duration_seconds=?, day_night=?, weather=?, action_description=?,
                             emotion_intensity=?, emotion_label=?, dialogue_text=?,
-                            visual_style_notes=?, include_music=?, confirmed=?, storyboard_image_path=? WHERE id=?""", params)
+                            visual_style_notes=?, include_music=?, confirmed=?, storyboard_image_path=?
+                        WHERE id=? AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)""",
+                     params + (project_id,))
 
 
-def unlink_shot_characters(*params):
-    return run_query('DELETE FROM shot_characters WHERE shot_id=?', params)
+def unlink_shot_characters(project_id, *params):
+    return run_query('DELETE FROM shot_characters WHERE shot_id=? AND shot_id IN '
+                     '(SELECT sh.id FROM shots sh JOIN scenes s ON s.id=sh.scene_id WHERE s.project_id=?)',
+                     params + (project_id,))
 
 
-def unlink_shot_props(*params):
-    return run_query('DELETE FROM shot_props WHERE shot_id=?', params)
+def unlink_shot_props(project_id, *params):
+    return run_query('DELETE FROM shot_props WHERE shot_id=? AND shot_id IN '
+                     '(SELECT sh.id FROM shots sh JOIN scenes s ON s.id=sh.scene_id WHERE s.project_id=?)',
+                     params + (project_id,))
 
 
-def delete_shot(*params):
-    return run_query('DELETE FROM shots WHERE id=?', params)
+def delete_shot(project_id, *params):
+    return run_query('DELETE FROM shots WHERE id=? '
+                     'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))
 
 
 def prop_ids_in_shot(*params):

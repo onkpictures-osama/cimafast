@@ -97,7 +97,7 @@ def render(project_id):
                             key=f"loc_maps_input_{l['id']}",
                         )
                         if st.button(t("💾 حفظ"), key=f"loc_maps_save_{l['id']}"):
-                            repo.set_location_maps_url(_clean_maps_url(new_maps_url), l["id"])
+                            repo.set_location_maps_url(project_id, _clean_maps_url(new_maps_url), l["id"])
                             st.session_state[_editing_key] = False
                             mark_saved(f"loc_maps_{l['id']}")
                             st.rerun()
@@ -106,7 +106,7 @@ def render(project_id):
                 st.markdown(f"**{t('🖼️ صورة المكان')}**")
 
                 def _save_loc_image(rel, _id=l["id"]):
-                    repo.set_location_image(rel, _id)
+                    repo.set_location_image(project_id, rel, _id)
 
                 render_image_picker(
                     f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
@@ -141,14 +141,14 @@ def render(project_id):
                         new_parent_id = None
                         if e_loc_parent != "بدون - مكان رئيسي":
                             new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
-                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, l.get("maps_url"), l["id"])
+                        repo.update_location(project_id, e_loc_name, e_loc_desc, new_parent_id, l.get("maps_url"), l["id"])
                         mark_saved(f"loc_{l['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم المكان مينفعش يبقى فاضي"))
                 show_saved_badge(f"loc_{l['id']}")
                 if del_loc:
-                    ok = guarded_delete(repo.delete_location, (l["id"],), t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."))
+                    ok = guarded_delete(repo.delete_location, (project_id, l["id"]), t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."))
                     if ok:
                         delete_image_file(l["reference_image_path"])
                         st.success(t("تم حذف المكان"))
@@ -178,11 +178,11 @@ def render(project_id):
                             with vdel_col:
                                 del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
                         if save_var:
-                            repo.update_location_state(ev_name, ev_desc, move_options[ev_move_to], v["id"])
+                            repo.update_location_state(project_id, ev_name, ev_desc, move_options[ev_move_to], v["id"])
                             mark_saved(f"variant_{v['id']}")
                             st.rerun()
                         if del_var:
-                            ok = guarded_delete(repo.delete_location_state, (v["id"],), t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."))
+                            ok = guarded_delete(repo.delete_location_state, (project_id, v["id"]), t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."))
                             if ok:
                                 delete_image_file(v["reference_image_path"])
                                 st.success(t("تم حذف الحالة"))
@@ -192,7 +192,7 @@ def render(project_id):
                         st.caption(t("صورة مرجعية للحالة"))
 
                         def _save_var_image(rel, _id=v["id"]):
-                            repo.set_location_state_image(rel, _id)
+                            repo.set_location_state_image(project_id, rel, _id)
 
                         render_image_picker(
                             f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",

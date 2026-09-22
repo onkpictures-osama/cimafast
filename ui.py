@@ -126,12 +126,16 @@ def shift_scene_numbers(project_id, from_number, exclude_scene_id=None):
         repo.shift_scene_numbers_up(project_id, from_number)
 
 
-def shift_shot_numbers(scene_id, from_number, exclude_shot_id=None):
-    """نفس فكرة shift_scene_numbers بس على مستوى اللقطات جوه مشهد واحد."""
+def shift_shot_numbers(project_id, scene_id, from_number, exclude_shot_id=None):
+    """نفس فكرة shift_scene_numbers بس على مستوى اللقطات جوه مشهد واحد.
+
+    اللقطات مفيهاش project_id، فالمشروع بيتمرر عشان طبقة البيانات تقفل الكتابة
+    على مشاهد المشروع ده بس.
+    """
     if exclude_shot_id is not None:
-        repo.shift_shot_numbers_up_except(scene_id, from_number, exclude_shot_id)
+        repo.shift_shot_numbers_up_except(project_id, scene_id, from_number, exclude_shot_id)
     else:
-        repo.shift_shot_numbers_up(scene_id, from_number)
+        repo.shift_shot_numbers_up(project_id, scene_id, from_number)
 
 
 _DIALOGUE_LINE_RE = re.compile(r'^([^:：]{1,30})[:：]\s*(.+)$')

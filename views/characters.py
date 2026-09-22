@@ -30,7 +30,7 @@ def render(project_id):
                     new_char_id = repo.add_character(project_id, ch_name, ch_role, ch_species, ch_gender, ch_notes)
                     if ch_image is not None:
                         image_path = save_uploaded_image(ch_image, f"characters/{new_char_id}")
-                        repo.set_character_image(image_path, new_char_id)
+                        repo.set_character_image(project_id, image_path, new_char_id)
                     st.rerun()
 
     characters = repo.characters_of_project(project_id)
@@ -114,13 +114,13 @@ def render(project_id):
                         new_ch_image_path = ch["reference_image_path"]
                         if ech_image is not None:
                             new_ch_image_path = save_uploaded_image(ech_image, f"characters/{ch['id']}")
-                        repo.update_character(ech_name, ech_role, ech_species, ech_gender, ech_notes, new_ch_image_path, ch["id"])
+                        repo.update_character(project_id, ech_name, ech_role, ech_species, ech_gender, ech_notes, new_ch_image_path, ch["id"])
                         mark_saved(f"char_{ch['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم الشخصية مينفعش يبقى فاضي"))
                 if del_ch:
-                    ok = guarded_delete(repo.delete_character, (ch["id"],), t("معرفش أمسح الشخصية دي لأن مظهر بتاعها مستخدم في لقطة أو أكتر. شيلها من اللقطات دي الأول من تبويب التفريغ."))
+                    ok = guarded_delete(repo.delete_character, (project_id, ch["id"]), t("معرفش أمسح الشخصية دي لأن مظهر بتاعها مستخدم في لقطة أو أكتر. شيلها من اللقطات دي الأول من تبويب التفريغ."))
                     if ok:
                         delete_image_file(ch["reference_image_path"])
                         st.success(t("تم حذف الشخصية"))
@@ -160,11 +160,11 @@ def render(project_id):
                         new_look_image_path = lk["reference_image_path"]
                         if elk_image is not None:
                             new_look_image_path = save_uploaded_image(elk_image, f"characters/{ch['id']}")
-                        repo.update_character_look(elk_name, elk_age, elk_makeup, elk_hair, elk_wardrobe, elk_desc, new_look_image_path, lk["id"])
+                        repo.update_character_look(project_id, elk_name, elk_age, elk_makeup, elk_hair, elk_wardrobe, elk_desc, new_look_image_path, lk["id"])
                         mark_saved(f"look_{lk['id']}")
                         st.rerun()
                     if del_lk:
-                        ok = guarded_delete(repo.delete_character_look, (lk["id"],), t("معرفش أمسح المظهر ده لأنه مستخدم في لقطة أو أكتر. شيله من اللقطات دي الأول من تبويب التفريغ."))
+                        ok = guarded_delete(repo.delete_character_look, (project_id, lk["id"]), t("معرفش أمسح المظهر ده لأنه مستخدم في لقطة أو أكتر. شيله من اللقطات دي الأول من تبويب التفريغ."))
                         if ok:
                             delete_image_file(lk["reference_image_path"])
                             st.success(t("تم حذف المظهر الإضافي"))

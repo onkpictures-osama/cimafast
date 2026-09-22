@@ -73,13 +73,13 @@ def render(project_id):
                 if save_pr:
                     if ep_name.strip():
                         new_linked_char_id = char_id_by_name.get(ep_character)
-                        repo.update_prop(ep_name, int(ep_continuity), new_linked_char_id, pr["id"])
+                        repo.update_prop(project_id, ep_name, int(ep_continuity), new_linked_char_id, pr["id"])
                         mark_saved(f"prop_{pr['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم الإكسسوار مينفعش يبقى فاضي"))
                 if del_pr:
-                    repo.delete_prop(pr["id"])
+                    repo.delete_prop(project_id, pr["id"])
                     st.success(t("تم حذف الإكسسوار"))
                     st.rerun()
                 show_saved_badge(f"prop_{pr['id']}")

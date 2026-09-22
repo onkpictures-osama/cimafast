@@ -516,7 +516,7 @@ if project["project_type"] == "مسلسل":
                     
                     # Delete button
                     if st.button(t("حذف الحلقة"), key=f"del_ep_{ep['id']}", disabled=not _can_edit):
-                        repo.delete_episode(ep['id'])
+                        repo.delete_episode(project_id, ep['id'])
                         st.success(t("تم حذف الحلقة"))
                         st.rerun()
 
