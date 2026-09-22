@@ -548,48 +548,49 @@ def build_shot_list_word(project, project_id, fetch_all):
 # ---------- تصدير PDF ----------
 # النص العربي في مكتبة reportlab محتاج إعادة تشكيل الحروف (ligation) وترتيب
 # ثنائي الاتجاه (bidi) يدويًا قبل الرسم، لأن reportlab أصلًا مبني للغات LTR.
-# وبرضو محتاج خط يدعم العربي - بنستخدم خط Tahoma الموجود مع ويندوز لأنه
-# بيغطي العربي كويس وموجود على أي جهاز ويندوز من غير الحاجة لتوزيع خط إضافي.
-_ARABIC_FONT_CANDIDATES = [
-    r"C:\Windows\Fonts\tahoma.ttf",
-    r"C:\Windows\Fonts\arial.ttf",
-    r"C:\Windows\Fonts\segoeui.ttf",
-]
-_ARABIC_BOLD_FONT_CANDIDATES = [
-    r"C:\Windows\Fonts\tahomabd.ttf",
-    r"C:\Windows\Fonts\arialbd.ttf",
-    r"C:\Windows\Fonts\segoeuib.ttf",
-]
+# وبرضو محتاج خط يدعم العربي فعليًا - كنا قبل كده بنفتش على Tahoma/Arial في
+# مسارات ويندوز (C:\Windows\Fonts)، وده كان شغال بس على جهاز المطور بويندوز؛
+# على السيرفر (لينكس) المسارات دي مش موجودة خالص، فالتسجيل كان بيفشل بصمت
+# ويرجع Helvetica اللي مفيهوش حرف عربي واحد - يعني كل تصدير PDF فيه عربي كان
+# طالع فاضي أو حروف مش مفهومة.
+#
+# الحل: نستضيف خط عربي كامل جوه الريبو نفسه (زي ما إحنا مستضيفين Cairo و
+# Readex Pro لواجهة الموقع في static/fonts) بدل ما نفتش على مسارات نظام
+# التشغيل. اخترنا Amiri (SIL OFL 1.1 - مرخّص للتوزيع الحر) لأنه، على عكس
+# نسخة Cairo المتغيّرة (variable font) المستضافة للويب، بيغطي حروف "أشكال
+# العرض العربية" (Arabic Presentation Forms، النطاقات FB50-FDFF و FE70-FEFF)
+# اللي مكتبة arabic_reshaper بترجّع بيها النص بعد التشكيل - وده بالظبط اللي
+# reportlab محتاجه لأنه بيرسم كل حرف بالـ code point بتاعه من غير أي معالجة
+# OpenType shaping (HarfBuzz) زي المتصفح. جرّبنا Cairo الأول ولقيناه ناقص
+# غطاء كبير من النطاقات دي (حروف زي الألف والراء المنفصلة بتطلع فاضية)،
+# فمكانه فضل مع خطوط الويب وده ملف مستقل مخصوص للتصدير.
+_ARABIC_FONT_DIR = os.path.join(os.path.dirname(__file__), "static", "fonts")
+_ARABIC_FONT_PATH = os.path.join(_ARABIC_FONT_DIR, "Amiri-Regular.ttf")
+_ARABIC_BOLD_FONT_PATH = os.path.join(_ARABIC_FONT_DIR, "Amiri-Bold.ttf")
 _ARABIC_FONT_NAME = None
 _ARABIC_BOLD_FONT_NAME = None
 
 
 def _register_arabic_font():
-    """بيسجل نسخة عادية وبولد من نفس الخط (Tahoma) عشان نقدر نبين عناوين
-    الأعمدة والخانات المهمة بالبولد فعليًا (مش بس تشبيه)."""
+    """بيسجل خط Amiri (عادي وبولد) المستضاف جوه الريبو في static/fonts عشان
+    التصدير يشتغل صح على أي سيرفر - من غير ما نعتمد على خطوط نظام تشغيل معين،
+    ومن غير fallback صامت لخط زي Helvetica مفيهوش عربي أصلًا."""
     global _ARABIC_FONT_NAME, _ARABIC_BOLD_FONT_NAME
     if _ARABIC_FONT_NAME:
         return _ARABIC_FONT_NAME, _ARABIC_BOLD_FONT_NAME
-    for path in _ARABIC_FONT_CANDIDATES:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("CFArabic", path))
-                _ARABIC_FONT_NAME = "CFArabic"
-                break
-            except Exception:
-                continue
-    if not _ARABIC_FONT_NAME:
-        _ARABIC_FONT_NAME = "Helvetica"
 
-    for path in _ARABIC_BOLD_FONT_CANDIDATES:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("CFArabicBold", path))
-                _ARABIC_BOLD_FONT_NAME = "CFArabicBold"
-                break
-            except Exception:
-                continue
-    if not _ARABIC_BOLD_FONT_NAME:
+    if not os.path.exists(_ARABIC_FONT_PATH):
+        raise FileNotFoundError(
+            f"خط العربي الأساسي مش موجود: {_ARABIC_FONT_PATH} - "
+            "من غيره تصدير PDF فيه نص عربي هيطلع فاضي أو تالف."
+        )
+    pdfmetrics.registerFont(TTFont("CFArabic", _ARABIC_FONT_PATH))
+    _ARABIC_FONT_NAME = "CFArabic"
+
+    if os.path.exists(_ARABIC_BOLD_FONT_PATH):
+        pdfmetrics.registerFont(TTFont("CFArabicBold", _ARABIC_BOLD_FONT_PATH))
+        _ARABIC_BOLD_FONT_NAME = "CFArabicBold"
+    else:
         _ARABIC_BOLD_FONT_NAME = _ARABIC_FONT_NAME
     return _ARABIC_FONT_NAME, _ARABIC_BOLD_FONT_NAME
 
