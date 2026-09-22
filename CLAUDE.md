@@ -113,11 +113,19 @@ venv/bin/python tests/visual/shots.py   --out /tmp/shots/after  --port 8592
 venv/bin/python tests/visual/shots.py   --out /tmp/shots/glass  --port 8593 --theme glass
 venv/bin/python tests/visual/compare.py /tmp/shots/before /tmp/shots/after
 venv/bin/python tests/visual/blur_depth.py --port 8596        # backdrop-filter nesting
+venv/bin/python tests/visual/mobile_ui.py  --port 8607        # phone layout, measured
 ```
 
-30 shots per run: 3 viewports (phone/tablet/desktop) × 2 languages × 5 screens
-(login, project list, scene editor, final reports, script analysis). To shoot an
-older commit for comparison, add a worktree and point `--tree` at it:
+`mobile_ui.py` is the phone check. At 390×844, in both languages, it measures
+that no tab falls off-screen, that the active-tab underline still lines up with
+the open tab, that the sidebar collapses to an overlay it can reopen, that
+nothing sits in two columns, and that every button and input clears 44px. One
+PASS/FAIL line per check, non-zero exit on any failure.
+
+54 shots per run: 3 viewports (phone/tablet/desktop) × 2 languages × 9 screens
+(login, project list, locations, characters, props, scene editor, shots, final
+reports, script analysis). To shoot an older commit for comparison, add a
+worktree and point `--tree` at it:
 
 ```
 git worktree add /tmp/cf-baseline <commit>
@@ -139,6 +147,7 @@ inside `app.py`.
 | `theme/inject.py` | the only place that writes CSS into the page |
 | `theme/flag.py` | `?theme=glass` resolution; defaults to `classic`, always |
 | `theme/components.py` | `glass_panel()` / `glass_card()` helpers |
+| `theme/mobile.py` | phone rules, all inside one `@media (max-width: 767px)` |
 
 Rules that are load-bearing:
 

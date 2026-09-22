@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from theme import contrast as C  # noqa: E402
-from theme import flag, glass, tokens  # noqa: E402
+from theme import flag, glass, mobile, tokens  # noqa: E402
 
 _results = []
 
@@ -265,6 +265,71 @@ def test_no_google_font_cdn_anywhere():
                       ("MAIN", classic.MAIN_CSS)):
         assert "fonts.googleapis.com" not in css, name
         assert "fonts.gstatic.com" not in css, name
+
+
+# --------------------------------------------------------------------------
+# 4) طبقة الموبايل — الحد اللي بيحمي التابلت وسطح المكتب
+# --------------------------------------------------------------------------
+
+@test
+def test_mobile_css_is_entirely_inside_one_media_query():
+    """أهم حد في الخطة: صفر فرق على التابلت وسطح المكتب.
+
+    الضمانة دي بنيوية مش بالنية: لو كل قاعدة جوه ‎@media (max-width: 767px)‎
+    يبقى مستحيل تتطبق على 834px أو 1440px. الاختبار ده بيقفل الباب على قاعدة
+    تتكتب بالغلط بره البلوك.
+    """
+    css = mobile.mobile_css().strip()
+    assert css.startswith("@media (max-width: 767px) {"), css[:80]
+    assert css.endswith("}")
+    # مفيش أي ‎}‎ على أول السطر غير القفلة الأخيرة = مفيش بلوك تاني بره
+    body = css[css.index("{") + 1: css.rindex("}")]
+    depth = 0
+    for ch in body:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            assert depth >= 0, "قوس زيادة — في قاعدة خرجت بره الـ @media"
+    assert depth == 0
+
+
+@test
+def test_mobile_breakpoint_is_below_the_tablet_viewport():
+    """767px مش رقم اعتباطي: هو ‎breakpoints.md - 1‎ بتاع Streamlit نفسه،
+    ولازم يفضل أقل من أضيق شاشة في الهارنس (tablet = 834px)."""
+    assert mobile.BREAKPOINT == 767
+    assert mobile.BREAKPOINT < 834
+
+
+@test
+def test_mobile_touch_target_matches_the_existing_standard():
+    from theme import classic  # noqa: PLC0415
+
+    assert mobile.TOUCH == 44
+    assert "44px" in classic.MAIN_CSS, "الرقم المرجعي اتغير في classic.py"
+    assert mobile.mobile_css().count("44px") >= 2
+
+
+@test
+def test_mobile_tab_bar_wraps_instead_of_scrolling():
+    """المرحلة 1: التبويبات بتلفّ أسطر. لو حد رجّع ‎nowrap‎ أو سكرول أفقي،
+    تبويب أو أكتر هيختفي على 390px تاني."""
+    css = mobile.mobile_css()
+    assert 'role="tablist"' in css
+    assert "flex-wrap: wrap" in css
+    assert "nowrap" not in css
+
+
+@test
+def test_mobile_text_never_drops_below_the_body_contrast_floor():
+    """المرحلة 3 بتصغّر العناوين على التليفون، والنص الصغير في WCAG بيتحاسب
+    على الحد الأعلى (4.5) مش حد النص الكبير (3.0). فبنتأكد إن كل زوج في
+    التصميم بيعدّي 4.5 كمان — يعني التصغير مبيوقعش أي زوج تحت الحد."""
+    for mode in ("dark", "light"):
+        rows, _ = C.audit([(n, f, b, C.BODY_FLOOR) for (n, f, b, _fl) in _pairs(mode)])
+        bad = [r["pair"] for r in rows if not r["pass"]]
+        assert not bad, f"{mode}: {bad} تحت 4.5 — التصغير على التليفون مش آمن"
 
 
 def _strip_comments(css):
