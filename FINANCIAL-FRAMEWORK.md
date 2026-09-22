@@ -415,3 +415,97 @@ direction, not fully modeled numbers, since they're policy/contract
 decisions more than pricing math. All four need the same owner+Mohamed
 sign-off as Cards A/B/C, and more so, since together they change what a
 subscription *is* (flat price → base-plus-usage), not just what it costs.
+
+## 12. The Ultimate Model — full repricing, ≥30% net floor guaranteed at any usage
+
+*Added 2026-09-22, at the owner's request: "create the ultimate best
+practice model to target achieving 30% net revenue per year, free to
+reprice, cost bases locked as per provider costs." Unlike Cards A/B/C
+(which kept sticker prices fixed and only resized allotments), this
+version reprices Go from scratch — its sticker prices were never
+re-examined for whether they made sense against real video cost, only
+patched around. AI vendor cost ($0.03/token, $0.45/clip) is the one locked
+input; everything else — price, allotment, tier count — was open.*
+
+### 12.1 Structure
+
+Combines every mechanism validated so far into one card:
+
+- **Metered overage (§11.1)**, applied to every tier: half of a locked-rate
+  full-equivalent allotment is bundled into the price, the rest meters at
+  the same **$0.043/token ($0.645/clip)** rate. This is what makes 30% a
+  **mathematical floor at any usage level**, not an assumption — proven by
+  running the arithmetic to absurd extremes (see below), not just at one
+  assumed consumption point the way Cards A/B/C were.
+- **Team tier (§11.2)** kept at $249/mo, unchanged — already well-placed
+  between Individual Pro and Enterprise Standard.
+- **Go repriced from scratch**, since its old $9/$29/$79 prices were
+  inherited, never actually designed against real clip cost:
+
+| Tier | Old price | New price | Bundled clips | Full-equiv clips |
+|---|---|---|---|---|
+| Go Starter | $9 | **$15** | 11 | 23 |
+| Go Popular | $29 | **$45** | 34 | 69 |
+| Go Value | $79 | **$99** | 76 | 153 |
+
+  Still beats Higgsfield/Magnific on price at every point (Higgsfield
+  $19→14–24 clips, $59→36–62, $129→76–131 — CimaFast's new prices are lower
+  at comparable-or-better clip counts throughout), so the reprice doesn't
+  cost the competitive position established in `AI-PROVIDER-COSTS.md` §8.
+- **Individual/Enterprise prices unchanged** ($39/$99, $499/$1,299/$3,999)
+  — these were reasoned through with the owner directly (§1's "Enterprise
+  buys infrastructure" logic); no cost-based reason to move them, only Go's
+  prices were actually broken.
+
+### 12.2 The floor is provably real, not assumed
+
+Enterprise Standard ($499, 5,802 bundled tokens), margin at increasing
+overage:
+
+| Extra tokens used beyond bundle | Effective revenue | Margin |
+|---|---|---|
+| 0 (bundled only) | $499 | 65.1% |
+| 5,802 (= old Card C full allotment) | $748 | 53.5% |
+| 50,000 | $2,649 | 36.8% |
+| 500,000 | $21,999 | 31.0% |
+| 5,000,000 | $215,499 | **30.3%** |
+
+Margin asymptotically approaches **30.2%** as usage grows without bound and
+never goes below it — the resale rate itself (1.433× cost) is the floor, by
+construction, regardless of how much or little any customer consumes. This
+is the actual "ultimate" property being targeted: 30% stops being something
+true only under one assumed usage level and becomes something true always.
+
+### 12.3 Annual results, 1,000-subscriber realistic population
+
+Same realistic long-tail mix as §7/§11 (93% Go/Individual/Team, 7%
+Enterprise, now across the repriced 9-tier ladder):
+
+| Scenario | ARR | Annual profit | Net margin |
+|---|---|---|---|
+| Typical usage (bundled only — the expected steady state) | $1,331,040 | $869,326 | **65.3%** |
+| Heaviest realistic usage (bundle + full historical-equivalent overage) | $1,997,947 | $1,070,949 | **53.6%** |
+| Typical usage, with a 15% annual-billing discount (§11.4) applied | $1,131,384 | — | **59.2%** |
+
+All three clear the 30% target by a wide margin — 30% is the guaranteed
+floor under pathological overage, not the expected outcome; realistic
+outcomes land 53–65%.
+
+**Concentration, re-checked one more time:** repricing Go upward (while
+staying cheaper than Higgsfield/Magnific) moves Enterprise's ARR share to
+**53.6%**, down from 67.5% with no Team tier and 57.3% with Team at old Go
+prices. Still the largest single contributor — repricing doesn't erase
+concentration, since that's still a function of Enterprise's price being
+inherently larger than Go's — but every lever pulled so far (Team, Go
+reprice) chips away at it in the same direction.
+
+### 12.4 What's still not in this number
+
+Same standing gap as every card before it: this is still **AI-generation
+vendor cost only**. Hosting, payment processing (~3% of revenue is a safe
+placeholder), support/CAM (scales with Enterprise account count
+specifically), and CAC are all still unpriced (§2.2, §8). At 53–65% margin
+on the AI-generation layer alone, there's real room to absorb those once
+they're modeled — but "30% net" in this section means net of *locked
+provider cost*, not net of the full P&L. Pricing the rest is the
+next real gap to close, not another rate card.
