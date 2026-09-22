@@ -130,6 +130,39 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   same file; show AI spend per project and company.
 - **P5 Looks and continuity** [universal-creative] — scenes that note a look
   change create or link a look; continuity-sensitive props tracked across scenes.
+- **P6 Learn from users' own linking choices, feed it back into analysis**
+  [universal-creative, infrastructure] — 🗒️ **Proposed 2026-09-22, not
+  scoped yet — topic to discuss at length with the owner and Ziad before
+  building.** Today every project starts analysis from a blank slate: a
+  location or character comes out of script analysis as a bare name, and a
+  user fills in its description and every prop/wardrobe link by hand, even
+  though users make the same kind of linking decision constantly across
+  their own projects. Checked the codebase for any existing learning loop —
+  there isn't one (`audit_log`/`usage_events` record *that* a field changed,
+  not a queryable "what got linked to what" dataset; `location_matcher.py`
+  is a fixed regex/dictionary matcher, not learning). Idea: capture what
+  users actually choose and add while working inside their projects (a
+  database of real linking decisions — locations, characters, descriptions,
+  which props/wardrobe belong to which character/scene) and feed it back
+  into script analysis, the very first step, so locations, characters, their
+  descriptions and full details come out pre-filled instead of empty. Users
+  can still edit anything the AI got wrong — analysis proposes, it never
+  silently overrides a human edit. *Open questions for that discussion:*
+  what counts as a reusable pattern vs. one company's private data (must not
+  leak one company's project details into another's, per Principle 1);
+  what "done" looks like; who owns the review before this goes further than
+  a proposal.
+- **P7 A universal script-analysis prompt across production types**
+  [universal-creative] — 🗒️ **Proposed 2026-09-22, not scoped yet — same
+  discussion as P6.** The analysis prompt today isn't developed to
+  distinguish a series from a feature film from an ad from a short video, or
+  a professional production user from someone with no industry background.
+  Idea: develop the core analysis prompt so the same agent reads screenplay
+  or brief-style input across all of those production shapes and industry
+  norms, and adapts its questions/explanations to how much the user already
+  knows about the craft — still bound by the existing rule that extracted
+  data must mirror the source exactly, never invent content
+  (`cimafast-never-invent-data`).
 
 ### Phase 3 — Scheduling and shoot days (the heart of a production ERP)
 
