@@ -25,6 +25,73 @@ The output isn't a `.docx` or `.pdf` — it's a new, CimaFast-owned file
 format/extension for this editor, produced by the tool screenwriters would
 use to write.
 
+## Who reaches this tool, and why (owner's elaboration, 2026-09-22)
+
+Real production practice, as described: work on a film or series starts from
+three roles — producer, director, script writer. That triangle decides how
+production will run, what gets written, where the story goes, and its size
+and detail. On an Enterprise subscription, these three are the company's
+first users.
+
+Most of the time in real production the script isn't written cold: a
+treatment/synopsis tracks the story's events as an idea first, and only
+after the trio agrees does the writer produce the actual script — precisely
+so the writer doesn't write pages the director rejects, or that turn out not
+to be production-feasible, unless the script was already written in full
+independently of that agreement. So the producer, director and writer are
+usually all present *at the writing stage itself*, not just reviewing a
+finished draft afterward.
+
+Two entry paths follow from that: the writer opens their own account and
+either brings an old script to load into the new editor to keep working on
+it, or the producer creates the writer's CimaFast account and hands them an
+existing script to put on the system.
+
+## The confirm flow, more concretely
+
+As the writer works — fresh or imported — the system walks the script line
+by line, proposes tags, and asks for confirmation on each: *"Is this a
+location state? Clothing for a character? Are these two character names
+actually the same person?"* Two ways this could surface, both raised in the
+same breath: a running questionnaire the writer works through, or a mark/
+highlight directly on the specific lines or names that still have open
+questions, so the writer goes and resolves those in place. Either way, the
+writer keeps confirming until the script reads as unambiguous to the system —
+at which point everything downstream (breakdown, shots, reports) is grounded
+in something the writer actually attested to, not a guess.
+
+## Role-based default views — a related but distinct idea, worth scoping separately
+
+Once inside, each role should see the part of the system relevant to their
+work, not the same undifferentiated view everyone gets today. As described:
+script writer and director mainly work from shot lists (their découpage);
+the producer mainly works from reports; producer and director can both see
+everything, but each role still has its own prioritized lists within that.
+
+**Checked against the current code before recording this — partial
+infrastructure already exists, this isn't a blank page:**
+- `home.py`'s `needs_you()` already surfaces role- and job-title-specific
+  "needs your attention" items per project (e.g. a `manager`-role user whose
+  job title contains "مخرج" (director) already gets shot-related alerts
+  pointing at the shots tab — already close to what's being asked for the
+  director role).
+- But there is **no formal `director` or `script writer` role** in the
+  permission system — `permissions.py`'s role set is
+  `{operator, admin, producer, manager, department}` (F2). "Director" and
+  "script writer" exist today only as free-text job-title keywords matched
+  inside `home.py`'s rule table, which is fragile (depends on the exact
+  Arabic word appearing in a free-text job-title field) and only drives a
+  "needs attention" alert list, not a full default view.
+- And **reports aren't a target in that rule table at all today** — nothing
+  currently makes a producer's default view be reports.
+
+So this piece isn't "build a new role system from scratch" — it's extending
+the existing `home.py`/H1 mechanism (and possibly promoting director/script-
+writer to real roles in F2) rather than inventing a parallel one. Worth
+scoping as its own conversation once P8 itself is further along, since it's
+really about *every* role's home experience, not specific to the script
+editor.
+
 ## Why this matters (analysis)
 
 **This is the source-fidelity answer to `P6`, not a separate idea.** `P6`
