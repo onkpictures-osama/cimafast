@@ -76,8 +76,8 @@ that CimaFast data work must never imply more than what's actually sourced).
 ## 3. Margin policy — three cards, one decision needed
 
 `AI-PROVIDER-COSTS.md` §5.5–5.6 worked out two complete rate cards against
-the same $0.03/token cost basis; a third (Card C) was added 2026-09-22 at the
-owner's request, targeting a firm 30% floor. The only variable between all
+the same $0.03/token cost basis; a third (Card C) was added 2026-09-22 at
+Mohamed El-Zayat's request, targeting a firm 30% floor. The only variable between all
 three is resale price per token:
 
 | | Resale rate | Margin | Enterprise Standard tokens | Go Starter clips |
@@ -101,7 +101,7 @@ thinner card and have to claw back.
 
 ### 3.1 Card C — reworked to guarantee ≥30% profit in every tier
 
-*Added 2026-09-22, at the owner's request: rework the whole pricing so every
+*Added 2026-09-22, at Mohamed El-Zayat's request: rework the whole pricing so every
 tier clears at least 30% profit, validated against the two subscriber-mix
 scenarios in §7 (normal-distribution and realistic long-tail populations).*
 
@@ -228,7 +228,7 @@ larger number of Go/Individual accounts in raw MRR, under any realistic mix.
 
 **What this means in practice — a real dependency risk, not just a modeling
 curiosity:** if the subscriber base does end up mostly "average users" (the
-likely real outcome, per the owner's read), CimaFast's revenue stays
+likely real outcome, per Mohamed El-Zayat's read), CimaFast's revenue stays
 concentrated in a small number of Enterprise accounts regardless. That's a
 customer-concentration risk worth planning around explicitly, separate from
 the margin questions in §3:
@@ -310,7 +310,7 @@ floor-case model against list prices with 0 paying subscribers today.
 
 ## 11. Model v2 — a best-practices rethink
 
-*Added 2026-09-22, at the owner's request to "rethink the model freely
+*Added 2026-09-22, at Mohamed El-Zayat's request to "rethink the model freely
 based on best practices" after §7 showed that no rate card (A/B/C) fixes
 revenue concentration — only the tier architecture itself can. This is a
 structural proposal on top of Cards A/B/C, not a replacement for the margin
@@ -418,7 +418,7 @@ subscription *is* (flat price → base-plus-usage), not just what it costs.
 
 ## 12. The Ultimate Model — full repricing, ≥30% net floor guaranteed at any usage
 
-*Added 2026-09-22, at the owner's request: "create the ultimate best
+*Added 2026-09-22, at Mohamed El-Zayat's request: "create the ultimate best
 practice model to target achieving 30% net revenue per year, free to
 reprice, cost bases locked as per provider costs." Unlike Cards A/B/C
 (which kept sticker prices fixed and only resized allotments), this
@@ -512,7 +512,7 @@ next real gap to close, not another rate card.
 
 ## 13. The full-cost model — every cost, not just AI-generation
 
-*Added 2026-09-22, at the owner's request: "add all costs to your base cost
+*Added 2026-09-22, at Mohamed El-Zayat's request: "add all costs to your base cost
 before calculating profit and rethink it." §12's 30–65% margins were real,
 but only against the AI-generation layer — this section adds hosting,
 payment processing, support, and CAC, and reprices where the full picture
