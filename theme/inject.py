@@ -61,7 +61,7 @@ THEME_COLOR = tokens.BRAND["midnight"]
 
 
 def _document_attrs(st, lang):
-    """بيظبط ‎lang‎ على ‎<html>‎ وبيحط ‎theme-color‎.
+    """بيظبط ‎lang‎ على ‎<html>‎ وبيحط ‎theme-color‎ + أيقونة الشاشة الرئيسية.
 
     Streamlit بيسيب ‎<html lang="en">‎ ثابت، فقارئ الشاشة كان بيقرا العربي
     بصوت إنجليزي، والمتصفح بيختار قواعد التقطيع والخطوط على إنه إنجليزي.
@@ -72,6 +72,15 @@ def _document_attrs(st, lang):
 
     ‎st.html‎ بالسكريبت بيشتغل في الصفحة نفسها من غير iframe. القيمة بتتحط في
     كل rerun، فلما اللغة تتغير ‎lang‎ بيتبعها.
+
+    ‎apple-touch-icon‎ و‎manifest‎: ‎page_icon=‎ في ‎set_page_config‎ (app.py)
+    بيظبط فافيكون التاب بس. من غيرهم، "إضافة للشاشة الرئيسية" على الموبايل
+    بترجع لسلوك المتصفح الافتراضي: لقطة شاشة للصفحة مقصوصة وملزّقة — مش
+    اللوجو. المسار نسبي (‎app/static/…‎) زي خطوط ‎config.toml‎ بالظبط؛ نفس
+    النمط ده شغال فعلاً في الإنتاج تحت ‎/v1/‎ لأن Streamlit بيحوّل ‎/v1‎
+    (من غير الشرطة) لـ ‎/v1/‎ دايمًا (307)، فالمستند بيتحمّل من مسار فيه
+    الشرطة على طول والمسار النسبي بيتحل صح — العلامة موجودة في ‎data:‎ URI
+    بس عشان محتاجينها جوه HTML متحقن، مش جوه ‎<link>‎ في الهيد.
     """
     lang = "en" if lang == "en" else "ar"
     st.html(
@@ -81,6 +90,14 @@ def _document_attrs(st, lang):
         "if(!m){m=document.createElement('meta');m.name='theme-color';"
         "document.head.appendChild(m);}"
         f"m.content='{THEME_COLOR}';"
+        "if(!document.querySelector('link[rel=apple-touch-icon]')){"
+        "var a=document.createElement('link');a.rel='apple-touch-icon';"
+        "a.href='app/static/brand/apple-touch-icon.png';"
+        "document.head.appendChild(a);}"
+        "if(!document.querySelector('link[rel=manifest]')){"
+        "var mf=document.createElement('link');mf.rel='manifest';"
+        "mf.href='app/static/manifest.webmanifest';"
+        "document.head.appendChild(mf);}"
         "})();</script>",
         unsafe_allow_javascript=True,
     )
