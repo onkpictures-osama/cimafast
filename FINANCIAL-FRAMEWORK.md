@@ -73,27 +73,75 @@ margin," a necessary input, not the whole P&L. Flagging this explicitly
 rather than presenting a partial number as complete (per the standing rule
 that CimaFast data work must never imply more than what's actually sourced).
 
-## 3. Margin policy — two cards, one decision needed
+## 3. Margin policy — three cards, one decision needed
 
 `AI-PROVIDER-COSTS.md` §5.5–5.6 worked out two complete rate cards against
-the same $0.03/token cost basis. The only variable between them is resale
-price per token:
+the same $0.03/token cost basis; a third (Card C) was added 2026-09-22 at the
+owner's request, targeting a firm 30% floor. The only variable between all
+three is resale price per token:
 
 | | Resale rate | Margin | Enterprise Standard tokens | Go Starter clips |
 |---|---|---|---|---|
 | **Card A (50% margin)** | $0.06/token | 50.0–50.4% | 8,300 (vs. 15,000 drafted) | 10 (5-sec clips) |
 | **Card B (33% margin, "50% markup on cost")** | $0.045/token | 33.3–35.0% | 11,088 | 13 |
+| **Card C (30% floor, per-tier)** | $0.043/token | 30.2–35.0% | 11,604 | 13 |
 
-They trade off mechanically: Card B gives customers ~33% more tokens at the
-same sticker price and costs CimaFast about a third of its profit per
-subscription to do it. Neither is more "correct" — Card A is the safer
-floor if usage runs hotter than modeled, Card B looks more generous next to
-Kling/Runway/Pika-style consumer credit counts. **This needs an explicit
+They trade off mechanically: a lower resale rate gives customers more
+tokens/clips at the same sticker price and costs CimaFast a larger share of
+its potential profit per subscription. Card A is the safest floor if usage
+runs hotter than modeled; Card B looks more generous next to
+Kling/Runway/Pika-style consumer credit counts; **Card C is sized to the
+specific instruction to guarantee at least 30% profit in every tier
+individually — not just in blended terms** (§3.1). **This needs an explicit
 owner+Mohamed pick, since every other number in this framework (tokens
 included, EGP price, Go clip counts) is downstream of it.** Recommend Card A
 (50%) as the working default until that conversation happens, since it's the
-safer error to default to — cheaper to loosen later than to have sold Card B
-and have to claw back.
+safer error to default to — cheaper to loosen later than to have sold a
+thinner card and have to claw back.
+
+### 3.1 Card C — reworked to guarantee ≥30% profit in every tier
+
+*Added 2026-09-22, at the owner's request: rework the whole pricing so every
+tier clears at least 30% profit, validated against the two subscriber-mix
+scenarios in §7 (normal-distribution and realistic long-tail populations).*
+
+**Method — same lever as Cards A/B, not a sticker-price change.** Card C
+keeps every listed subscription price exactly as drafted and instead resizes
+what each tier includes, at a resale rate of **$0.043/token** (≈1.433× the
+$0.03 cost basis) and **$0.645/clip** (15 tokens/clip) for Go. Token/clip
+counts are floored (rounded down) the same way Cards A/B are, so real margin
+is never under the 30% target:
+
+| Tier | Price/mo | Tokens/clips | Vendor cost | Profit | Margin |
+|---|---|---|---|---|---|
+| Enterprise Standard | $499 | 11,604 tokens | $348.12 | $150.88 | 30.2% |
+| Enterprise Pro | $1,299 | 30,209 tokens | $906.27 | $392.73 | 30.2% |
+| Enterprise Ultimate | $3,999 | 93,000 tokens | $2,790.00 | $1,209.00 | 30.2% |
+| Individual Standard | $39 | 906 tokens | $27.18 | $11.82 | 30.3% |
+| Individual Pro | $99 | 2,302 tokens | $69.06 | $29.94 | 30.2% |
+| Go Starter | $9 | 13 clips | $5.85 | $3.15 | 35.0% |
+| Go Popular | $29 | 44 clips | $19.80 | $9.20 | 31.7% |
+| Go Value | $79 | 122 clips | $54.90 | $24.10 | 30.5% |
+
+**Every tier clears the 30% floor individually** — the range is 30.2–35.0%,
+never below target. Validated against both subscriber-mix scenarios from §7
+(same 1,000-subscriber populations, Card C prices/allotments applied
+instead of Card A's):
+
+| Scenario | Total MRR | Vendor cost | Profit | Blended margin |
+|---|---|---|---|---|
+| A — normal distribution | $375,010 | $261,535 | $113,475 | 30.3% |
+| B — realistic long-tail | $95,500 | $66,342 | $29,158 | 30.5% |
+
+Blended margin holds at ~30% under **either** population shape, which is
+expected — margin is a per-token property of the rate card, not of who buys
+it, so the population mix changes total profit dollars but not the margin
+percentage. **This does not touch the revenue-concentration finding in §7**:
+Card C still gives customers 30–40% more tokens/clips than Card A for the
+same price, which lowers CimaFast's absolute profit per subscriber at every
+tier (most visibly at Enterprise, where the dollar amounts are largest) —
+it makes the AI-generation layer cheaper for customers, not more balanced
+across personas.
 
 **The highest-leverage lever either way:** default generations at
 draft/preview quality with a paid step-up to finish, which alone gets the
