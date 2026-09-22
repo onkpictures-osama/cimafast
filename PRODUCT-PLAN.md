@@ -163,6 +163,21 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   knows about the craft — still bound by the existing rule that extracted
   data must mirror the source exactly, never invent content
   (`cimafast-never-invent-data`).
+- ⭐ **P8 A dedicated screenwriting app with a CimaFast-native script format**
+  [universal-creative] — **Highlighted 2026-09-22 — priority discussion
+  topic, not scoped, not built, not to be deployed.** A "Word, but for
+  screenwriters": writers work in standard screenplay format and tag
+  characters/decor/props inline as they write, with auto-detection asking
+  short clarifying questions ("is this a location state, a different
+  outfit, whose prop is this, dialogue or description?"), so the full
+  story's detail exists as structured data inside the script file itself —
+  saved in a new CimaFast-owned format instead of `.docx`/`.pdf`. This is
+  the source-fidelity version of P6 (tag it live, at the moment the writer
+  knows the answer, instead of inferring it later) — read together with P6
+  in that discussion, not separately. Full writeup, analysis and open
+  questions (adoption cost of a new file format, flow vs. interruption,
+  relationship to the existing importer, honest scope) in
+  **`SCRIPT-EDITOR-PLAN.md`**.
 
 ### Phase 3 — Scheduling and shoot days (the heart of a production ERP)
 
