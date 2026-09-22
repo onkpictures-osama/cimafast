@@ -170,9 +170,13 @@ def _logout():
 
 
 def _nav_link(label, href):
-    """لينك في الـ sidebar بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا
-    بيفتح تاب جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب."""
-    st.sidebar.markdown(
+    """لينك بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا بيفتح تاب
+    جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب.
+
+    ‎st.markdown‎ عادي مش ‎st.sidebar.markdown‎ عمدًا: بيترسم في أي حاوية
+    (عمود، شريط جانبي...) اللي بينادي عليها من جواها، مش الشريط الجانبي
+    دايمًا."""
+    st.markdown(
         f'<a class="cf-navlink" href="{html.escape(href, quote=True)}" target="_self">{html.escape(label)}</a>',
         unsafe_allow_html=True)
 
@@ -351,43 +355,29 @@ theme.inject_main(
 
 
 # ---------------- الشريط الجانبي ----------------
-# هيكل ثابت طلبه المالك 2026-09-22: قسمين بس. ⚙️ الإعدادات (لوجو، لغة،
-# الحساب ونوع الاشتراك، خروج) فوق، و📁 مشاريعي تحته. أي تفاصيل تنفيذية خاصة
-# بمشروع معيّن (تعديل/حذف، الحلقات، الفريق، جدول التصوير) بقت في تبويب
-# "⚙️ إعدادات المشروع" جوه المشروع نفسه (views/project_settings.py) —
-# مش هنا. وكلمة "شركة" مش بتظهر في أي مكان غير نوع الاشتراك.
+# إعادة تصميم 2026-09-22 (تانية): "مشاريعي" أول حاجة تحت لوجو مختصر —
+# مش قسم "إعدادات" كامل فوقها. كل حاجة عن الحساب (اللغة، نوع الاشتراك،
+# الرئيسية، الخروج) بقت شريط واحد رفيع تحت خالص، بعد ما تختار مشروعك، مش
+# قبله. صندوق الوصف الطويل بقى بطاقة popover تتفتح بالطلب (ℹ️) وتتقفل
+# لوحدها — مش صندوق ثابت دايمًا ظاهر. أي تفاصيل تنفيذية خاصة بمشروع معيّن
+# (تعديل/حذف، الحلقات، الفريق، جدول التصوير) في تبويب "⚙️ إعدادات المشروع"
+# جوه المشروع نفسه (views/project_settings.py) — مش هنا. وكلمة "شركة" مش
+# بتظهر في أي مكان غير نوع الاشتراك.
 
-st.sidebar.markdown(
-    f"""
-    <div class="cf-sidebar-header">
-        <div class="cf-title">🎬 CimaFast Studio</div>
-        <div class="cf-subtitle">{tr('studio_tagline')}</div>
-        <div class="cf-desc-box">{t(_APP_DESCRIPTION)}</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+_brand_col, _info_col = st.sidebar.columns([5, 1])
+with _brand_col:
+    st.markdown('<div class="cf-title">🎬 CimaFast Studio</div>', unsafe_allow_html=True)
+with _info_col:
+    with st.popover("ℹ️"):
+        st.markdown(f"**{tr('studio_tagline')}**")
+        st.caption(t(_APP_DESCRIPTION))
 
-st.sidebar.caption(tr("settings"))
-
-# زرارين كبيرين نص عرض الشريط لكل واحد كانوا تقيلين جدًا لمجرد اختيار لغة —
-# خصوصًا على الموبايل. segmented_control عنصر واحد مدمج بحجمه الطبيعي
-# (width="content")، مش متمدد لعرض العمود.
-_lang_widget_key = "lang_toggle"
-if _lang_widget_key not in st.session_state:
-    st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
-_lang_selected = st.sidebar.segmented_control(
-    "Language", options=["AR", "EN"], key=_lang_widget_key,
-    required=True, label_visibility="collapsed",
-)
-if _lang_selected.lower() != st.session_state["ui_lang"]:
-    st.session_state["ui_lang"] = _lang_selected.lower()
-    st.rerun()
+st.sidebar.caption(f"📁 {tr('sidebar_projects')}")
 
 _current_user = st.session_state.get("_auth_user")
 
 # F1: المستخدم بيشوف مشاريع الحسابات اللي هو عضو فيها بس. لو عضو في أكتر من
-# حساب (أو المشغّل)، بيختار واحد. بنجيبها بدري عشان نعرض نوع الاشتراك فوق.
+# حساب (أو المشغّل)، بيختار واحد.
 _my_companies = accounts.companies_for(_current_user or "")
 if not _my_companies:
     st.sidebar.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
@@ -416,11 +406,11 @@ if len(_my_companies) > 1:
 else:
     _company = _my_companies[0]
 company_id = _company["id"]
-# B5: اسم المستخدم + نوع الاشتراك (Enterprise / Studio / Creator) — كلمة
-# "شركة" ماتظهرش هنا خالص، الإطار كله User + نوع اشتراك.
+# B5: نوع الاشتراك (Enterprise / Studio / Creator) — كلمة "شركة" ماتظهرش
+# هنا خالص، الإطار كله User + نوع اشتراك. العرض الفعلي بقى في الشريط
+# السفلي تحت (بعد اختيار المشروع)، مش هنا.
 _tier = _company.get("subscription_tier") or "creator"
 _tier_label = accounts.TIER_LABELS.get(_tier, _tier)
-st.sidebar.caption(f"{tr('logged_in_as')}: {_current_user} · **{_tier_label}**")
 # F2: من هنا لحد آخر الـ run (والـ callbacks في الـ run الجاي) كل كتابة بتتفحص بالدور ده
 _role = _company["role"]
 st.session_state["_cf_role"] = _role
@@ -429,17 +419,6 @@ st.session_state["_cf_company"] = company_id
 _can_edit = permissions.can(_role, "edit")
 if not _can_edit:
     st.sidebar.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
-
-if _current_user:
-    if st.sidebar.button(tr("logout"), use_container_width=True, key="logout_btn"):
-        _logout()
-        st.rerun()
-
-if os.environ.get("CIMAFAST_HOME_URL"):
-    _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
-
-st.sidebar.divider()
-st.sidebar.caption(f"📁 {tr('sidebar_projects')}")
 
 projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
@@ -474,9 +453,38 @@ project_id = project_names[selected_project_name]
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
 
-# جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات، اسمك ودورك — كل
-# التفاصيل التنفيذية دي بقت في تبويب "⚙️ إعدادات المشروع" (views/
-# project_settings.py) بدل الشريط الجانبي، زي ما طلب المالك.
+# شريط الحساب — رفيع، في الآخر خالص، بعد ما اخترت مشروعك مش قبله. اسمك
+# ونوع اشتراكك في سطر، اللغة سطر لوحدها (لازمة مسافة لقطعتين)، والرئيسية/
+# الخروج جنب بعض تحت (أيقونات + tooltip بدل عناصر كل واحد ياخد سطر لوحده).
+st.sidebar.divider()
+st.sidebar.caption(f"{_current_user} · **{_tier_label}**")
+
+# segmented_control عنصر واحد مدمج بحجمه الطبيعي — بديل الزرارين الكبيرين
+# اللي كانوا نص عرض الشريط لكل واحد. سطر لوحده عشان قطعتين محتاجين مساحة.
+_lang_widget_key = "lang_toggle"
+if _lang_widget_key not in st.session_state:
+    st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
+_lang_selected = st.sidebar.segmented_control(
+    "Language", options=["AR", "EN"], key=_lang_widget_key,
+    required=True, label_visibility="collapsed",
+)
+if _lang_selected.lower() != st.session_state["ui_lang"]:
+    st.session_state["ui_lang"] = _lang_selected.lower()
+    st.rerun()
+
+_prof_home, _prof_out = st.sidebar.columns(2)
+with _prof_home:
+    if os.environ.get("CIMAFAST_HOME_URL"):
+        _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
+with _prof_out:
+    if st.button("🚪", key="logout_btn", help=tr("logout")):
+        _logout()
+        st.rerun()
+st.sidebar.divider()
+
+# جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات — كل التفاصيل
+# التنفيذية دي بقت في تبويب "⚙️ إعدادات المشروع" (views/project_settings.py)
+# بدل الشريط الجانبي، زي ما طلب المالك.
 _board_url = os.environ.get("CIMAFAST_BOARD_URL")
 
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير

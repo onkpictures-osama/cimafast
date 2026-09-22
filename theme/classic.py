@@ -319,6 +319,17 @@ MAIN_CSS = r'''
         background-color: rgba(18, 32, 61, 0.14) !important;
         border-radius: 8px;
     }
+    /* segmented_control (زرار اللغة AR/EN) - نفس مشكلة الـ expander بالظبط:
+       Streamlit بيحط خلفية غامقة افتراضية على القطعة الغير مختارة، والقاعدة
+       العامة فوق بتحط نص كحلي على أي حاجة في الشريط - نص كحلي على خلفية
+       غامقة بيختفي. القطعة المختارة أصلاً خلفيتها فاتحة (تينت ذهبي) فمالهاش
+       نفس المشكلة، بس بنثبّتها هنا برضو عشان الاتساق. */
+    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"] {
+        background-color: rgba(18, 32, 61, 0.08) !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] {
+        background-color: rgba(232, 185, 35, 0.45) !important;
+    }
     /* علامة "تم الحفظ" - نص رفيع بسيط على أرضية التصميم، مش شكل زرار،
        بتفضل ظاهرة بعد الحفظ لحد ما المستخدم يحفظ سجل تاني */
     .cf-saved-badge {
