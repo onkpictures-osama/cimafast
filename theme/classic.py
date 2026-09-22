@@ -171,6 +171,13 @@ MAIN_CSS = r'''
     section[data-testid="stSidebar"] * {
         color: var(--cf-on-brand) !important;
     }
+    /* Streamlit بيحط ‎opacity: .6‎ على النص التوضيحي (caption). على أرضية
+       غامقة ده مقبول، بس على الحقل الأصفر الكحلي بينزل من 9.67:1 لـ 3.64:1
+       — تحت الحد الأدنى. قاعدة الدليل إن النص فوق الأصفر Ink كامل مش باهت،
+       فبنرجّع الشفافية لواحد هنا بس (جوه الشريط الجانبي). */
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+        opacity: 1 !important;
+    }
     section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
     section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label {
         color: var(--cf-on-brand) !important;
@@ -370,13 +377,23 @@ MAIN_CSS = r'''
     /* segmented_control (زرار اللغة AR/EN) - نفس مشكلة الـ expander بالظبط:
        Streamlit بيحط خلفية غامقة افتراضية على القطعة الغير مختارة، والقاعدة
        العامة فوق بتحط نص كحلي على أي حاجة في الشريط - نص كحلي على خلفية
-       غامقة بيختفي. القطعة المختارة أصلاً خلفيتها فاتحة (تينت ذهبي) فمالهاش
-       نفس المشكلة، بس بنثبّتها هنا برضو عشان الاتساق. */
+       غامقة بيختفي.
+
+       القطعة المختارة كانت تينت دهبي فوق الشريط. ده كان بالكاد باين على
+       التدرّج القديم، وبقى مختفي تمامًا فوق الأصفر المصمت (أصفر على أصفر).
+       فالمختارة بقت العكس: تعبئة Ink وحروف بيضا (14.86:1)، وهو نفس أسلوب
+       "chip مختار = تعبئة اللكنة" في الدليل - واللكنة فوق حقل أصفر هي Ink. */
     section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"] {
         background-color: rgba(27, 37, 75, 0.08) !important;
+        border: 1px solid rgba(27, 37, 75, 0.25) !important;
     }
     section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] {
-        background-color: rgba(254, 202, 5, 0.45) !important;
+        background-color: var(--cf-on-brand) !important;
+        border-color: var(--cf-on-brand) !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"],
+    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] * {
+        color: var(--cf-white) !important;
     }
     /* علامة "تم الحفظ" - نص رفيع بسيط على أرضية التصميم، مش شكل زرار،
        بتفضل ظاهرة بعد الحفظ لحد ما المستخدم يحفظ سجل تاني */
@@ -451,6 +468,18 @@ MAIN_CSS = r'''
         border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04);
     }
     a.cf-navlink:hover, a.cf-navlink:focus-visible { border-color: var(--cf-accent); color: var(--cf-text); }
+    /* نفس الرابط جوه الشريط الجانبي بيقف فوق الحقل الأصفر مش فوق الأرضية
+       الغامقة، فالحد والخلفية البيضا الشفافة بيختفوا خالص. نسخة الحقل
+       الأصفر: حد Ink وتعبئة Ink خفيفة - نفس لغة باقي عناصر الشريط. */
+    section[data-testid="stSidebar"] a.cf-navlink {
+        border: 1px solid rgba(27, 37, 75, 0.30);
+        background: rgba(27, 37, 75, 0.06);
+    }
+    section[data-testid="stSidebar"] a.cf-navlink:hover,
+    section[data-testid="stSidebar"] a.cf-navlink:focus-visible {
+        border-color: var(--cf-on-brand);
+        background: rgba(27, 37, 75, 0.14);
+    }
     .cf-progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
     .cf-progress-seg {
         flex: 1; height: 4px; border-radius: 2px;
