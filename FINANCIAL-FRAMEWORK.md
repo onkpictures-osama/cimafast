@@ -62,8 +62,10 @@ by count, 7% Enterprise):**
 | Enterprise's share of ARR | 56.5% |
 
 **The one finding this framework does not resolve, and isn't trying to
-anymore:** revenue concentration in Enterprise is structural (§7's 444×
-price-ratio finding), and pricing Enterprise to cover its *real* cost to
+anymore:** revenue concentration in Enterprise is structural (§7's original
+444× price-ratio finding, now ~267× at current repriced Go Starter $15 vs.
+Enterprise Ultimate $3,999 — smaller, not gone), and pricing Enterprise to
+cover its *real* cost to
 serve (§13–14) pushed its revenue share up, not down — fixing margin and
 reducing concentration pull in opposite directions. Fourteen sections of
 rate-carding confirmed this isn't a pricing-math problem to out-model; it's
