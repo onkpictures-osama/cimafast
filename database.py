@@ -331,7 +331,10 @@ def init_db():
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             active INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT
+            created_at TEXT,
+            -- B5: نوع الاشتراك (creator / studio / enterprise) — بيحدد إمكانية
+            -- إضافة فريق. مبدئي لحد ما B5 يتقفل مع المالك.
+            subscription_tier TEXT DEFAULT 'creator'
         );
 
         CREATE TABLE IF NOT EXISTS users (
@@ -608,7 +611,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             active INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT
+            created_at TEXT,
+            -- B5: نوع الاشتراك (creator / studio / enterprise) — بيحدد إمكانية
+            -- إضافة فريق. مبدئي لحد ما B5 يتقفل مع المالك.
+            subscription_tier TEXT DEFAULT 'creator'
         );
 
         CREATE TABLE IF NOT EXISTS users (
@@ -688,6 +694,11 @@ def init_db():
 # أعمدة اتضافت بعد أول نسخة من قاعدة البيانات - المهاجرة دي بتضيفها لأي
 # قاعدة بيانات قديمة موجودة عند المستخدم من غير ما تأثر على بياناته
 _MIGRATIONS = {
+    "companies": [
+        # B5: نوع الاشتراك (creator / studio / enterprise). مبدئي — لحد ما
+        # B5 يتقفل مع المالك، كل الشركات الموجودة بتاخد creator.
+        ("subscription_tier", "TEXT DEFAULT 'creator'"),
+    ],
     "projects": [
         # F1: كل مشروع تبع شركة. المشاريع القديمة بتتربط بالشركة الافتراضية في
         # accounts.migrate_accounts() أول ما البرنامج يشتغل.

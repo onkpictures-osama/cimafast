@@ -221,6 +221,30 @@ def test_admin_renames_the_company():
     _raises(accounts.AccessDenied, accounts.rename_company, "dop_a", a_id, "x")
 
 
+# --- B5: نوع الاشتراك (creator / studio / enterprise) --------------------------------
+
+@test
+def test_new_companies_default_to_creator_tier():
+    a_id = accounts.companies_for("admin_a")[0]["id"]
+    row = [c for c in accounts.companies_for("admin_a") if c["id"] == a_id][0]
+    assert row["subscription_tier"] == "creator"
+
+
+@test
+def test_only_the_operator_changes_the_subscription_tier():
+    a_id = accounts.companies_for("admin_a")[0]["id"]
+    _raises(accounts.AccessDenied, accounts.set_subscription_tier, "admin_a", a_id, "enterprise")
+    accounts.set_subscription_tier("melzayat", a_id, "enterprise")
+    row = [c for c in accounts.companies_for("admin_a") if c["id"] == a_id][0]
+    assert row["subscription_tier"] == "enterprise"
+
+
+@test
+def test_an_unknown_tier_is_rejected():
+    a_id = accounts.companies_for("admin_a")[0]["id"]
+    _raises(ValueError, accounts.set_subscription_tier, "melzayat", a_id, "gold")
+
+
 def main():
     failed = 0
     for fn in _results:

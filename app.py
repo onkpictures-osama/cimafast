@@ -361,10 +361,10 @@ with _lang_col2:
         st.session_state["ui_lang"] = "ar"
         st.rerun()
 
-# المستخدم الحالي وزرار الخروج (بيظهر بس لما يكون فيه تسجيل دخول فعلي)
+# زرار الخروج (بيظهر بس لما يكون فيه تسجيل دخول فعلي). اسم المستخدم ونوع
+# الاشتراك بيتعرضوا تحت، بعد ما الشركة/الحساب يتحدد — تحتاج company_id.
 _current_user = st.session_state.get("_auth_user")
 if _current_user:
-    st.sidebar.caption(f"{tr('logged_in_as')}: {_current_user}")
     if st.sidebar.button(tr("logout"), use_container_width=True, key="logout_btn"):
         _logout()
         st.rerun()
@@ -412,6 +412,11 @@ else:
     _company = _my_companies[0]
     st.sidebar.caption(f"🏢 {_company['name']}")
 company_id = _company["id"]
+# B5: اسم المستخدم + نوع الاشتراك (Enterprise / Studio / Creator) — عربة
+# الأولوية اللي طلبها المالك 2026-09-22، قبل باقي إعادة تصميم الـ sidebar.
+_tier = _company.get("subscription_tier") or "creator"
+_tier_label = accounts.TIER_LABELS.get(_tier, _tier)
+st.sidebar.caption(f"{tr('logged_in_as')}: {_current_user} · **{_tier_label}**")
 # F2: من هنا لحد آخر الـ run (والـ callbacks في الـ run الجاي) كل كتابة بتتفحص بالدور ده
 _role = _company["role"]
 st.session_state["_cf_role"] = _role

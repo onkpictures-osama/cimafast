@@ -45,6 +45,14 @@ ROLE_LABELS = {
 }
 DEFAULT_COMPANY = "الشركة الافتراضية"
 
+# B5 ("بوابات الاشتراك"): نوع الاشتراك بيحدد قدرة الحساب على ضم فريق —
+# creator شغال لوحده دايمًا، studio بيضيف فريق صغير، enterprise بيضيف عدد
+# كبير. الأسماء والأرقام دي لسه مقترحة (SUBSCRIPTIONS-PLAN.md) مش مقفولة
+# نهائيًا، فده تمثيل مبدئي مش نظام فوترة حقيقي.
+TIERS = ("creator", "studio", "enterprise")
+TIER_LABELS = {"creator": "Creator", "studio": "Studio", "enterprise": "Enterprise"}
+TIER_ALLOWS_TEAM = {"creator": False, "studio": True, "enterprise": True}
+
 # الحسابات القديمة أغلبها أسماء وظايف؛ ده أول تخمين للدور والمسمى، والأدمن
 # يقدر يغيّره من صفحة الفريق.
 _LEGACY_ROLES = {
@@ -207,9 +215,10 @@ def companies_for(username):
         return []
     if u["is_operator"]:
         return [dict(r, role="operator") for r in
-                fetch_all("SELECT id, name, active FROM companies ORDER BY name")]
+                fetch_all("SELECT id, name, active, subscription_tier FROM companies ORDER BY name")]
     return fetch_all("""
-        SELECT c.id, c.name, c.active, m.role FROM memberships m JOIN companies c ON c.id = m.company_id
+        SELECT c.id, c.name, c.active, c.subscription_tier, m.role
+        FROM memberships m JOIN companies c ON c.id = m.company_id
         WHERE m.user_id = ? AND m.active = 1 AND c.active = 1 ORDER BY c.name""", (u["id"],))
 
 
@@ -314,6 +323,23 @@ def rename_company(actor, company_id, name):
         act.extra = {"من": (old or {}).get("name"), "لـ": name.strip()}
         with _tx() as ex:
             ex("UPDATE companies SET name=? WHERE id=?", (name.strip(), company_id))
+
+
+def set_subscription_tier(actor, company_id, tier):
+    """بتغيّر نوع الاشتراك — المشغّل بس، زي إنشاء الشركة، لحد ما يبقى فيه
+    نظام فوترة حقيقي بيحصّل الترقية فعليًا بدل ما تتحط يدوي."""
+    u = user(actor)
+    if not u or not u["is_operator"]:
+        raise AccessDenied("المشغّل بس يقدر يغيّر نوع الاشتراك")
+    if tier not in TIERS:
+        raise ValueError(f"نوع اشتراك غير معروف: {tier}")
+    old = _one("SELECT subscription_tier FROM companies WHERE id=?", (company_id,))
+    with audit.action("subscription_tier_change", "companies", entity_id=company_id,
+                      summary=f"نوع الاشتراك بقى {TIER_LABELS.get(tier, tier)}",
+                      username=actor, company_id=company_id) as act:
+        act.extra = {"من": (old or {}).get("subscription_tier"), "لـ": tier}
+        with _tx() as ex:
+            ex("UPDATE companies SET subscription_tier=? WHERE id=?", (tier, company_id))
 
 
 def members(actor, company_id):
