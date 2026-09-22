@@ -9,12 +9,13 @@ from auth import (
     authenticate, no_login_allowed, resolve_users,
     make_session_token, verify_session_token, SESSION_COOKIE_NAME,
 )
-from database import init_db, FIELD_HELP, PROJECT_ROLE_OPTIONS
+from database import init_db, FIELD_HELP
 import theme
 
 from i18n import t, tr
-from ui import ltr, mark_saved, safe_index, show_saved_badge
+from ui import ltr
 import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
+import views.project_settings
 import repo
 import accounts
 import audit
@@ -349,25 +350,12 @@ theme.inject_main(
 
 
 
-# ---------------- الشريط الجانبي: اختيار / إنشاء مشروع ----------------
-
-_lang_col1, _lang_col2 = st.sidebar.columns(2)
-with _lang_col1:
-    if st.button("EN", use_container_width=True, disabled=st.session_state["ui_lang"] == "en", key="lang_btn_en"):
-        st.session_state["ui_lang"] = "en"
-        st.rerun()
-with _lang_col2:
-    if st.button("AR", use_container_width=True, disabled=st.session_state["ui_lang"] == "ar", key="lang_btn_ar"):
-        st.session_state["ui_lang"] = "ar"
-        st.rerun()
-
-# زرار الخروج (بيظهر بس لما يكون فيه تسجيل دخول فعلي). اسم المستخدم ونوع
-# الاشتراك بيتعرضوا تحت، بعد ما الشركة/الحساب يتحدد — تحتاج company_id.
-_current_user = st.session_state.get("_auth_user")
-if _current_user:
-    if st.sidebar.button(tr("logout"), use_container_width=True, key="logout_btn"):
-        _logout()
-        st.rerun()
+# ---------------- الشريط الجانبي ----------------
+# هيكل ثابت طلبه المالك 2026-09-22: قسمين بس. ⚙️ الإعدادات (لوجو، لغة،
+# الحساب ونوع الاشتراك، خروج) فوق، و📁 مشاريعي تحته. أي تفاصيل تنفيذية خاصة
+# بمشروع معيّن (تعديل/حذف، الحلقات، الفريق، جدول التصوير) بقت في تبويب
+# "⚙️ إعدادات المشروع" جوه المشروع نفسه (views/project_settings.py) —
+# مش هنا. وكلمة "شركة" مش بتظهر في أي مكان غير نوع الاشتراك.
 
 st.sidebar.markdown(
     f"""
@@ -380,16 +368,29 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-st.sidebar.caption(tr("sidebar_projects"))
+st.sidebar.caption(tr("settings"))
 
-# F1: المستخدم بيشوف مشاريع الشركات اللي هو عضو فيها بس. لو عضو في أكتر من
-# شركة (أو المشغّل)، بيختار الشركة الأول.
+_lang_col1, _lang_col2 = st.sidebar.columns(2)
+with _lang_col1:
+    if st.button("EN", use_container_width=True, disabled=st.session_state["ui_lang"] == "en", key="lang_btn_en"):
+        st.session_state["ui_lang"] = "en"
+        st.rerun()
+with _lang_col2:
+    if st.button("AR", use_container_width=True, disabled=st.session_state["ui_lang"] == "ar", key="lang_btn_ar"):
+        st.session_state["ui_lang"] = "ar"
+        st.rerun()
+
+_current_user = st.session_state.get("_auth_user")
+
+# F1: المستخدم بيشوف مشاريع الحسابات اللي هو عضو فيها بس. لو عضو في أكتر من
+# حساب (أو المشغّل)، بيختار واحد. بنجيبها بدري عشان نعرض نوع الاشتراك فوق.
 _my_companies = accounts.companies_for(_current_user or "")
 if not _my_companies:
-    st.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
+    st.sidebar.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
     st.stop()
 # H2: رابط مباشر (?project=&tab=) من الصفحة الرئيسية أو تنبيه أو بوست. بيتطبّق
 # مرة واحدة لما يوصل؛ بعد كده اليوزر حر يتنقّل، وشريط العنوان بيتبعه (تحت).
+# لازم يتنفّذ قبل ما selectbox الحساب يتبنى تحت، عشان بيحط قيمة الجلسة بتاعته.
 _link_project, _link_tab = links.parse(st.query_params)
 if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_state.get("_applied_link"):
     st.session_state["_applied_link"] = (_link_project, _link_tab)
@@ -407,13 +408,12 @@ if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_sta
 
 if len(_my_companies) > 1:
     _company_names = {c["name"]: c for c in _my_companies}
-    _company = _company_names[st.sidebar.selectbox(t("الشركة"), list(_company_names), key="company_selector")]
+    _company = _company_names[st.sidebar.selectbox(t("الحساب"), list(_company_names), key="company_selector")]
 else:
     _company = _my_companies[0]
-    st.sidebar.caption(f"🏢 {_company['name']}")
 company_id = _company["id"]
-# B5: اسم المستخدم + نوع الاشتراك (Enterprise / Studio / Creator) — عربة
-# الأولوية اللي طلبها المالك 2026-09-22، قبل باقي إعادة تصميم الـ sidebar.
+# B5: اسم المستخدم + نوع الاشتراك (Enterprise / Studio / Creator) — كلمة
+# "شركة" ماتظهرش هنا خالص، الإطار كله User + نوع اشتراك.
 _tier = _company.get("subscription_tier") or "creator"
 _tier_label = accounts.TIER_LABELS.get(_tier, _tier)
 st.sidebar.caption(f"{tr('logged_in_as')}: {_current_user} · **{_tier_label}**")
@@ -425,16 +425,18 @@ st.session_state["_cf_company"] = company_id
 _can_edit = permissions.can(_role, "edit")
 if not _can_edit:
     st.sidebar.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
+
+if _current_user:
+    if st.sidebar.button(tr("logout"), use_container_width=True, key="logout_btn"):
+        _logout()
+        st.rerun()
+
 if os.environ.get("CIMAFAST_HOME_URL"):
     _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
-# صفحة الفريق (الأعضاء والأدوار وكلمات السر) في الواجهة الجديدة جنب جدول التصوير
-if os.environ.get("CIMAFAST_BOARD_URL"):
-    _team_label = t("إدارة الفريق") if _company["role"] in ("admin", "operator") else t("الفريق وحسابي")
-    _nav_link(f"👥 {_team_label}", f"{os.environ['CIMAFAST_BOARD_URL']}team/")
-    # F3: سجل النشاط — مدير الشركة (والمشغّل) بس
-    if permissions.can(_role, "view_audit"):
-        _nav_link(f"🧾 {t('سجل النشاط')}",
-                  f"{os.environ['CIMAFAST_BOARD_URL']}activity/?company_id={company_id}")
+
+st.sidebar.divider()
+st.sidebar.caption(f"📁 {tr('sidebar_projects')}")
+
 projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
@@ -468,11 +470,10 @@ project_id = project_names[selected_project_name]
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
 
-# جدول التصوير — أول شاشة في الواجهة الجديدة (board/). اللينك بيظهر بس لما
-# CIMAFAST_BOARD_URL متظبط، ودلوقتي ده في خدمة /v1 بس — الإنتاج مالوش board.
+# جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات، اسمك ودورك — كل
+# التفاصيل التنفيذية دي بقت في تبويب "⚙️ إعدادات المشروع" (views/
+# project_settings.py) بدل الشريط الجانبي، زي ما طلب المالك.
 _board_url = os.environ.get("CIMAFAST_BOARD_URL")
-if _board_url:
-    _nav_link(f"🗓️ {t('جدول التصوير')}", f"{_board_url}?project={project_id}")
 
 # لو المستخدم بدّل المشروع، لازم نمسح أي معاينة سكريبت لسه واقفة من غير
 # تأكيد، عشان ميحصلش استيراد مشاهد بالغلط لمشروع تاني
@@ -484,131 +485,6 @@ if st.session_state.get("parsed_script_project_id") != project_id:
                "last_analysis", "_ai_pending", "_which_analysis"):
         st.session_state.pop(_k, None)
     st.session_state["parsed_script_project_id"] = project_id
-
-# Episodes section (للمسلسلات)
-if project["project_type"] == "مسلسل":
-    # العنوان كان نص ثنائي ثابت (عربي + إنجليزي) مبيعديش على t() — وفي الواجهة
-    # الإنجليزي الكلمة العربية كانت بتترسم مكسّرة جوه سطر LTR.
-    with st.sidebar.expander(f"🎬 {t('الحلقات')}"):
-        episodes = repo.episodes_of_project(project_id)
-        
-        st.subheader(t("إنشاء حلقة جديدة"))
-        new_ep_num = st.number_input(t("رقم الحلقة"), min_value=1, value=len(episodes)+1, key=f"new_ep_num_{project_id}")
-        new_ep_title = st.text_input(t("عنوان الحلقة"), key=f"new_ep_title_{project_id}")
-        new_ep_desc = st.text_area(t("وصف الحلقة"), key=f"new_ep_desc_{project_id}")
-        
-        if st.button(t("إضافة حلقة"), key=f"add_ep_btn_{project_id}", disabled=not _can_edit):
-            if new_ep_title.strip():
-                repo.add_episode(project_id, int(new_ep_num), new_ep_title, new_ep_desc)
-                st.success(t("تم إضافة الحلقة"))
-                st.rerun()
-            else:
-                st.warning(t("أدخل عنوان الحلقة"))
-        
-        # List episodes
-        if episodes:
-            st.subheader(f"{t('الحلقات')} ({len(episodes)})")
-            for ep in episodes:
-                with st.expander(f"الحلقة {ep['episode_number']}: {ep['title'] or '(بدون عنوان)'}"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**رقم:** {ep['episode_number']}")
-                    with col2:
-                        st.write(f"**الحالة:** {ep.get('status', 'planning')}")
-                    
-                    if ep['description']:
-                        st.write(f"**الوصف:** {ep['description']}")
-                    
-                    # Delete button
-                    if st.button(t("حذف الحلقة"), key=f"del_ep_{ep['id']}", disabled=not _can_edit):
-                        repo.delete_episode(project_id, ep['id'])
-                        st.success(t("تم حذف الحلقة"))
-                        st.rerun()
-
-if _can_edit:
-    with st.sidebar.expander(tr("edit_delete_project")):
-        # ملحوظة مهمة: كل الـ keys هنا لازم تتربط برقم المشروع (project_id) —
-        # لو الـ key ثابت، Streamlit بيفتكر قيمة قديمة من مشروع تاني كان متفتح
-        # قبل كده، وده ممكن يأدي لحفظ أو حتى مسح المشروع الغلط بالغلط.
-        e_proj_name = st.text_input(t("اسم المشروع"), value=project["name"], key=f"edit_proj_name_{project_id}")
-        e_proj_type = st.selectbox(
-            t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"],
-            index=safe_index(["فيلم", "مسلسل", "إعلان", "فيديو قصير"], project["project_type"]),
-            format_func=t,
-            key=f"edit_proj_type_{project_id}",
-        )
-        e_proj_res = st.selectbox(
-            t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"],
-            index=safe_index(["720p", "1080p", "2K", "4K"], project["default_resolution"]),
-            key=f"edit_proj_res_{project_id}",
-        )
-        e_proj_orient = st.selectbox(
-            t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"],
-            index=safe_index(["أفقي", "رأسي", "مربع"], project["default_orientation"]),
-            format_func=t,
-            key=f"edit_proj_orient_{project_id}",
-        )
-        e_proj_ratio = st.selectbox(
-            t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"],
-            index=safe_index(["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], project["default_aspect_ratio"]),
-            key=f"edit_proj_ratio_{project_id}",
-        )
-        if st.button(t("💾 حفظ تعديل المشروع"), key=f"save_proj_btn_{project_id}"):
-            if e_proj_name.strip():
-                repo.update_project_settings(e_proj_name, e_proj_type, e_proj_res, e_proj_orient, e_proj_ratio, project_id)
-                st.success(t("تم تعديل بيانات المشروع"))
-                st.rerun()
-            else:
-                st.warning(t("اسم المشروع مينفعش يبقى فاضي"))
-
-        # F2: الحذف لمدير الشركة بس (repo.delete_project بيرفض أي حد تاني برضو)
-        if permissions.can(_role, "delete_project"):
-            st.markdown("---")
-            st.caption(t("⚠️ حذف المشروع بيمسح كل الأماكن والشخصيات والمشاهد واللقطات بتاعته نهائيًا."))
-            confirm_delete_project = st.checkbox(
-                f"{t('متأكد إني عايز أمسح مشروع')} \"{project['name']}\" {t('وكل بياناته')}",
-                key=f"confirm_delete_project_{project_id}",
-            )
-            if st.button(t("🗑️ حذف المشروع نهائيًا"), disabled=not confirm_delete_project, key=f"delete_proj_btn_{project_id}"):
-                accounts.delete_project(_current_user, project_id)
-                st.success(t("تم حذف المشروع"))
-                st.rerun()
-
-if project["owner_name"]:
-    _owner_line = f"👤 {project['owner_name']}"
-    if project["owner_role"]:
-        _owner_line += f" · {t(project['owner_role'])}"
-    st.sidebar.markdown(f'<div class="cf-owner-box">{_owner_line}</div>', unsafe_allow_html=True)
-
-with st.sidebar:
-    _settings_key = f"show_settings_{project_id}"
-    if _settings_key not in st.session_state:
-        st.session_state[_settings_key] = False
-    _set_col1, _set_col2 = st.columns([1, 5])
-    with _set_col1:
-        if st.button("⚙", key=f"toggle_settings_{project_id}", type="primary", help=t("الإعدادات")):
-            st.session_state[_settings_key] = not st.session_state[_settings_key]
-    with _set_col2:
-        st.markdown(f'<div class="cf-settings-label">{t("⚙️ الإعدادات")}</div>', unsafe_allow_html=True)
-
-    if st.session_state[_settings_key]:
-        st.caption(t("اسمك ووظيفتك في المشروع ده (بتتحفظ مع المشروع نفسه)."))
-        role_options_with_blank = ["—"] + PROJECT_ROLE_OPTIONS
-        e_owner_name = st.text_input(
-            t("اسم المستخدم"), value=project["owner_name"] or "", placeholder=t("مثال: أحمد محمد"),
-            key=f"edit_owner_name_{project_id}",
-        )
-        e_owner_role = st.selectbox(
-            t("الوظيفة في المشروع"), role_options_with_blank,
-            index=safe_index(role_options_with_blank, project["owner_role"] or "—"),
-            format_func=t,
-            key=f"edit_owner_role_{project_id}",
-        )
-        if st.button(t("💾 حفظ الإعدادات"), key=f"save_settings_btn_{project_id}"):
-            repo.update_project_owner(e_owner_name, None if e_owner_role == "—" else e_owner_role, project_id)
-            mark_saved(f"settings_{project_id}")
-            st.rerun()
-        show_saved_badge(f"settings_{project_id}")
 
 _caption_line = (
     f"{t(project['project_type'])} · {ltr(project['default_resolution'])} · "
@@ -686,7 +562,8 @@ st.markdown(
 # on_change="rerun": التبويب المفتوح بس هو اللي بيتبني (tab.open)، بدل السبعة في
 # كل ضغطة — ومعرفة التبويب المفتوح بتخلّي شريط العنوان رابط للشاشة دي بالظبط.
 _tabs = st.tabs([tr(k) for k in links.TABS.values()], key="main_tabs", on_change="rerun")
-tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown, tab_dashboard = _tabs
+(tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
+ tab_dashboard, tab_settings) = _tabs
 _open_tab = next((slug for slug, tab in zip(links.TABS, _tabs) if tab.open), "import")
 # شريط العنوان = الشاشة الحالية: يتحفظ bookmark أو يتبعت لزميل
 st.query_params.update(project=str(project_id), tab=_open_tab)
@@ -737,3 +614,7 @@ if tab_breakdown.open:
 if tab_dashboard.open:
     with tab_dashboard:
         _render(views.reports, project=project, project_id=project_id, _char_count=_char_count, _loc_count=_loc_count, _scene_count=_scene_count, _shot_count=_shot_count)
+if tab_settings.open:
+    with tab_settings:
+        _render(views.project_settings, project_id=project_id, current_user=_current_user,
+               company_id=company_id, role=_role, tier=_tier, board_url=_board_url)

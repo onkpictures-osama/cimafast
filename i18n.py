@@ -18,6 +18,7 @@ UI_TEXT = {
     "tab_scenes": {"ar": "📝 المشاهد", "en": "📝 Scenes"},
     "tab_breakdown": {"ar": "🎥 اللقطات", "en": "🎥 Shots"},
     "tab_dashboard": {"ar": "📊 التقارير النهائية", "en": "📊 Final Reports"},
+    "tab_settings": {"ar": "⚙️ إعدادات المشروع", "en": "⚙️ Project Settings"},
     "sub_import": {"ar": "استيراد السكريبت من ملف Word أو نصي أو JSON", "en": "Import script from Word, text, or JSON"},
     "sub_locations": {"ar": "مكتبة الأماكن", "en": "Locations Library"},
     "sub_characters": {"ar": "مكتبة الشخصيات", "en": "Characters Library"},
@@ -51,6 +52,10 @@ def tr(key):
 
 TRANSLATIONS = {
     "الشركة": "Company",
+    "الحساب": "Account",
+    "دورك في المشروع ده": "Your role on this project",
+    "إدارة الفريق مش متاحة في باقة Creator — شغال لوحدك. رقّي الاشتراك لـ Studio أو Enterprise عشان تضيف فريق.":
+        "Team management isn't available on the Creator plan — you work solo. Upgrade to Studio or Enterprise to add a team.",
     "إدارة الفريق": "Manage team",
     "الفريق وحسابي": "Team & my account",
     "الرئيسية": "Home",

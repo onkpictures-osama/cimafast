@@ -17,6 +17,7 @@ TABS = {
     "scenes": "tab_scenes",
     "shots": "tab_breakdown",
     "reports": "tab_dashboard",
+    "settings": "tab_settings",
 }
 
 
