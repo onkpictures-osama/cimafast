@@ -112,6 +112,31 @@ def lockup(surface="dark", px=44, arabic=False, tm=True):
     )
 
 
+_MASTER_W, _MASTER_H = 2400, 1000  # أبعاد ماستر الـ lockup الأصلي
+
+
+def lockup_master(surface="light", height=44, arabic=False):
+    """اللوجو الرسمي الجامد (PNG) زي ما هو من مجلد البراند — مش النسخة
+    المركّبة (mark + نص حي) اللي بتفرّق STUDIO عن MEDIA. للاستخدام لما
+    المطلوب صراحةً هو الماستر الحرفي بدل نسخة الاستوديو.
+
+    PNG مش SVG عمدًا: النص جوه ماستر الـ lockup مرسوم كـ ‎<text>‎، ولو
+    اتحط كـ ‎<img src="data:image/svg+xml...">‎ مش هياخد خطوط الصفحة
+    (Inter) — الـ SVG جوه ‎<img>‎ معزول عن CSS بتاع الصفحة. الـ PNG بكسلات
+    جاهزة فمفيش اعتماد على خط خالص.
+    """
+    src = data_uri("cimafast-lockup-%s-transparent.png" % surface)
+    width = round(height * _MASTER_W / _MASTER_H)
+    img = (
+        '<img class="cf-logo-master" src="%s" alt="CimaFast" '
+        'style="height:%dpx;width:%dpx;display:block;object-fit:contain">'
+    ) % (src, height, width)
+    if not arabic:
+        return img
+    arabic_html = '<span class="cf-logo__ar">%s</span>' % ARABIC_NAME
+    return '<span class="cf-logo cf-logo--%s" dir="ltr">%s%s</span>' % (surface, img, arabic_html)
+
+
 # --------------------------------------------------------------------------
 # ستايل المكوّن — بيتحقن مع باقي الستايل الجلوبال في ‎inject.inject_base‎.
 # المسافة الآمنة حوالين اللوجو = قطر الراس (8.75% من المربّع) على الأربع

@@ -91,7 +91,7 @@ def _render_login_screen():
             <div class="cf-login__logo">%s</div>
             <p>تسجيل الدخول / Sign in</p>
         </div>
-        """ % theme.brand.lockup("dark", px=80, arabic=True),
+        """ % theme.brand.lockup_master("dark", height=80, arabic=True),
         unsafe_allow_html=True,
     )
     _, mid, _ = st.columns([1, 1.4, 1])
@@ -385,7 +385,7 @@ with _brand_col:
     # (الدليل ص 03: "On yellow → navy figure"). من غير ™ هنا: الدليل بيقول
     # إنها اختيارية في كروم الواجهة، والشريط ضيق.
     st.markdown(
-        '<div class="cf-title">%s</div>' % theme.brand.lockup("light", px=44, tm=False),
+        '<div class="cf-title">%s</div>' % theme.brand.lockup_master("light", height=44),
         unsafe_allow_html=True,
     )
 with _info_col:
