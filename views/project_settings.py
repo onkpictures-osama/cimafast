@@ -7,7 +7,7 @@
 
 import streamlit as st
 from i18n import t, tr
-from ui import mark_saved, safe_index, show_saved_badge
+from ui import guarded_delete, mark_saved, safe_index, show_saved_badge
 import accounts
 import permissions
 import repo
@@ -135,14 +135,24 @@ def render(project_id, current_user, company_id, role, tier, board_url):
         else:
             st.warning(t("اسم المشروع مينفعش يبقى فاضي"))
 
+    st.markdown("---")
     if permissions.can(role, "delete_project"):
-        st.markdown("---")
         st.caption(t("⚠️ حذف المشروع بيمسح كل الأماكن والشخصيات والمشاهد واللقطات بتاعته نهائيًا."))
         confirm_delete_project = st.checkbox(
             f"{t('متأكد إني عايز أمسح مشروع')} \"{project['name']}\" {t('وكل بياناته')}",
             key=f"confirm_delete_project_{project_id}",
         )
         if st.button(t("🗑️ حذف المشروع نهائيًا"), disabled=not confirm_delete_project, key=f"delete_proj_btn_{project_id}"):
-            accounts.delete_project(current_user, project_id)
-            st.success(t("تم حذف المشروع"))
-            st.rerun()
+            # guarded_delete بيمسك أي IntegrityError (بيانات قديمة عندها ارتباط
+            # مش متغطّى بـ cascade) ويوري رسالة واضحة بدل ما الحذف "يفشل بصمت"
+            ok = guarded_delete(
+                accounts.delete_project, (current_user, project_id),
+                t("معرفش أمسح المشروع ده — فيه بيانات قديمة فيه مرتبطة بحاجة تانية بشكل مش متوقع. قول لمهندس النظام."),
+            )
+            if ok:
+                st.session_state.pop("project_selector", None)
+                st.session_state.pop(f"confirm_delete_project_{project_id}", None)
+                st.success(t("تم حذف المشروع"))
+                st.rerun()
+    else:
+        st.caption(t("حذف مشروع لمدير الشركة بس."))
