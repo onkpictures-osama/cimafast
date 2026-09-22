@@ -38,6 +38,14 @@ TOUCH_CSS = f"""
     div[data-testid="stNumberInput"] input {{
         min-height: {TOUCH}px !important;
     }}
+    /* زرار إظهار كلمة السر جوه الخانة: 16×32 بالقياس على ‎/v1‎ الحي — مالوش
+       ‎data-testid‎ فالقواعد اللي فوق مكانتش بتلمسه، وهو أول حاجة بتتداس
+       على التليفون لما حد يكتب كلمة السر غلط. الخانة نفسها 44px فالزرار
+       بياخد ارتفاعها كله من غير ما يزوّد حاجة. */
+    div[data-testid="stTextInput"] button {{
+        min-height: {TOUCH}px !important;
+        min-width: {TOUCH}px !important;
+    }}
 """
 
 # ---------------------------------------------------------------------------
