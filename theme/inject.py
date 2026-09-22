@@ -144,6 +144,103 @@ def _header_logo_css():
     """
 
 
+def _sticky_bar_css():
+    """شريط ثابت (خارج شجرة React بتاعة Streamlit — جوه ‎body‎ مباشرة، مبني
+    بجافاسكريبت في ‎_sticky_bar_js‎) بيظهر بس لما المستخدم يسكرول: هيدر
+    Streamlit شفاف أصلًا (‎_header_logo_css‎)، فمحتوى الصفحة بيبين من وراه
+    وهو بيسكرول تحته — ده اللي كان شكله "اللوجو بيتراكب" في شكوى المستخدم.
+    الشريط ده معتم ومخفي فوق حافة الشاشة (‎translateY(-100%)‎) لغاية ما
+    يظهر، فمش بيغطي حاجة وهو واقف في أول الصفحة."""
+    return """
+    #cf-sticky-bar {
+        position: fixed; top: 0; left: 0; right: 0; height: 56px;
+        z-index: 1000001; /* فوق هيدر Streamlit (999990) */
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 16px;
+        background: var(--cf-midnight, #0F1B45);
+        border-bottom: 1px solid rgba(255,255,255,.12);
+        box-shadow: 0 4px 16px rgba(0,0,0,.35);
+        transform: translateY(-100%);
+        transition: transform .25s ease;
+    }
+    #cf-sticky-bar.cf-sticky-bar--visible { transform: translateY(0); }
+    #cf-sticky-bar .cf-sticky-bar__logo { height: 28px; width: auto; display: block; }
+    #cf-sticky-bar .cf-sticky-bar__burger {
+        appearance: none; border: none; background: transparent;
+        color: var(--cf-yellow, #FECA05); font-size: 22px; line-height: 1;
+        width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+    }
+    #cf-sticky-bar .cf-sticky-bar__burger:hover,
+    #cf-sticky-bar .cf-sticky-bar__burger:focus-visible {
+        background: rgba(254,202,5,.14); outline: none;
+    }
+    """
+
+
+def _sticky_bar_js(st):
+    """بتبني الشريط الثابت مرة واحدة بس (‎idempotent‎ — بتتفحص وجوده الأول)
+    وتربط سكرول الحاوية الحقيقية اللي بتسكرول في Streamlit (مش ‎window‎ —
+    شرح كامل في ‎glass.py:_ground_rules‎). زرار البرغر بيدوس على زرار فتح
+    الشريط الجانبي الأصلي بتاع Streamlit (‎stExpandSidebarButton‎) بدل ما
+    يبني قايمة تانية مكررة — الشريط الجانبي أصلًا فيه كل حاجة مطلوبة
+    (الحساب، المشاريع، اللغة، تسجيل الخروج).
+
+    العناصر متبنية بـ ‎createElement‎/‎setAttribute‎، مش ‎innerHTML = '<img …>'‎:
+    ‎st.html‎ بيمسح محتوى الـ ‎<script>‎ كله بصمت (من غير استثناء ولا رسالة)
+    لو فيه أي نص شبه تاج HTML (‎‎<img‎‎، ‎‎<button‎‎) جواه، حتى لو النص ده
+    جوه string جافاسكريبت مش HTML حقيقي — اتأكدت منها بتجربة معزولة قبل
+    الحل ده. ونفس السبب ماخدتش ‎src‎ اللوجو من بايثون: بنقراه وقت التشغيل
+    من اللوجو الموجود أصلًا جوه الشريط الجانبي (‎.cf-logo-master‎) بدل ما
+    نكرر الـ ‎data:‎ URI هنا."""
+    js = """
+    (function(){
+        function ensureBar(){
+            var bar = document.getElementById('cf-sticky-bar');
+            if (bar) return bar;
+            var sidebarLogo = document.querySelector('.cf-logo-master');
+            bar = document.createElement('div');
+            bar.id = 'cf-sticky-bar';
+            var img = document.createElement('img');
+            img.className = 'cf-sticky-bar__logo';
+            img.alt = 'CimaFast';
+            img.src = sidebarLogo ? sidebarLogo.src : '';
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cf-sticky-bar__burger';
+            btn.setAttribute('aria-label', 'القائمة');
+            btn.textContent = String.fromCharCode(9776);
+            btn.addEventListener('click', function(){
+                var t = document.querySelector('[data-testid="stExpandSidebarButton"]');
+                if (t) t.click();
+            });
+            bar.appendChild(img);
+            bar.appendChild(btn);
+            document.body.appendChild(bar);
+            return bar;
+        }
+        function bindScroll(){
+            var container = document.querySelector('[data-testid="stMain"]');
+            if (!container || container.dataset.cfScrollBound) return;
+            container.dataset.cfScrollBound = '1';
+            var bar = ensureBar();
+            container.addEventListener('scroll', function(){
+                bar.classList.toggle('cf-sticky-bar--visible', container.scrollTop > 40);
+            }, {passive: true});
+        }
+        ensureBar();
+        bindScroll();
+        var tries = 0;
+        var iv = setInterval(function(){
+            tries++;
+            bindScroll();
+            var c = document.querySelector('[data-testid="stMain"]');
+            if ((c && c.dataset.cfScrollBound) || tries > 20) clearInterval(iv);
+        }, 250);
+    })();
+    """
+    st.html("<script>%s</script>" % js, unsafe_allow_javascript=True)
+
+
 def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reverse"):
     """الستايل الكبير بعد الدخول — بياخد اتجاه اللغة الحالي.
 
@@ -151,7 +248,7 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     فالقوالب ‎__DIR__‎ / ‎__ALIGN__‎ / ‎__ROWDIR__‎ بتتبدل في النسختين
     بنفس الطريقة.
     """
-    parts = [classic.MAIN_CSS, _header_logo_css()]
+    parts = [classic.MAIN_CSS, _header_logo_css(), _sticky_bar_css()]
     if variant == GLASS:
         parts.append(glass.main_css(dir_))
     # موبايل: طبقة CSS ثابتة جوه @media، بتتطبق لوحدها لما عرض الشاشة يضيق —
@@ -160,3 +257,4 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     _emit(st, _template("\n".join(parts), dir_, align, rowdir))
     if variant == GLASS:
         glass.inject_runtime(st)
+    _sticky_bar_js(st)
