@@ -9,9 +9,85 @@ see them for the full methodology and sourcing. Like both source docs, this
 is explicitly **not** a decision: tier pricing stays the owner's and Mohamed
 El-Zayat's call, not something an agent locks in.
 
+## Executive summary — the rethought, final model (2026-09-22)
+
+*Added at Mohamed's request to "rethink the financial framework based on
+these findings" after 14 sections of iteration (Cards A/B/C → Model v2 →
+the Ultimate Model → the full-cost model → hardened CapEx/OpEx). This is
+the current, decision-ready state — §1–14 below are the audit trail of how
+it was derived, kept for traceability, not simultaneous alternatives. Where
+a number below differs from an earlier section (e.g. §1's original
+$9/$29/$79 Go prices, or Cards A/B's $499/$1,299 Enterprise pricing), the
+number here supersedes it.*
+
+**The pricing (final, repriced where the findings demanded it):**
+
+| Tier | Price/mo | Bundled / full allotment | Changed from original? |
+|---|---|---|---|
+| Go Starter | $15 | 11 / 23 clips | ✅ repriced (was $9) |
+| Go Popular | $45 | 34 / 69 clips | ✅ repriced (was $29) |
+| Go Value | $99 | 76 / 153 clips | ✅ repriced (was $79) |
+| Individual Standard | $39 | 453 / 906 tokens | unchanged |
+| Individual Pro | $99 | 1,151 / 2,302 tokens | unchanged |
+| **Team** (new tier) | $249 | 2,895 / 5,790 tokens | ✅ new |
+| Enterprise Standard | $649 | 5,802 / 11,604 tokens | ✅ repriced (was $499) |
+| Enterprise Pro | $1,399 | 15,104 / 30,209 tokens | ✅ repriced (was $1,299) |
+| Enterprise Ultimate | $3,999 | 46,500 / 93,000 tokens | unchanged |
+
+**The mechanism:** every tier bundles half its allotment into the price and
+meters the rest at the same locked rate ($0.043/token, $0.645/clip). This
+makes the margin floor **mathematically real at any usage level** (proven
+in §12.2 out to absurd overage extremes), not an assumption that holds only
+at one modeled consumption point the way the earliest cards did.
+
+**The full cost stack (§13–14, hardened against real infra pricing and
+published SaaS benchmarks, not guesses):** AI-generation (locked,
+$0.03/token) + 3% payment processing + hosting (~$600/mo total for the
+whole 1,000-subscriber base — grounded in this server's actual Hetzner-class
+spec and Cloudflare R2 storage pricing, not a % placeholder) + support and
+CAC graduated by actual deal size against real 2026 benchmarks, not flat
+across "Enterprise" as if a $649 and a $3,999 account cost the same to
+sell and support.
+
+**The result, 1,000-subscriber realistic population (93% Go/Individual/Team
+by count, 7% Enterprise):**
+
+| | Value |
+|---|---|
+| ARR | **$1,421,040** |
+| Annual cost (every line: AI-gen, payment, hosting, support, CAC) | $825,571 |
+| Annual net profit | $595,469 |
+| **Net margin** | **41.9%** |
+| Tightest single tier | Enterprise Standard, 34.0% |
+| Enterprise's share of ARR | 56.5% |
+
+**The one finding this framework does not resolve, and isn't trying to
+anymore:** revenue concentration in Enterprise is structural (§7's 444×
+price-ratio finding), and pricing Enterprise to cover its *real* cost to
+serve (§13–14) pushed its revenue share up, not down — fixing margin and
+reducing concentration pull in opposite directions. Fourteen sections of
+rate-carding confirmed this isn't a pricing-math problem to out-model; it's
+a strategic choice between two viable shapes (broad-based revenue vs.
+Enterprise-anchored-with-a-funnel) that only Mohamed and the owner can make.
+This framework's job was to make that choice's real cost visible, not to
+make it — §11.3/§11.4 (Go as acquisition funnel, annual Enterprise
+contracts) are the mitigations if the Enterprise-anchored shape is the one
+chosen.
+
+**What's still owed before any of this is real money:** the token
+ledger/quota enforcement (§8), and replacing every benchmark in §14 with
+CimaFast's own measured hosting/support/CAC numbers once there's a live
+product generating them.
+
 ## 1. Revenue model — three tiers, three personas
 
-| Persona | Tiers | What it's buying |
+*Prices below are the original draft as proposed in `SUBSCRIPTIONS-PLAN.md`.
+**Superseded by the Executive Summary above** for Go (repriced) and
+Enterprise Standard/Pro (repriced) and by the addition of a Team tier —
+kept here unedited for the persona/positioning reasoning, which still
+holds, not for the numbers.*
+
+| Persona | Tiers (original draft — see Executive Summary for current) | What it's buying |
 |---|---|---|
 | **Enterprise** (production companies/agencies) | Standard $499 · Pro $1,299 · Ultimate $3,999 /mo | Operational infrastructure — projects, seats, collaboration, reports/scheduling/call-sheets, hosted DB — with AI tokens bundled in, not sold as the product |
 | **Individual/Artist** (any creative role — director, editor, art director, VFX, etc., not just "filmmaker") | Standard $39 · Pro $99 /mo | Smaller-scale version of the same operational product, still multi-seat (3–6) since even solo artists work with a small crew |
