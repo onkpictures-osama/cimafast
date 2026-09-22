@@ -364,11 +364,14 @@ theme.inject_main(
 # جوه المشروع نفسه (views/project_settings.py) — مش هنا. وكلمة "شركة" مش
 # بتظهر في أي مكان غير نوع الاشتراك.
 
-_brand_col, _info_col = st.sidebar.columns([5, 1])
+_brand_col, _info_col = st.sidebar.columns([4, 2])
 with _brand_col:
     st.markdown('<div class="cf-title">🎬 CimaFast Studio</div>', unsafe_allow_html=True)
 with _info_col:
-    with st.popover("ℹ️"):
+    # "؟" مش إيموجي ("ℹ️") ولا حرف دائرة نادر ("ⓘ") - الاتنين ما رسمهمش
+    # صحيح. علامة استفهام عادية أكيد موجودة في نفس الخط اللي بيرسم باقي
+    # نص الواجهة كله صح.
+    with st.popover("؟"):
         st.markdown(f"**{tr('studio_tagline')}**")
         st.caption(t(_APP_DESCRIPTION))
 
@@ -477,7 +480,11 @@ with _prof_home:
     if os.environ.get("CIMAFAST_HOME_URL"):
         _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
 with _prof_out:
-    if st.button("🚪", key="logout_btn", help=tr("logout")):
+    # نص قصير بس ("خروج") مش tr("logout") الكامل ("🚪 تسجيل الخروج") - ده
+    # عمود ضيق نص عرض الشريط، والنص الطويل كان بيتقطع. من غير إيموجي عمدًا:
+    # إيموجي الألوان بتتجاهل لون النص اللي الـ CSS بيحطه، فلو خلفية غامقة
+    # وإيموجي غامق (زي البني/البرتقالي بتاع الباب) بيبقى شبه مختفي.
+    if st.button(t("خروج"), key="logout_btn", help=tr("logout")):
         _logout()
         st.rerun()
 st.sidebar.divider()

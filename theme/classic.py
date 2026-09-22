@@ -125,11 +125,14 @@ MAIN_CSS = r'''
         z-index: 2;
         background: #16233F;
     }
-    /* الشريط الجانبي بالكامل أصفر - نفس اتجاه الواجهة، وبيقلب مكانه
-       (يمين للعربي، شمال للإنجليزي) */
+    /* الشريط الجانبي أصفر - نفس اتجاه الواجهة، وبيقلب مكانه (يمين للعربي،
+       شمال للإنجليزي). تدرّج (gradient) بدل اللون المصمت عشان يهدّي حدة
+       الأصفر شوية - لسه نفس لون البراند فوق، وبيغمق تدريجيًا لدرجة أعمق
+       وأهدأ. النص الكحلي لسه واضح عند كل نقطة (أقل تباين في القاع 6.27:1،
+       فوق الحد الأدنى 4.5:1 بمسافة أمان). */
     section[data-testid="stSidebar"] {
         direction: __DIR__;
-        background-color: #E8B923;
+        background: linear-gradient(160deg, #E8B923 0%, #D9A81F 50%, #C99A2E 100%);
     }
     section[data-testid="stSidebar"] * {
         color: #12203D !important;
@@ -215,6 +218,14 @@ MAIN_CSS = r'''
         color: #8A93A6 !important;
         background-color: #16233F !important;
         opacity: 0.7;
+    }
+    /* زرار الـ popover (ℹ️ بجانب اسم البرنامج) - نفس مشكلة الـ expander
+       والـ segmented_control بالظبط: Streamlit بيديله خلفية غامقة
+       افتراضية (مش .stButton فمابيلحقهاش القاعدة فوق)، والنص فوقها كحلي
+       من القاعدة العامة - كحلي على غامق يختفي. */
+    section[data-testid="stSidebar"] [data-testid="stPopoverButton"] {
+        background-color: rgba(18, 32, 61, 0.1) !important;
+        border: 1px solid rgba(18, 32, 61, 0.3) !important;
     }
     /* زرار الإعدادات - مربع وأزرق ومختلف شكلًا ولونًا عن باقي أزرار
        الشريط الجانبي (زي ما طلب المستخدم)، بترس أبيض في النص */

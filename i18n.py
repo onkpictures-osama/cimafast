@@ -53,6 +53,7 @@ def tr(key):
 TRANSLATIONS = {
     "الشركة": "Company",
     "الحساب": "Account",
+    "خروج": "Log out",
     "دورك في المشروع ده": "Your role on this project",
     "إدارة الفريق مش متاحة في باقة Creator — شغال لوحدك. رقّي الاشتراك لـ Studio أو Enterprise عشان تضيف فريق.":
         "Team management isn't available on the Creator plan — you work solo. Upgrade to Studio or Enterprise to add a team.",
