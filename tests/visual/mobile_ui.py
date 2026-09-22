@@ -295,7 +295,8 @@ def main(argv=None):
                 page.wait_for_timeout(400)
                 _login(page, app)
                 if lang == "en":
-                    page.get_by_role("button", name="EN", exact=True).first.click()
+                    # segmented_control بيطلع كـ radio مش button
+                    page.get_by_role("radio", name="EN", exact=True).first.click()
                     _settle(page, 1200)
                 page.set_viewport_size({"width": PHONE[0], "height": PHONE[1]})
                 _settle(page, 900)

@@ -370,15 +370,19 @@ st.sidebar.markdown(
 
 st.sidebar.caption(tr("settings"))
 
-_lang_col1, _lang_col2 = st.sidebar.columns(2)
-with _lang_col1:
-    if st.button("EN", use_container_width=True, disabled=st.session_state["ui_lang"] == "en", key="lang_btn_en"):
-        st.session_state["ui_lang"] = "en"
-        st.rerun()
-with _lang_col2:
-    if st.button("AR", use_container_width=True, disabled=st.session_state["ui_lang"] == "ar", key="lang_btn_ar"):
-        st.session_state["ui_lang"] = "ar"
-        st.rerun()
+# زرارين كبيرين نص عرض الشريط لكل واحد كانوا تقيلين جدًا لمجرد اختيار لغة —
+# خصوصًا على الموبايل. segmented_control عنصر واحد مدمج بحجمه الطبيعي
+# (width="content")، مش متمدد لعرض العمود.
+_lang_widget_key = "lang_toggle"
+if _lang_widget_key not in st.session_state:
+    st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
+_lang_selected = st.sidebar.segmented_control(
+    "Language", options=["AR", "EN"], key=_lang_widget_key,
+    required=True, label_visibility="collapsed",
+)
+if _lang_selected.lower() != st.session_state["ui_lang"]:
+    st.session_state["ui_lang"] = _lang_selected.lower()
+    st.rerun()
 
 _current_user = st.session_state.get("_auth_user")
 

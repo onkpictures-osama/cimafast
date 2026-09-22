@@ -243,7 +243,8 @@ def capture(app, out_dir, lang, viewport, theme_flag, browser, shots):
     _login(page, app)
 
     if lang == "en":
-        page.get_by_role("button", name="EN", exact=True).first.click()
+        # segmented_control بيطلع كـ radio مش button
+        page.get_by_role("radio", name="EN", exact=True).first.click()
         _settle(page, 1200)
 
     if (w, h) != desktop:
