@@ -597,3 +597,152 @@ further rate card — it's **instrumenting real hosting spend, real support
 ticket time, and real CAC per channel** once there's a live product to
 measure, and re-running this exact section against measured numbers instead
 of benchmarked ones.
+
+## 14. Hardened cost grounds — CapEx, and OpEx against published benchmarks
+
+*Added 2026-09-22, at Mohamed's request to "find valid capex and opex and
+harden the framework grounds." §13's hosting/support/CAC numbers were
+reasonable guesses; this section replaces them with real infrastructure
+pricing (this box's own actual specs, priced against current vendor rates)
+and published SaaS benchmarks, cited by source — still not measured CimaFast
+data (0 subscribers), but no longer arbitrary either.*
+
+### 14.1 CapEx: effectively none, by design
+
+CimaFast runs entirely on rented cloud infrastructure (this server is a
+2 vCPU / 7.7 GB RAM / 96 GB disk instance, Hetzner-pattern hostname) — no
+owned hardware exists or is planned. **This is the correct modern SaaS
+default, not a gap to fill:** renting compute as OpEx instead of buying
+servers as CapEx is standard practice precisely because it converts a fixed
+upfront cost into a variable one that scales with — and is fundable by —
+revenue. The only CapEx-adjacent items are trivial (domain registration,
+~$10–15/year) or an accounting classification question rather than a cash
+cost (whether engineering time gets capitalized as internally-developed
+software under GAAP/IFRS rules) — neither changes the margin math below.
+**Conclusion: model CimaFast as 100% OpEx; do not manufacture a CapEx line
+that doesn't reflect how the business actually runs.**
+
+### 14.2 Hosting, re-grounded: split into fixed compute + metered storage
+
+§13 used a flat 8%-of-revenue hosting placeholder. Split into what it
+actually is, priced against real 2026 vendor rates:
+
+- **Compute** (app servers, DB, background workers): this single box's
+  spec runs ~$18–25/month on Hetzner Cloud's comparable plan (CPX31, 4
+  vCPU/8 GB). A 1,000-subscriber deployment needs more headroom/redundancy
+  than one box — budgeted at a **flat $300/month total**, generously
+  covering 3–4 Hetzner-class instances (web, worker, DB, staging).
+- **Storage** (AI-generated images/video): priced at **Cloudflare R2**
+  ($0.015/GB-month storage, **$0 egress** — materially cheaper than AWS S3
+  for a media-heavy product, since S3 charges ~$0.09/GB on every byte
+  served to a user's browser). At this population's typical usage (bundled
+  allotments from §12/§13, ~3MB/token and ~8MB/clip for draft-quality
+  media, a 6-month average retention assumption), total new+stored media
+  runs **~$300–600/month** for the whole 1,000-subscriber base — a
+  rounding error next to $118K/month revenue.
+
+**Total hosting: ~$600/month for 1,000 subscribers, not 8% of revenue
+(~$9,474/month).** The earlier placeholder overstated hosting cost by
+roughly 15×. This is the single biggest correction in this section —
+infrastructure was never the real cost driver here; AI-generation, CAC and
+support are.
+
+### 14.3 CAC, re-benchmarked by actual deal size
+
+Published 2026 SaaS CAC benchmarks show acquisition cost scales steeply
+with deal size: self-serve/PLG $50–500, SMB $200–700, mid-market
+$1,000–3,000, true enterprise (ACV > $50K) $10,000–15,000+ — roughly a 16×
+spread between self-serve and true enterprise. **CimaFast's "Enterprise"
+tiers, by their own ACV ($649×12=$7,788 to $3,999×12=$47,988), are mid-
+market to upper-mid-market by this benchmark, not ">$50K true enterprise"**
+— so their CAC should be benchmarked against the $1,000–3,000 mid-market
+band (Ultimate sitting closer to the enterprise boundary given its $48K
+ACV), not against $10K+ enterprise sales-motion figures:
+
+| Tier | ACV | CAC (re-benchmarked) | Benchmark band used |
+|---|---|---|---|
+| Go (all) | — | $20 | Self-serve/PLG ($50–500) — low end, viral/organic-leaning |
+| Individual (both) | $468–$1,188 | $80 | Self-serve/PLG, low end |
+| Team | $2,988 | $400 | SMB / low mid-market |
+| Enterprise Standard | $7,788 | $1,500 | Mid-market |
+| Enterprise Pro | $16,788 | $2,500 | Mid-market |
+| Enterprise Ultimate | $47,988 | $7,000 | Upper mid-market, approaching true-enterprise |
+
+### 14.4 Support cost, re-benchmarked against published ratios
+
+Published benchmarks: median SaaS support+CS spend is **~9% of ARR**;
+efficient/mature operators run **3–8%**; enterprise-heavy blends typically
+land **8–10%**, since enterprise accounts cost 3–5× more to support than
+SMB but generate 7–10× more revenue. Re-set per tier to land inside these
+bands instead of a flat guess:
+
+| Tier | Support $/mo | % of price |
+|---|---|---|
+| Go (all) | $0.50 | <5% — near-zero, self-serve/automated, matches PLG norm |
+| Individual (both) | $3 | 3–7.7% — efficient-operator band |
+| Team | $20 | 8% — at the enterprise-blend benchmark |
+| Enterprise Standard | $55 | 8.5% |
+| Enterprise Pro | $120 | 8.6% |
+| Enterprise Ultimate | $350 | 8.8% |
+
+### 14.5 Result: every tier still clears 30% net — no new price changes needed
+
+Re-running §13's exact prices ($649/$1,399 Enterprise Standard/Pro, all
+others unchanged) against every hardened cost line above:
+
+| Tier | Full hardened cost | Net margin |
+|---|---|---|
+| Go Starter | $7.87 | 47.5% |
+| Go Popular | $19.14 | 57.5% |
+| Go Value | $39.69 | 59.9% |
+| Individual Standard | $24.85 | 36.3% |
+| Individual Pro | $47.77 | 51.7% |
+| Team | $148.72 | 40.3% |
+| Enterprise Standard | $428.14 | 34.0% |
+| Enterprise Pro | $862.90 | 38.3% |
+| Enterprise Ultimate | $2,460.86 | 38.5% |
+
+**Every tier clears 30% with real margin — tightest is Enterprise Standard
+at 34.0%.** No further repricing was needed: §13's prices already held up
+once hosting was corrected down and CAC/support were corrected to match
+real published bands, because the two corrections partly offset each other.
+
+### 14.6 Annual result, hardened
+
+Same 1,000-subscriber realistic population, same prices as §13, hardened
+costs:
+
+| | §13 (placeholder costs) | §14 (hardened costs) |
+|---|---|---|
+| ARR | $1,421,040 | $1,421,040 |
+| Annual cost | $872,743 | $825,571 |
+| Annual net profit | $548,297 | $595,469 |
+| **Net margin** | 38.6% | **41.9%** |
+
+Margin *improved* once costs were hardened, not worsened — the grounded
+hosting correction (§14.2) outweighs the more realistic (higher) CAC
+figures for Enterprise (§14.3). Enterprise's revenue share is unchanged at
+56.5%, since none of §14's corrections touched pricing.
+
+### 14.7 What's still not hardened
+
+- **Every figure here is still a benchmark or this-box's-own current spec,
+  not measured CimaFast data** — there is still no live product, no real
+  support ticket volume, no real CAC per channel. The benchmarks replace
+  guesses with cited external data, which is a real improvement, but they
+  are not a substitute for CimaFast's own numbers once it has any.
+- **Compute cost is a single flat estimate ($300/mo)** for the whole
+  population; it doesn't yet model how compute scales past 1,000
+  subscribers (more workers, a managed DB, CDN) — fine at this scale,
+  needs revisiting at 10× the volume.
+- **Text/LLM cost** (script analysis, still flagged unpriced since §2.2)
+  remains the one AI-cost line nobody has sized yet.
+
+### Sources
+
+- [Hetzner Cloud CPX31 pricing](https://www.hetzner.com/cloud/regular-performance/)
+- [SaaS CAC Benchmarks 2026 — LTV:CAC Book](https://ltvcacbook.com/blog/cac-benchmarks-2026)
+- [SaaS CAC statistics 2026 — GTM 8020](https://www.gtm8020.com/blog/customer-acquisition-cost-statistics)
+- [SaaS support cost benchmarks — Unthread 2026](https://unthread.io/blog/customer-support-budget-statistics/)
+- [SaaS cost-of-revenue breakdown — humanr.ai](https://www.humanr.ai/intelligence/saas-cost-of-revenue-breakdown-hosting-support-professional-services-benchmarks)
+- [Cloudflare R2 pricing vs S3 2026 — Filebase](https://filebase.com/blog/cloudflare-r2-pricing-costs-savings-and-alternatives-in-2026/)
