@@ -509,3 +509,91 @@ on the AI-generation layer alone, there's real room to absorb those once
 they're modeled — but "30% net" in this section means net of *locked
 provider cost*, not net of the full P&L. Pricing the rest is the
 next real gap to close, not another rate card.
+
+## 13. The full-cost model — every cost, not just AI-generation
+
+*Added 2026-09-22, at the owner's request: "add all costs to your base cost
+before calculating profit and rethink it." §12's 30–65% margins were real,
+but only against the AI-generation layer — this section adds hosting,
+payment processing, support, and CAC, and reprices where the full picture
+demands it. **These four costs are illustrative estimates benchmarked
+against typical SaaS ratios, not measured data — CimaFast has 0 paying
+subscribers, so no real hosting/support/CAC figures exist yet.** Treat every
+number below as a placeholder to replace once real cost data exists, the
+same caveat every population scenario in this document already carries.*
+
+### 13.1 Cost assumptions added
+
+| Cost | Basis | Source of estimate |
+|---|---|---|
+| Payment processing | 3% of revenue | Standard card-processing rate (Stripe-class ~2.9%+$0.30) |
+| Hosting/infrastructure | 8% of revenue | SaaS median COGS-infra ratio, skewed up for media (image/video) storage and bandwidth |
+| Support / customer success | Flat $/month, **graduated by tier** — $0.50 (Go) → $5 (Individual) → $20 (Team) → $50/$120/$220 (Enterprise Standard/Pro/Ultimate) | Self-serve tiers need near-zero support; Enterprise needs real account-management time, scaled to deal size |
+| CAC | One-time $, amortized over 12 months — $6 (Go) → $50 (Individual) → $300 (Team) → $1,000/$2,500/$4,500 (Enterprise Standard/Pro/Ultimate) | Self-serve/viral acquisition is cheap; enterprise sales-led acquisition (demos, contracts, sales-rep time) is expensive — graduated by deal size, not flat across all Enterprise sub-tiers |
+
+**The critical modeling correction:** the first pass at this used one flat
+support+CAC figure ($180/mo support, $3,500 CAC) across *all three*
+Enterprise sub-tiers. That broke the model — Enterprise Standard's net
+margin came out **–40.4%** and Enterprise Pro **17.8%**, because a $499/mo
+account can't carry the same acquisition/support cost as a $3,999/mo one.
+The fix isn't just repricing, it's **not pricing a self-serve-ish $499
+account and a full sales-led $3,999 account as if they cost the same to
+acquire and support** — hence the graduated table above.
+
+### 13.2 Repricing required to clear 30% net on the full cost stack
+
+With graduated support/CAC, only **two** prices actually needed to move —
+Individual, Team, Go and Enterprise Ultimate already clear 30% net without
+any change:
+
+| Tier | §12 price | Full-cost price | Full-cost net margin |
+|---|---|---|---|
+| Go Starter | $15 | $15 (unchanged) | 49.3% |
+| Go Popular | $45 | $45 (unchanged) | 52.8% |
+| Go Value | $99 | $99 (unchanged) | 53.4% |
+| Individual Standard | $39 | $39 (unchanged) | 30.6% |
+| Individual Pro | $99 | $99 (unchanged) | 44.9% |
+| Team | $249 | $249 (unchanged) | 36.0% |
+| **Enterprise Standard** | $499 | **$649** | 33.6% |
+| **Enterprise Pro** | $1,299 | **$1,399** | 30.6% |
+| Enterprise Ultimate | $3,999 | $3,999 (unchanged) | 39.2% |
+
+Every tier now clears 30% net **after every modeled cost**, not just AI
+generation — Enterprise Pro is the tightest at 30.6%, everything else has
+real buffer.
+
+### 13.3 Annual result, full cost stack, realistic population
+
+Same 1,000-subscriber realistic long-tail mix as §7/§11/§12, at these
+full-cost prices:
+
+| | Value |
+|---|---|
+| ARR | $1,421,040 |
+| Annual cost (all five cost lines) | $872,743 |
+| Annual net profit | $548,297 |
+| **Net margin** | **38.6%** |
+
+Clears the 30% target with real margin to spare, even after every cost
+line is included — not just the AI-generation layer.
+
+### 13.4 The honest trade-off this section adds
+
+**Fixing Enterprise's true profitability pulled against the
+concentration-reduction goal from §7/§11/§12.** Enterprise's share of ARR
+rose from 53.6% (§12, AI-gen-only pricing) to **56.5%** here, because the
+repricing needed to cover its real acquisition/support cost made Enterprise
+accounts worth more per subscriber, not less. Reducing revenue
+concentration and pricing Enterprise to cover its true cost to serve are
+two different goals that don't automatically move together — this
+document doesn't resolve that tension, it surfaces it. Which one to
+prioritize, if they conflict further as real data comes in, is an
+owner+Mohamed call, not a costing one.
+
+### 13.5 Still not real data
+
+Every number in §13.1 is a placeholder. The actual next step isn't a
+further rate card — it's **instrumenting real hosting spend, real support
+ticket time, and real CAC per channel** once there's a live product to
+measure, and re-running this exact section against measured numbers instead
+of benchmarked ones.
