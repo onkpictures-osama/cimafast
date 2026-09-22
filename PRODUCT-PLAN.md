@@ -247,3 +247,6 @@ never a decision for the owner.
 1. **Order** — decided 2026-09-21: Phase 0 (ERP foundations) first. "OK, go."
 2. **Off-site backups** — decided 2026-09-21: GitHub, with proper documentation.
 3. **Promoting /v1 to production** — the owner decides when. Agents do not raise it.
+4. **Daily decisions/milestones log** — decided 2026-09-22: archive it on
+   GitHub, one dated file per day in `logs/` (see `logs/README.md`), sourced
+   from commit history and this plan. [infrastructure] to automate.
