@@ -7,7 +7,8 @@
      دي بالظبط المخاطرة اللي الخطة حذّرت منها، فبتتقاس هنا تبويب تبويب.
   2. **الشريط الجانبي**: على عرض التليفون Streamlit بيقفله ويحوّله طبقة فوق
      المحتوى. بنتأكد إنه فعلاً كده، وإن زرار فتحه مساحته ≥44px، وإنه لما
-     يتفتح بيغطي المحتوى مش بيزقّه.
+     يتفتح بيغطي المحتوى مش بيزقّه — وجواه كمان (مرحلة 4): مساحات اللمس
+     ومقاس خط الخانات ومفيش زحلقة أفقية.
   3. **الرصّ في عمود واحد**: أي عمودين في نفس الصف = التخطيط لسه مش مرصوص.
   4. **مساحات اللمس**: كل زرار/حقل ≥44px.
   5. **مفيش زحلقة أفقية** في الصفحة نفسها، وبنسجّل الحاجات اللي CSS الصفحة
@@ -129,6 +130,29 @@ JS_SCREEN = r"""() => {
     };
 }"""
 
+# جوه الشريط الجانبي نفسه وهو مفتوح. ‎JS_SCREEN‎ بيقيس جوه ‎stMain‎ بس، والشريط
+# على التليفون هو الطريق الوحيد لتبديل المشروع واللغة وتسجيل الخروج — فلو ساب
+# من غير قياس، مساحات اللمس جواه ممكن تفضل ناقصة من غير ما حد ياخد باله.
+# (اتضاف في المرحلة 4، بعد ما القياس لقى الأزرار جواه كانت 40px والخانة 36px
+# قبل طبقة الموبايل، وإن مقبض التكبير بيعمل زحلقة أفقية 6px في الإنجليزي.)
+JS_SIDEBAR_INNER = r"""() => {
+    const sb = document.querySelector('[data-testid="stSidebar"]');
+    if (!sb) return {err: 'no sidebar'};
+    const small = [...sb.querySelectorAll(
+        '.stButton button, .stDownloadButton button, .stFormSubmitButton button,'
+      + ' [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,'
+      + ' [data-baseweb="select"] > div,'
+      + ' [data-testid="stRadio"] [role="radiogroup"] label')]
+      .filter(e => {const b = e.getBoundingClientRect(); return b.height > 0 && b.height < 43.5;})
+      .map(e => (e.innerText || e.type || e.tagName).trim().slice(0, 20)
+                + ':' + Math.round(e.getBoundingClientRect().height));
+    const fonts = [...sb.querySelectorAll('input, textarea, select')]
+      .filter(e => e.getBoundingClientRect().height > 0)
+      .map(e => parseFloat(getComputedStyle(e).fontSize));
+    return {small, minFont: fonts.length ? Math.min(...fonts) : null,
+            overflow: Math.round(sb.scrollWidth - sb.clientWidth)};
+}"""
+
 JS_SIDEBAR = r"""() => {
     const sb = document.querySelector('[data-testid="stSidebar"]');
     // في Streamlit 1.64 زرار فتح الشريط اسمه stExpandSidebarButton
@@ -217,6 +241,18 @@ def _run_lang(page, app, lang, out_dir, shots_on):
     check(f"[{lang}] الشريط بيفتح فوق المحتوى مش بيزقّه",
           op["visible"] and op["mainWidth"] == before_main,
           f"عرض الشريط {op['width']}px · عرض المحتوى {before_main}→{op['mainWidth']}")
+
+    # والشريط وهو مفتوح: مساحات اللمس جواه، ومقاس خط الخانات، ومفيش زحلقة
+    inner = page.evaluate(JS_SIDEBAR_INNER)
+    check(f"[{lang}] الشريط الجانبي: مساحات اللمس ≥{TOUCH}px", not inner.get("small"),
+          str(inner.get("small", [])[:4]))
+    check(f"[{lang}] الشريط الجانبي: خط الخانات ≥16px",
+          inner.get("minFont") is None or inner["minFont"] >= 16,
+          f"{inner.get('minFont')}px")
+    check(f"[{lang}] الشريط الجانبي: مفيش زحلقة أفقية جواه",
+          inner.get("overflow", 0) <= 1,
+          f"scrollWidth-clientWidth = {inner.get('overflow')}px")
+
     if shots_on:
         page.screenshot(path=os.path.join(out_dir, f"mobile-{lang}-sidebar.png"), full_page=False)
     page.keyboard.press("Escape")

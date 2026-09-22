@@ -83,10 +83,13 @@ five, so "every screen" means every screen.
    iOS Safari zooms the whole page on focus), body text to 15px/1.7, headings
    cut to phone scale, and 136px of dead padding reclaimed. Contrast re-audited:
    all 24 pairs pass, in both modes. *(this session — see "Phase 3 result")*
-4. **Full verification** — phone-viewport visual pass across every screen in
+4. ✅ **Full verification** — phone-viewport visual pass across every screen in
    `tests/visual`, zero diff confirmed at tablet/desktop for all of them, run
    once under `--theme classic` and once under `--theme glass` (the harness
-   was only ever run against `classic` before this pass).
+   was only ever run against `classic` before this pass). Glass came out
+   identical to classic on every measurement; the one real defect found was in
+   the sidebar overlay, which nothing had been measuring.
+   *(this session — see "Phase 4 result" below)*
 
 ## Breakpoint
 
@@ -232,3 +235,103 @@ push a pair below its limit. Every pair in the palette clears 4.5:1 anyway
 `test_mobile_text_never_drops_below_the_body_contrast_floor` asserts exactly
 that, so a future palette change cannot quietly invalidate the smaller
 headings.
+
+## Phase 4 result — full verification
+
+216 screenshots compared and 160 in-browser measurements taken. The headline:
+**glass behaves exactly like classic** — every number below is identical in the
+two themes — and **tablet and desktop did not move by a single pixel**, in
+either theme. One real defect surfaced, in the one place no check had ever
+looked, and it is fixed.
+
+### How "before" was defined
+
+Comparing against an older commit would have mixed this plan's CSS with every
+unrelated change since. So the baseline is a git worktree at the *same* `HEAD`
+with one line changed — `mobile.mobile_css()` returning `""`. The only
+difference between the two trees is the mobile layer itself, which is what the
+hard limit is actually about.
+
+### Tablet and desktop: 0 px, not "within budget"
+
+| theme | shots at 834px + 1440px | identical | changed pixels |
+|---|---|---|---|
+| classic | 36 | 36 | 0 |
+| glass | 36 | 36 | 0 |
+
+That is 9 screens × 2 languages × 2 viewports × 2 themes. Not "under the 0.05%
+budget" — the difference image is empty. The layer is one `@media (max-width:
+767px)` block and the harness's narrowest non-phone viewport is 834px, so this
+is the limit holding structurally, now measured under both themes rather than
+one.
+
+### Phone: every screen changed, and changed on purpose
+
+All 18 phone shots per theme differ from the no-mobile baseline, by 14.6%–31.5%
+(classic) and 15.0%–33.6% (glass) of their pixels. The largest movers are the
+scene editor (27.4% ar classic / 33.6% ar glass) and shots (31.5% / 31.7%) —
+the two densest forms, where the 16px inputs, 44px controls and reclaimed
+padding all land at once. The smallest is reports (14.9% / 15.6%), which is
+mostly links and headings.
+
+The structural harness is what says those changes are the *right* ones:
+`mobile_ui.py` now runs **80/80 under classic and 80/80 under glass**, across
+all seven tabs in Arabic and English — zero tabs off-screen (tab bar 140px in
+Arabic, 92px in English, 0px of horizontal scroll), zero rows with more than one
+column, zero touch targets under 44px, 0px of page overflow on every screen, the
+active-tab underline still 0.0px from its tab, and the scenes table (703px of
+content in 358px in Arabic, 668px in English) still carrying its edge fade in
+both themes.
+
+### The one regression — and it was not glass
+
+The glass theme was the suspected risk and it was clean. The defect was in the
+**sidebar overlay**, which on a phone is the only route to switching project,
+switching language, or logging out — and which no check had ever measured,
+because `mobile_ui.py`'s screen probe scopes itself to `stMain`.
+
+Opening the overlay and measuring inside it found:
+
+| | baseline (no mobile layer) | shipped |
+|---|---|---|
+| EN / AR / logout buttons | 40px | 44px |
+| project text input | 36px | 44px |
+| form submit | 40px | 44px |
+| input font size | 14px | 16px |
+| horizontal scroll inside the overlay (en) | 6px | 0px |
+
+The first four rows are the mobile layer already doing its job somewhere nobody
+had looked — good news, but unverified until now. The last row is the real bug:
+in English the sidebar scrolled sideways by 6px. Arabic measured 0px, which is
+why a single-language check would have missed it.
+
+The cause is Streamlit's own `stSidebarResizeHandle` — an 8px-wide drag strip
+standing on the sidebar's edge with 6px of it outside. It is **pre-existing, not
+caused by phases 0–3**: the no-mobile baseline tree measures the same 6px. It is
+also useless on a phone: the sidebar there is a full-height overlay, and an 8px
+target is a fifth of the 44px touch minimum, so it can only ever be hit by
+accident during a swipe.
+
+It is now hidden below 767px — and only below 767px, so a mouse can still resize
+the sidebar at every width where the sidebar is a real column. Hiding the handle
+alone was not enough: its wrapper is a separate 8px `div` that stayed in place
+and kept the scroll at 6px, so `div:has(> [data-testid="stSidebarResizeHandle"])`
+removes that too, matched by structure rather than by a generated class name.
+
+**The fix costs zero pixels:** re-capturing all 108 shots per theme before and
+after it gives 54/54 identical in classic and 54/54 in glass. The handle is only
+reachable with the overlay open, which the screenshot pass does not capture — so
+it removes a 6px scroll and changes nothing else on any screen, at any width, in
+either theme.
+
+`mobile_ui.py` now carries those three sidebar checks permanently (touch targets,
+16px fields, no horizontal scroll inside the overlay), which is why the check
+count went 74 → 80. A future Streamlit upgrade that reintroduces the handle, or
+a change that shrinks a sidebar control, fails the harness instead of shipping.
+
+### Everything else that was run
+
+All 19 plain-assert test files pass, including `test_theme.py` at 21/21 — which
+holds the structural guarantees the pixel pass cannot see: the whole mobile layer
+sits inside one media query, carries no RTL direction placeholders, and keeps its
+breakpoint below the tablet viewport.
