@@ -138,7 +138,23 @@ select, input { font: inherit; color: var(--text); background: var(--surface); b
 .signin h1 { font-weight: 600; }
 
 @media (max-width: 700px) {
-  .bar { padding: 12px 14px; }
+  /* الشريط العلوي كان بيلف كل عنصر (العنوان، اختيار المشروع، كل حقل جوه
+     .bar__actions، السطر الأخير) في سطر لوحده بمسافات سطح المكتب، فبيطلع
+     هيدر طويل فاضي على الموبايل. هنا بنقفل المسافات وبنخلي كل حقل (لابل +
+     مدخل) سطر واحد بدل اتنين. */
+  .bar { padding: 10px 14px; gap: 8px 10px; align-items: center; }
+  .bar__title { gap: 10px; }
+  .bar__title h1 { font-size: 18px; }
+  .cf-logo-master { height: 32px; }
+  .field { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 12px; }
+  .field span { white-space: nowrap; }
+  .field--inline { flex: 0 0 auto; }
+  .field--inline input { width: 52px; }
+  select, input { min-height: 44px; padding: 6px 8px; }
+  .btn { min-height: 44px; padding: 6px 12px; white-space: nowrap; }
+  /* حقول اليوم + زراير الاقتراح مع بعض أعرض من أي شاشة موبايل — سكرول
+     أفقي بدل ما اللابل يتقطّع لعمود ضيق (نفس فكرة .board اللي تحتها). */
+  .bar__actions { gap: 8px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .board { padding: 8px 14px 20px; }
   .day { flex-basis: 82vw; }
   .legend { flex-wrap: wrap; padding: 8px 14px; }

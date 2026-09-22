@@ -11,6 +11,17 @@
 .home__main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 64px; display: grid; gap: 18px; }
 .home__cols { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 18px; align-items: start; }
 @media (max-width: 880px) { .home__cols { grid-template-columns: 1fr; } }
+
+@media (max-width: 700px) {
+  /* الاسم والدور والزرارين كانوا بيلفوا كل واحد في سطر لوحده (مسافات
+     سطح المكتب)، فالهيدر بيطلع طويل فاضي على الموبايل — نفس شكوى المستخدم.
+     اللوجو ياخد سطر، والاسم+الدور+الشارة ياخدوا عرض الشاشة الكامل عشان
+     يبقوا سطر واحد بدل ما الشارة تلف لوحدها، والزرارين ياخدوا نص العرض. */
+  .bar__title { flex-wrap: wrap; gap: 4px; }
+  .who { flex-basis: 100%; font-size: 13px; gap: 5px; }
+  .bar__nav { flex: 1 1 100%; gap: 8px; }
+  .bar__nav .btn { flex: 1; text-align: center; font-size: 13px; padding: 6px 10px; }
+}
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
 .panel h2 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
 .panel__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
