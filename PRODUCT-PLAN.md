@@ -181,6 +181,20 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   questions (adoption cost of a new file format, flow vs. interruption,
   relationship to the existing importer, honest scope) in
   **`SCRIPT-EDITOR-PLAN.md`**.
+- ⭐ **P9 "Talent Vault" (خزانة المواهب) — an Actor role and a cross-company
+  casting directory** [universal-creative, production] — 🗒️ **Proposed
+  2026-09-22, not scoped, not to be deployed until decided.** A new Actor
+  role (their own scenes/shots/wardrobe/props/direction notes), plus a
+  searchable directory any director/producer can cast from — actors
+  self-register with photos (refreshed every 3 months), measurements, looks,
+  skills, showreel links and credits — and an AI matching feature that
+  proposes actors for a role from a character's analyzed specs (reads
+  together with P7). The first feature that needs to deliberately cross
+  company boundaries (a shared talent pool, not per-company data) and the
+  first with a real person's personal data to protect, not a company's.
+  Full analysis and open questions (platform-wide vs. per-company
+  visibility, formal role vs. separate account type, who sees sensitive
+  fields, honest scope) in **`ACTOR-CASTING-PLAN.md`**.
 
 ### Phase 3 — Scheduling and shoot days (the heart of a production ERP)
 
