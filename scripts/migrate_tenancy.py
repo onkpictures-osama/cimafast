@@ -71,8 +71,12 @@ def now():
 
 def company_name(username):
     """اسم الشركة على اسم صاحبها. المالك أو أي أدمن يقدر يغيّره بضغطة من صفحة
-    الفريق (accounts.rename_company)، فده اسم مبدئي مش قرار نهائي."""
-    return f"شركة {username}"
+    الفريق (accounts.rename_company)، فده اسم مبدئي مش قرار نهائي.
+
+    من غير بادئة "شركة": الاسم دايمًا مسمى وظيفي أو username إنجليزي (زي
+    director أو executive_director)، و"شركة" قدامه مكنش صح (صحّحنا كل
+    الشركات الموجودة فعليًا بنفس الطريقة، 2026-09-22)."""
+    return username
 
 
 def load_hashes(path):
