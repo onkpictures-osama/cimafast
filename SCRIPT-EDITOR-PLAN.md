@@ -1,4 +1,6 @@
-# A dedicated screenwriting app with a CimaFast-native script format
+# P8 — "Living Script" (السيناريو الحي)
+
+### A dedicated screenwriting app with a CimaFast-native script format
 
 ⭐ **Highlighted 2026-09-22 — priority discussion topic, the team will work
 on this.** Not scoped, not built, **not to be deployed** — recorded so the

@@ -1,4 +1,6 @@
-# Subscription tiers — proposal
+# B5 — "Subscription Gates" (بوابات الاشتراك)
+
+### Subscription tiers — proposal
 
 🗒️ **Proposed 2026-09-22 by the owner. Not scoped, not built, and explicitly
 NOT to be deployed until the owner and Mohamed El-Zayat discuss it.** This

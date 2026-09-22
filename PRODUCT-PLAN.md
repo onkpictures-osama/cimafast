@@ -130,7 +130,8 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   same file; show AI spend per project and company.
 - **P5 Looks and continuity** [universal-creative] — scenes that note a look
   change create or link a look; continuity-sensitive props tracked across scenes.
-- **P6 Learn from users' own linking choices, feed it back into analysis**
+- ⭐ **P6 "Production Memory" (ذاكرة الإنتاج) — learn from users' own
+  linking choices, feed it back into analysis**
   [universal-creative, infrastructure] — 🗒️ **Proposed 2026-09-22, not
   scoped yet — topic to discuss at length with the owner and Ziad before
   building.** Today every project starts analysis from a blank slate: a
@@ -152,7 +153,8 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   leak one company's project details into another's, per Principle 1);
   what "done" looks like; who owns the review before this goes further than
   a proposal.
-- **P7 A universal script-analysis prompt across production types**
+- ⭐ **P7 "Universal Analyst" (العقل الشامل) — a universal script-analysis
+  prompt across production types**
   [universal-creative] — 🗒️ **Proposed 2026-09-22, not scoped yet — same
   discussion as P6.** The analysis prompt today isn't developed to
   distinguish a series from a feature film from an ad from a short video, or
@@ -163,7 +165,8 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   knows about the craft — still bound by the existing rule that extracted
   data must mirror the source exactly, never invent content
   (`cimafast-never-invent-data`).
-- ⭐ **P8 A dedicated screenwriting app with a CimaFast-native script format**
+- ⭐ **P8 "Living Script" (السيناريو الحي) — a dedicated screenwriting app
+  with a CimaFast-native script format**
   [universal-creative] — **Highlighted 2026-09-22 — priority discussion
   topic, not scoped, not built, not to be deployed.** A "Word, but for
   screenwriters": writers work in standard screenplay format and tag
@@ -194,7 +197,8 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
 - **B3 Vendors, equipment and rentals.**
 - **B4 AI-generated production module** — versioned prompts, generation settings,
   digital-asset tracking, linked to scenes and shots.
-- **B5 Subscription tiers & pricing** [orchestrator] — 🗒️ **Proposed
+- ⭐ **B5 "Subscription Gates" (بوابات الاشتراك) — subscription tiers &
+  pricing** [orchestrator] — 🗒️ **Proposed
   2026-09-22, not scoped, explicitly not to be deployed until the owner and
   Mohamed El-Zayat discuss it.** Three tiers by persona — a no-subscription
   wizard-driven tier for a non-industry user making quick ads/social video, an
