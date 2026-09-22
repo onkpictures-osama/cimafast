@@ -15,7 +15,7 @@ El-Zayat's call, not something an agent locks in.
 |---|---|---|
 | **Enterprise** (production companies/agencies) | Standard $499 · Pro $1,299 · Ultimate $3,999 /mo | Operational infrastructure — projects, seats, collaboration, reports/scheduling/call-sheets, hosted DB — with AI tokens bundled in, not sold as the product |
 | **Individual/Artist** (any creative role — director, editor, art director, VFX, etc., not just "filmmaker") | Standard $39 · Pro $99 /mo | Smaller-scale version of the same operational product, still multi-seat (3–6) since even solo artists work with a small crew |
-| **Go/Creator** (no subscription, "Dummies" internally — rename before anything customer-facing) | Starter $9 · Popular $29 · Value $79, pay-as-you-go | Fast, full video generation for reach/virality — not the ERP product at all; may not even create a `companies`/`projects` row (open question, §9) |
+| **Go/Creator** (no subscription, "Dummies" internally — rename before anything customer-facing) | Starter $9 · Popular $29 · Value $79, pay-as-you-go | Fast, full video generation for reach/virality — not the ERP product at all; may not even create a `companies`/`projects` row (open question, §10) |
 
 Full tier tables, the per-token pricing analysis, and the naming discussion
 (**Artist**/**Atelier** for Individual, **Creator**/**Social**/**CimaFast Go**
@@ -157,9 +157,56 @@ behind one abstraction interface rather than hardcoding a single vendor:
 No hyperscaler indemnifies third-party models it resells (Seedance, Kling,
 etc.) — indemnification and model breadth trade off against each other, so
 "indemnified" should only ever be claimed for the Foundry-routed share of
-usage, never the whole plan (§3.1's ring-fence recommendation, §7 below).
+usage, never the whole plan (§3.1's ring-fence recommendation, §8 below).
 
-## 7. What has to be built before any of this is enforceable
+## 7. Revenue concentration risk
+
+*Added 2026-09-22, from a modeling exercise: the same 1,000-subscriber
+population run under two different tier-mix shapes, both at Card A pricing.*
+
+| Scenario | Enterprise % of subscribers | Enterprise % of MRR | Total MRR |
+|---|---|---|---|
+| **A — normal distribution** across all 8 tiers, centered on Individual | 28.2% | 87.8% | $375,010 |
+| **B — realistic long-tail**, weighted toward Go/Individual the way a real signup funnel would be (93% Go/Individual, 7% Enterprise) | 7.0% | 67.5% | $95,500 |
+
+**The finding that matters: this isn't an artifact of Scenario A's artificial
+bell curve.** Even in Scenario B — a population that is overwhelmingly
+"average users," matching the intuition that Go/Individual should be the main
+pool — Enterprise still produces roughly two-thirds of all revenue from 7% of
+subscribers. The cause is structural, not a distribution-shape choice: the
+price ratio between the cheapest and most expensive tier is **444x** ($9 →
+$3,999), so a small number of Enterprise accounts will always outweigh a much
+larger number of Go/Individual accounts in raw MRR, under any realistic mix.
+
+**What this means in practice — a real dependency risk, not just a modeling
+curiosity:** if the subscriber base does end up mostly "average users" (the
+likely real outcome, per the owner's read), CimaFast's revenue stays
+concentrated in a small number of Enterprise accounts regardless. That's a
+customer-concentration risk worth planning around explicitly, separate from
+the margin questions in §3:
+
+- **Losing a handful of Enterprise accounts hurts far more than losing
+  hundreds of Go/Individual ones.** Churn risk, payment risk and contract
+  terms for Enterprise accounts deserve more operational attention than their
+  headcount alone would suggest.
+- **Go/Individual's real role may be funnel, not revenue** — a large base of
+  low-cost users who occasionally convert into (or refer) an Enterprise
+  account is a defensible strategy, but it's a different strategy than
+  expecting Go/Individual volume to carry the P&L on its own, and it changes
+  what "growth" should be measured by (Enterprise pipeline, not subscriber
+  count).
+- **Worth deciding explicitly, not by default:** is CimaFast comfortable
+  being an Enterprise-revenue business with a large free/cheap funnel
+  underneath it (common, e.g. most B2B SaaS with a self-serve tier), or does
+  the tier pricing need to change to make Individual/Go a real revenue
+  contributor on their own? Both are viable strategies; drifting into one
+  without choosing it is the actual risk.
+
+This is a market-structure observation from modeled scenarios, not measured
+data — CimaFast has 0 paying subscribers today, so neither scenario's mix is
+known to be the real one. Re-run this once real signup data exists.
+
+## 8. What has to be built before any of this is enforceable
 
 None of the above can actually be charged for yet:
 
@@ -178,7 +225,7 @@ this framework is built on. **Nothing in this document should be treated as
 final pricing until that real-usage pass happens** — everything above is a
 floor-case model against list prices with 0 paying subscribers today.
 
-## 8. Governance
+## 9. Governance
 
 - Pricing/margin decisions are **owner + Mohamed El-Zayat**, not an agent
   call — matches how both source docs were scoped from the start.
@@ -192,7 +239,7 @@ floor-case model against list prices with 0 paying subscribers today.
   owner decisions already are (`PRODUCT-PLAN.md` § Owner decisions), so this
   framework's assumptions stay traceable to when and why they were set.
 
-## 9. Open decisions (consolidated)
+## 10. Open decisions (consolidated)
 
 1. **Margin target: Card A (50%) or Card B (33%)?** Everything downstream
    (tokens included, EGP price, Go clip counts) depends on this pick. (§3)
