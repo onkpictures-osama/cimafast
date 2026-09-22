@@ -6,8 +6,9 @@ pulls the revenue model in `SUBSCRIPTIONS-PLAN.md` and the cost model in
 governed together instead of drifting across two documents. It restates
 numbers already worked out in those two files rather than re-deriving them —
 see them for the full methodology and sourcing. Like both source docs, this
-is explicitly **not** a decision: tier pricing stays the owner's and Mohamed
-El-Zayat's call, not something an agent locks in.
+is explicitly **not** a decision: tier pricing stays Osama Nazeeh's and
+Mohamed El-Zayat's call (CimaFast's co-founders), not something an agent
+locks in.
 
 ## Executive summary — the rethought, final model (2026-09-22)
 
@@ -70,7 +71,8 @@ serve (§13–14) pushed its revenue share up, not down — fixing margin and
 reducing concentration pull in opposite directions. Fourteen sections of
 rate-carding confirmed this isn't a pricing-math problem to out-model; it's
 a strategic choice between two viable shapes (broad-based revenue vs.
-Enterprise-anchored-with-a-funnel) that only Mohamed and the owner can make.
+Enterprise-anchored-with-a-funnel) that only Mohamed El-Zayat and Osama
+Nazeeh, CimaFast's co-founders, can make.
 This framework's job was to make that choice's real cost visible, not to
 make it — §11.3/§11.4 (Go as acquisition funnel, annual Enterprise
 contracts) are the mitigations if the Enterprise-anchored shape is the one
@@ -100,7 +102,7 @@ Full tier tables, the per-token pricing analysis, and the naming discussion
 for the no-subscription tier, **Enterprise** unchanged) are in
 `SUBSCRIPTIONS-PLAN.md` — this framework doesn't repeat them.
 
-**Governing logic, from the owner directly (2026-09-22):** Enterprise's price
+**Governing logic, from Osama Nazeeh directly (2026-09-22):** Enterprise's price
 is buying the infrastructure a production company would otherwise have to
 run itself; Go is a different product goal entirely (virality, not
 operations). This is *why* the per-token price is allowed to run backwards
@@ -171,7 +173,7 @@ runs hotter than modeled; Card B looks more generous next to
 Kling/Runway/Pika-style consumer credit counts; **Card C is sized to the
 specific instruction to guarantee at least 30% profit in every tier
 individually — not just in blended terms** (§3.1). **This needs an explicit
-owner+Mohamed pick, since every other number in this framework (tokens
+Osama+Mohamed pick, since every other number in this framework (tokens
 included, EGP price, Go clip counts) is downstream of it.** Recommend Card A
 (50%) as the working default until that conversation happens, since it's the
 safer error to default to — cheaper to loosen later than to have sold a
@@ -353,8 +355,9 @@ floor-case model against list prices with 0 paying subscribers today.
 
 ## 9. Governance
 
-- Pricing/margin decisions are **owner + Mohamed El-Zayat**, not an agent
-  call — matches how both source docs were scoped from the start.
+- Pricing/margin decisions are **Osama Nazeeh + Mohamed El-Zayat**
+  (co-founders), not an agent call — matches how both source docs were
+  scoped from the start.
 - Re-check vendor pricing before any contract is signed — AI provider prices
   move monthly/weekly and this framework is a September 2026 snapshot.
 - Re-peg the EGP card on a fixed cadence (§5) once it ships.
@@ -362,7 +365,7 @@ floor-case model against list prices with 0 paying subscribers today.
   real redemption data exists — don't let a floor-case model calcify into
   permanent policy.
 - Record each pricing/margin decision in `logs/YYYY-MM-DD.md` the way other
-  owner decisions already are (`PRODUCT-PLAN.md` § Owner decisions), so this
+  founder decisions already are (`PRODUCT-PLAN.md` § Owner decisions), so this
   framework's assumptions stay traceable to when and why they were set.
 
 ## 10. Open decisions (consolidated)
@@ -384,7 +387,7 @@ floor-case model against list prices with 0 paying subscribers today.
    point, not a decision.
 7. **Whether to adopt Model v2 (§11)** — usage-based overage billing, a Team
    tier, the Go funnel reframe, and annual contracts are a structural
-   proposal, not a numbers tweak; needs its own owner+Mohamed pass.
+   proposal, not a numbers tweak; needs its own Osama+Mohamed pass.
 
 ## 11. Model v2 — a best-practices rethink
 
@@ -392,7 +395,7 @@ floor-case model against list prices with 0 paying subscribers today.
 based on best practices" after §7 showed that no rate card (A/B/C) fixes
 revenue concentration — only the tier architecture itself can. This is a
 structural proposal on top of Cards A/B/C, not a replacement for the margin
-work in §3; it still needs its own owner+Mohamed decision, more so than a
+work in §3; it still needs its own Osama+Mohamed decision, more so than a
 rate-card pick, since it changes what customers are actually buying.*
 
 Four changes, each a named, common SaaS/AI-product practice, each with a
@@ -490,7 +493,7 @@ costing one.
 **Summary — this is a proposal, not a decision:** §11.1 and §11.2 are
 quantified above; §11.3 and §11.4 are named practices with a stated
 direction, not fully modeled numbers, since they're policy/contract
-decisions more than pricing math. All four need the same owner+Mohamed
+decisions more than pricing math. All four need the same Osama+Mohamed
 sign-off as Cards A/B/C, and more so, since together they change what a
 subscription *is* (flat price → base-plus-usage), not just what it costs.
 
@@ -531,7 +534,7 @@ Combines every mechanism validated so far into one card:
   at comparable-or-better clip counts throughout), so the reprice doesn't
   cost the competitive position established in `AI-PROVIDER-COSTS.md` §8.
 - **Individual/Enterprise prices unchanged** ($39/$99, $499/$1,299/$3,999)
-  — these were reasoned through with the owner directly (§1's "Enterprise
+  — these were reasoned through with Osama Nazeeh directly (§1's "Enterprise
   buys infrastructure" logic); no cost-based reason to move them, only Go's
   prices were actually broken.
 
@@ -666,7 +669,7 @@ concentration and pricing Enterprise to cover its true cost to serve are
 two different goals that don't automatically move together — this
 document doesn't resolve that tension, it surfaces it. Which one to
 prioritize, if they conflict further as real data comes in, is an
-owner+Mohamed call, not a costing one.
+Osama+Mohamed call, not a costing one.
 
 ### 13.5 Still not real data
 
