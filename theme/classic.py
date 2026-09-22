@@ -115,6 +115,16 @@ MAIN_CSS = r'''
         color: #E8B923 !important;
         font-weight: 600;
     }
+    /* عنوان أي قايمة قابلة للطي (expander) يفضل ثابت في مكانه لما تتفتح
+       ومحتواها الطويل بيعمل scroll (زي وصف شخصية طويل) - عشان اليوزر يفضل
+       شايف هو بيعدّل في إيه بالظبط حتى لو دخل عميق في النص. خلفية صلبة (مش
+       شفافة) عشان النص اللي بيتعدّى تحته ميبانش وهو ماشي. */
+    [data-testid="stExpander"] summary {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #16233F;
+    }
     /* الشريط الجانبي بالكامل أصفر - نفس اتجاه الواجهة، وبيقلب مكانه
        (يمين للعربي، شمال للإنجليزي) */
     section[data-testid="stSidebar"] {
@@ -297,6 +307,12 @@ MAIN_CSS = r'''
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
         color: #12203D !important;
+    }
+    /* عنوان الـ expander ثابت (sticky) جوه الشريط الجانبي لازم خلفيته صلبة
+       بلون الشريط نفسه (ذهبي) مش لون المحتوى الرئيسي الغامق - وإلا نص كحلي
+       على خلفية كحلية بيختفي */
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        background: #E8B923 !important;
     }
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover,
     section[data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary {
