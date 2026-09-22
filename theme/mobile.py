@@ -150,12 +150,54 @@ LAYOUT_CSS = f"""
 """
 
 
+# ---------------------------------------------------------------------------
+# المرحلة 3 — الخط والكثافة
+# ---------------------------------------------------------------------------
+# كل رقم هنا اتقاس الأول على 390px، مش اتخمّن. القياسات قبل التعديل:
+#   نص عادي 14px/22.4 · caption 14px/22.4 · h2 36px · h3 28px
+#   حقول الإدخال 14px · فراغ العمود 96px فوق و160px تحت · الهيدر 60px
+TYPE_CSS = """
+    /* الكثافة: 96 + 160 = 256px من 844px (تلت الشاشة) فاضية على التليفون —
+       Streamlit بيصغّر الفراغ الجانبي لوحده (80→16) بس مبيلمسش الفوق والتحت.
+       الهيدر 60px بالقياس، فـ72 فوق بتسيبله مكانه و12px تنفّس، و48 تحت
+       كفاية لآخر عنصر. المكسب (~136px) أكبر من التمن اللي شريط التبويبات
+       أخده في المرحلة 1، فالشاشة طلعت أكسب مش أخسر. */
+    [data-testid="stMainBlockContainer"] {
+        padding-top: 72px !important;
+        padding-bottom: 48px !important;
+    }
+    /* 16px في حقول الإدخال مش مسألة ذوق: تحت 16px، Safari على iOS بيزوّم
+       الصفحة كلها أول ما المستخدم يدوس على أي خانة، وبيسيبها مزوّمة بعد
+       ما يخلص كتابة. ده أكتر حاجة بتخلي البرنامج يحس إنه مش متعمول
+       للتليفون. (بيتحط على ‎.stApp‎ عشان يشمل الشريط الجانبي كمان.) */
+    .stApp input,
+    .stApp textarea,
+    .stApp select {
+        font-size: 16px !important;
+    }
+    /* النص: 14px على ذراع مفرودة صغير، والعربي محتاج سطر أوسع من
+       الإنجليزي عشان النقط والحركات ماتلزقش في اللي تحتها. */
+    [data-testid="stMain"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMain"] [data-testid="stMarkdownContainer"] li,
+    [data-testid="stMain"] [data-testid="stCaptionContainer"] p {
+        font-size: 15px !important;
+        line-height: 1.7 !important;
+    }
+    /* العناوين: 36px/28px مقاس شاشة كبيرة — على عمود 358px العنوان الواحد
+       بياخد تلات سطور. الهرم زي ما هو، المقاس بس بقى مقاس الشاشة. */
+    [data-testid="stMain"] h1 { font-size: 30px !important; line-height: 1.25 !important; }
+    [data-testid="stMain"] h2 { font-size: 26px !important; line-height: 1.25 !important; }
+    [data-testid="stMain"] h3 { font-size: 20px !important; line-height: 1.3 !important; }
+    [data-testid="stMain"] h4 { font-size: 17px !important; line-height: 1.35 !important; }
+"""
+
+
 def _media(*blocks):
     body = "\n".join(b.rstrip() for b in blocks if b and b.strip())
     return f"@media (max-width: {BREAKPOINT}px) {{\n{body}\n}}\n"
 
 
-MOBILE_CSS = _media(TOUCH_CSS, NAV_CSS, LAYOUT_CSS)
+MOBILE_CSS = _media(TOUCH_CSS, NAV_CSS, LAYOUT_CSS, TYPE_CSS)
 
 
 def mobile_css():

@@ -332,6 +332,17 @@ def test_mobile_tab_bar_wraps_instead_of_scrolling():
 
 
 @test
+def test_mobile_inputs_are_at_least_16px():
+    """أقل من 16px في خانة إدخال = Safari على iOS بيزوّم الصفحة كلها أول ما
+    المستخدم يدوس عليها، وبيسيبها مزوّمة بعد كده. الرقم ده سلوك متصفح مش
+    ذوق، فمينفعش ينزل تحته."""
+    css = mobile.mobile_css()
+    assert ".stApp input," in css
+    block = css[css.index(".stApp input,"):]
+    assert "font-size: 16px" in block[:300], "حقول الإدخال نزلت تحت 16px"
+
+
+@test
 def test_mobile_text_never_drops_below_the_body_contrast_floor():
     """المرحلة 3 بتصغّر العناوين على التليفون، والنص الصغير في WCAG بيتحاسب
     على الحد الأعلى (4.5) مش حد النص الكبير (3.0). فبنتأكد إن كل زوج في

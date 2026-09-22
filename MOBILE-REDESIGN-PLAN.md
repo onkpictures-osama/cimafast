@@ -77,8 +77,10 @@ shots tabs.
    to 44px; fixed-pixel images capped at their column. The two things page CSS
    cannot reach are handled openly — one partly fixed, one descoped. *(this
    session — see "Phase 2 result" below)*
-3. **Typography & density pass** — base font-size/line-height/row-height
-   tuned for a phone held at arm's length, re-run the contrast audit.
+3. ✅ **Typography & density pass** — input fields raised to 16px (below that
+   iOS Safari zooms the whole page on focus), body text to 15px/1.7, headings
+   cut to phone scale, and 136px of dead padding reclaimed. Contrast re-audited:
+   all 24 pairs pass, in both modes. *(this session — see "Phase 3 result")*
 4. **Full verification** — phone-viewport visual pass across every screen in
    `tests/visual`, zero diff confirmed at tablet/desktop for all of them, run
    once under `--theme classic` and once under `--theme glass` (the harness
@@ -195,3 +197,36 @@ while the page is at 390px), so it does not track the phone breakpoint.
 It is a 6px shortfall on one button, and fixing it properly means accepting a
 small visible change on every screen size — an owner-visible decision, not one
 to bury in a mobile pass. Tracked separately.
+
+## Phase 3 result — typography and density
+
+Every number below was measured at 390px before it was changed, not guessed.
+
+| | before | after | why |
+|---|---|---|---|
+| input / textarea | 14px | 16px | below 16px, iOS Safari zooms the whole page the moment a field is focused, and leaves it zoomed |
+| body text | 14px / 1.6 | 15px / 1.7 | Arabic needs more leading than Latin; dots and marks were sitting on the line below |
+| caption | 14px / 1.6 | 15px / 1.7 | same |
+| h2 | 36px | 26px | 36px is a desktop size; in a 358px column one heading took three lines |
+| h3 | 28px | 20px | same |
+| column padding | 96px top, 160px bottom | 72px, 48px | Streamlit shrinks the side padding on a phone (80→16) but not the top and bottom: 256px of an 844px screen was empty |
+
+The 16px input rule is the one that most changes how the app *feels* on a
+phone — it is what stops the page lurching and zooming every time someone taps
+a field. It is set on `.stApp` rather than `stMain` so the sidebar's fields get
+it too.
+
+The padding reclaim (~136px) is deliberately larger than the ~100px the wrapped
+tab bar cost in Phase 1, so the visible-content budget came out ahead, not
+behind. The header measures 60px, so 72px of top padding clears it with room.
+
+**Contrast re-audited, as the plan required.** All 12 text/background pairs
+pass in dark mode and all 12 in light mode, unchanged from before this pass —
+colours were not touched. There is one size-dependent risk and it is now
+covered by a test: WCAG judges text under ~24px by the stricter 4.5:1 floor
+rather than the 3.0:1 large-text floor, so shrinking a heading can in principle
+push a pair below its limit. Every pair in the palette clears 4.5:1 anyway
+(the tightest is 4.90:1, navy on the gold sidebar), and
+`test_mobile_text_never_drops_below_the_body_contrast_floor` asserts exactly
+that, so a future palette change cannot quietly invalidate the smaller
+headings.
