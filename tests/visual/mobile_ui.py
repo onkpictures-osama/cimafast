@@ -96,7 +96,8 @@ JS_SCREEN = r"""() => {
     const touch = [...main.querySelectorAll(
         '.stButton button, .stDownloadButton button, .stFormSubmitButton button,' +
         ' [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,' +
-        ' [data-testid="stRadio"] [role="radiogroup"] label')]
+        ' [data-testid="stRadio"] [role="radiogroup"] label,' +
+        ' [data-testid="stTextInput"] button')]
         .filter(e => {const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 43.5;})
         .map(e => (e.innerText || e.placeholder || e.type) + ':' + Math.round(e.getBoundingClientRect().height));
     const wide = [...main.querySelectorAll('*')].filter(e => {

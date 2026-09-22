@@ -41,9 +41,11 @@ source of truth:
    (e.g. "الأماكن") is pushed off-screen with no visible label hinting it's
    there. Confirmed on current `HEAD`, not the stale baseline.
 
-Still to confirm per-screen in Phase 1 (not assumed): dense forms,
-image-picker columns, and report tables/dataframes on the characters/scenes/
-shots tabs.
+Those per-screen unknowns — dense forms, image-picker columns, report tables —
+were measured in Phase 2 rather than assumed. The tab-bar overflow turned out
+to be worse than written above: five of the seven tabs were off-screen in
+Arabic, not one. The harness also now captures all nine screens instead of
+five, so "every screen" means every screen.
 
 ## Hard limits
 
