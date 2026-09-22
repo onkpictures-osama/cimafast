@@ -282,7 +282,7 @@ def test_mobile_css_is_entirely_inside_one_media_query():
     css = mobile.mobile_css().strip()
     assert css.startswith("@media (max-width: 767px) {"), css[:80]
     assert css.endswith("}")
-    # مفيش أي ‎}‎ على أول السطر غير القفلة الأخيرة = مفيش بلوك تاني بره
+    # أي قوس بيقفل بدري معناه قاعدة خرجت بره الـ @media
     body = css[css.index("{") + 1: css.rindex("}")]
     depth = 0
     for ch in body:
@@ -292,6 +292,16 @@ def test_mobile_css_is_entirely_inside_one_media_query():
             depth -= 1
             assert depth >= 0, "قوس زيادة — في قاعدة خرجت بره الـ @media"
     assert depth == 0
+
+
+@test
+def test_mobile_layer_carries_no_direction_placeholders():
+    """‎inject_base‎ مبتعملش ‎_template‎، فأي ‎__ALIGN__‎ في طبقة الموبايل
+    هيوصل للصفحة كنص حرفي جوه قاعدة مكسورة على شاشة الدخول. الطبقة دي لازم
+    تفضل مستقلة عن اتجاه اللغة — وهي فعلاً كده: حتى تدرّج الجدول على اليمين
+    في اللغتين لأن الشبكة جواها ‎ltr‎ دايمًا."""
+    for token in ("__DIR__", "__ALIGN__", "__ROWDIR__"):
+        assert token not in mobile.mobile_css(), f"{token} في طبقة الموبايل"
 
 
 @test

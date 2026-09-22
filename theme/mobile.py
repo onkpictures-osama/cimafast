@@ -83,12 +83,79 @@ NAV_CSS = f"""
 """
 
 
+# ---------------------------------------------------------------------------
+# المرحلة 2 — الفورمات والجداول ومختار الصور
+# ---------------------------------------------------------------------------
+# الرصّ في عمود واحد **مش محتاج CSS**: Streamlit نفسه بيرصّ الأعمدة تحت 768px،
+# واتقاس على السبع تبويبات في اللغتين (صفر صف فيه أكتر من عمود،
+# tests/visual/mobile_ui.py). فمش بنضيف قاعدة تعمل حاجة حاصلة أصلًا — الفحص
+# هو اللي بيحرس الحالة دي لو Streamlit غيّر سلوكه في ترقية جاية.
+#
+# اللي محتاج شغل فعلًا حاجتين اتقاسوا: الصور بمقاس ثابت بالبكسل، وجدول
+# ‎st.dataframe‎ اللي بيزحلق أفقي من غير ما حد يعرف.
+LAYOUT_CSS = f"""
+    /* الشاشات بتطلب صور بعرض ثابت بالبكسل (‎st.image(width=340)‎ في مختار
+       الصور، و260 للستوري بورد، و220 للشخصيات). على 390px العمود 358px
+       فالكبيرة فيهم بتعدّي؛ وعلى تليفون 320px (iPhone SE) بتعدّي بفرق أوضح.
+       قاعدة وقائية: مفيش صورة في البيانات المزروعة عشان تتصوّر، بس الحد ده
+       مبيأثرش على أي صورة أصغر من العمود. */
+    [data-testid="stImage"] img {{
+        max-width: 100% !important;
+        height: auto !important;
+    }}
+    /* مصدر الصورة (رفع / كاميرا / توليد): الاختيارات كانت 22px بالقياس — نص
+       الحد الأدنى للمس، وهي أكتر حاجة بتتداس في مختار الصور. اللفّ نفسه
+       Streamlit بيعمله أصلًا (اتقاس: سطرين من غير أي CSS)، فمش بنكرره —
+       بس بنقفّل الفراغ بين السطرين اللي بقى واسع بعد ما الاختيار كبر. */
+    [data-testid="stRadio"] [role="radiogroup"] label {{
+        min-height: {TOUCH}px !important;
+        align-items: center !important;
+    }}
+    [data-testid="stRadio"] [role="radiogroup"] {{
+        row-gap: 2px !important;
+    }}
+    /* الجدول ‎st.dataframe‎ شبكة على ‎canvas‎ (glide-data-grid) بتحسب
+       تخطيطها بنفسها، فمفيش CSS في الصفحة يقدر يرصّها في عمود واحد — القرار
+       والتفصيل في ‎MOBILE-REDESIGN-PLAN.md‎ تحت "المرحلة 2".
+
+       واللي كان ناقص مش الرصّ أصلًا، ده إن حد يعرف إن فيه أعمدة تانية:
+       بالقياس على 390px المحتوى 703px والمساحة 356px، و‎scrollLeft‎ بيبدأ
+       من صفر وبيوصل 347.
+
+       السكرول بار الظاهر مش حل: اتجرب بأربع صور (‎display:block‎،
+       ‎-webkit-appearance:none‎، ‎scrollbar-width:auto‎، ‎overflow-x:scroll‎)
+       والنتيجة ‎offsetHeight - clientHeight = 0‎ في كلهم — المتصفح (وكل
+       متصفحات الموبايل) بيرسم السكرول بار كطبقة فوق المحتوى بتبان وقت السحب.
+
+       فالعلامة تدرّج على الحرف اللي الأعمدة مخبّية وراه. الحرف ده **اليمين في
+       اللغتين**: الشبكة جواها ‎direction: ltr‎ مهما كان اتجاه الصفحة (اتقاس:
+       ‎ltr‎ في العربي والإنجليزي، و‎scrollLeft‎ موجب في الاتنين)، فمفيش داعي
+       لأي منطق اتجاه هنا. */
+    [data-testid="stDataFrame"] {{
+        max-width: 100% !important;
+        position: relative !important;
+    }}
+    [data-testid="stDataFrame"]::after {{
+        content: "";
+        position: absolute;
+        top: 1px;
+        bottom: 1px;
+        right: 1px;
+        width: 26px;
+        pointer-events: none;
+        z-index: 1;
+        background: linear-gradient(to right,
+                                    rgba(11, 18, 32, 0), rgba(11, 18, 32, 0.88));
+    }}
+"""
+
+
 def _media(*blocks):
     body = "\n".join(b.rstrip() for b in blocks if b and b.strip())
     return f"@media (max-width: {BREAKPOINT}px) {{\n{body}\n}}\n"
 
 
-MOBILE_CSS = _media(TOUCH_CSS, NAV_CSS)
+MOBILE_CSS = _media(TOUCH_CSS, NAV_CSS, LAYOUT_CSS)
 
 
 def mobile_css():

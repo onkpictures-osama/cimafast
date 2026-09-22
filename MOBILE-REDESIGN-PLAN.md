@@ -71,12 +71,12 @@ shots tabs.
    all seven tabs are visible at 390px; the active-tab underline still tracks
    the open tab exactly; the sidebar's native collapse-to-overlay verified,
    not rebuilt. *(this session — see "Phase 1 result" below)*
-2. **Forms, tables, image pickers** — single-column stacking confirmed on
-   every tab (locations, characters, scenes, shots, reports). Confirm before
-   promising a fix for wide `st.dataframe` grids or anything inside an
-   `st.components.v1.html` iframe (e.g. `views/import_tab.py`) — injected page
-   CSS cannot reach into either, so those two need a different approach (or
-   get explicitly descoped) rather than the same CSS layer.
+2. ✅ **Forms, tables, image pickers** — single-column stacking measured on all
+   seven tabs in both languages (it is already Streamlit's own behaviour below
+   768px, so no CSS was added for it); the image-source options went from 22px
+   to 44px; fixed-pixel images capped at their column. The two things page CSS
+   cannot reach are handled openly — one partly fixed, one descoped. *(this
+   session — see "Phase 2 result" below)*
 3. **Typography & density pass** — base font-size/line-height/row-height
    tuned for a phone held at arm's length, re-run the contrast audit.
 4. **Full verification** — phone-viewport visual pass across every screen in
@@ -146,3 +146,52 @@ The sidebar was verified, not rebuilt, as planned: below 768px Streamlit
 already collapses it and reopens it as a 300px overlay *over* the content
 (main content width unchanged at 390px). The one real bug found there was its
 expand button — 28×28px, the only way into the sidebar on a phone, now 44px.
+
+## Phase 2 result — forms, tables, image pickers
+
+**Stacking needed no CSS.** Measured on all seven tabs in Arabic and English at
+390px: zero rows contain more than one column. Streamlit already stacks columns
+below its own 768px breakpoint, so adding a rule here would only have restated
+what the browser was doing. `mobile_ui.py` now measures it, which is what keeps
+it true after the next Streamlit upgrade.
+
+**What did need fixing.** The image-source picker (upload / camera / generate)
+had 22px tall options — half the touch minimum, on the control users tap most
+in that panel. Now 44px, with the gap between its two rows tightened so the
+taller options do not push the form down. Images requested at a fixed pixel
+width (340px in the picker, 260px for storyboards, 220px for characters) are
+capped at their column, which matters at 320px-wide phones.
+
+### The two things page CSS cannot reach
+
+**`st.dataframe` — reflow descoped, discoverability fixed.** The grid is
+glide-data-grid painting into a `<canvas>`: it computes its own column layout,
+so no rule in the page can make it stack. Measured on the scenes table at
+390px: 703px of content in 356px of space. Descoping the reflow is not the same
+as leaving it broken, because the actual failure was *silence* — the user had
+no way to know there were more columns. Four different ways of forcing a
+visible scrollbar were tried (`display:block`, `-webkit-appearance:none`,
+`scrollbar-width:auto`, `overflow-x:scroll`) and all four measured
+`offsetHeight - clientHeight == 0`: this browser, like every mobile browser,
+draws that scrollbar as an overlay that only appears mid-drag. So the table now
+carries a fade on the edge the columns are hidden behind — the right edge in
+both languages, because the grid's own scroller is `direction: ltr` whatever
+the page direction is (measured, not assumed: `ltr` and a positive `scrollLeft`
+range in Arabic and English alike).
+
+The real fix — a stacked card list instead of a grid on narrow screens — is a
+view change in `views/scenes.py`, not a CSS change, and it needs its own
+before/after. Tracked separately, not smuggled into this pass.
+
+**The `st.components.v1.html` iframe — descoped.** The copy button in
+`views/import_tab.py` renders inside an iframe. Page CSS cannot style its
+contents, and its own HTML is ours, so it *could* be fixed at source — except
+that it measures 37.6px tall on every viewport, so raising it to 44px would
+also change tablet and desktop, and "zero diff at tablet and desktop" is this
+plan's hard limit. A media query inside the iframe cannot stand in for one
+outside it either: the iframe's `innerWidth` is its own layout width (468px
+while the page is at 390px), so it does not track the phone breakpoint.
+
+It is a 6px shortfall on one button, and fixing it properly means accepting a
+small visible change on every screen size — an owner-visible decision, not one
+to bury in a mobile pass. Tracked separately.

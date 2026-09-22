@@ -95,7 +95,8 @@ JS_SCREEN = r"""() => {
     const shared = Object.entries(rows).filter(([, w]) => w.length > 1);
     const touch = [...main.querySelectorAll(
         '.stButton button, .stDownloadButton button, .stFormSubmitButton button,' +
-        ' [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input')]
+        ' [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input,' +
+        ' [data-testid="stRadio"] [role="radiogroup"] label')]
         .filter(e => {const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 43.5;})
         .map(e => (e.innerText || e.placeholder || e.type) + ':' + Math.round(e.getBoundingClientRect().height));
     const wide = [...main.querySelectorAll('*')].filter(e => {
@@ -112,9 +113,17 @@ JS_SCREEN = r"""() => {
             w: Math.round(f.getBoundingClientRect().width),
             title: f.title || '',
         })),
+        // الصور بمقاس ثابت بالبكسل متعدّيش عرض العمود
+        wideImages: [...main.querySelectorAll('[data-testid="stImage"] img')]
+            .filter(i => {
+                const p = i.closest('[data-testid="stVerticalBlock"]') || main;
+                return i.getBoundingClientRect().width > p.getBoundingClientRect().width + 1;
+            }).length,
         dataframes: [...main.querySelectorAll('[data-testid="stDataFrame"]')].map(d => ({
             w: Math.round(d.getBoundingClientRect().width),
             sw: Math.round((d.querySelector('[class*="dvn-scroller"]') || d).scrollWidth),
+            // علامة إن فيه أعمدة مخبّية: التدرّج على حرف الجدول
+            fade: getComputedStyle(d, '::after').backgroundImage !== 'none',
         })),
     };
 }"""
@@ -176,6 +185,13 @@ def _run_lang(page, app, lang, out_dir, shots_on):
               f"{s['wideCount']} {s['wideKinds'][:5]}")
         check(f"[{lang}] {key}: مساحات اللمس ≥{TOUCH}px", not s["smallTouch"],
               str(s["smallTouch"][:4]))
+        check(f"[{lang}] {key}: مفيش صورة أوسع من عمودها", s["wideImages"] == 0,
+              f"{s['wideImages']} صورة")
+        # أي جدول بيزحلق لازم يبان عليه إنه بيكمل
+        hidden = [d for d in s["dataframes"] if d["sw"] > d["w"] + 1]
+        if hidden:
+            check(f"[{lang}] {key}: الجدول اللي بيزحلق عليه علامة",
+                  all(d["fade"] for d in hidden), str(hidden))
         if s["dataframes"] or s["frames"]:
             print(f"      … {key}: dataframes={s['dataframes']} iframes={s['frames']}",
                   flush=True)
