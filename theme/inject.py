@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from . import classic, glass, mobile
+from . import brand, classic, glass, mobile, tokens
 from .flag import CLASSIC, GLASS
 
 
@@ -41,7 +41,10 @@ def inject_base(st, variant=CLASSIC, lang="ar"):
     ستايل شاشة الدخول داخل معاه عن قصد: هو متربط بمفتاح فورم الدخول
     فمبيأثرش على أي حاجة تانية، وكده شاشة الدخول ماخدتش حاوية زيادة.
     """
-    parts = [classic.BASE_CSS, classic.LOGIN_CSS]
+    # التوكنز أول حاجة: من بعد ما ألوان البراند الرسمية بقت في ‎tokens.py‎،
+    # الشكل الكلاسيكي بقى بيستهلك ‎var(--cf-*)‎ زي شكل الزجاج بالظبط. فلازم
+    # بلوك الـ ‎:root‎ يتحقن في المسارين، مش في مسار الزجاج بس زي الأول.
+    parts = [tokens.css_vars("dark"), brand.LOGO_CSS, classic.BASE_CSS, classic.LOGIN_CSS]
     if variant == GLASS:
         parts.append(glass.base_css())
         parts.append(glass.login_css())
@@ -53,7 +56,8 @@ def inject_base(st, variant=CLASSIC, lang="ar"):
 
 
 # لون شريط العنوان في الموبايل — نفس backgroundColor في config.toml
-THEME_COLOR = "#0B1220"
+# (CF Midnight، صفحة الوضع الغامق في دليل البراند)
+THEME_COLOR = tokens.BRAND["midnight"]
 
 
 def _document_attrs(st, lang):

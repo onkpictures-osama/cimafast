@@ -22,7 +22,14 @@ import audit
 import links
 import permissions
 
-st.set_page_config(page_title="CimaFast Studio", page_icon="🎬", layout="wide")
+# أيقونة البرنامج = العلامة لوحدها على مربع كحلي (الدليل ص 04، lockup رقم 5:
+# "Icon only — app icon, favicon, avatar, watermark"). كانت إيموجي 🎬، يعني
+# الفافيكون في تاب المتصفح مكانش فيه أي حاجة من البراند.
+st.set_page_config(
+    page_title="CimaFast Studio",
+    page_icon=theme.brand.asset_path(theme.brand.APP_ICON),
+    layout="wide",
+)
 
 # الشكل: النسخة الافتراضية classic، و‎?theme=glass‎ بيشغّل التصميم الجديد.
 # كل الـ CSS بقى في حزمة theme/ — مكان واحد بدل تلاتة.
@@ -33,8 +40,9 @@ theme.inject_base(st, _theme_variant, lang=st.session_state.get("ui_lang", "ar")
 def _render_locked_screen():
     """شاشة القفل لما مفيش حسابات متظبطة — بنقفل الباب ونقول للمسؤول السبب."""
     st.markdown(
-        "<h2 style='text-align:center; margin-top:15vh;'>🎬 CimaFast Studio</h2>"
-        "<p dir='auto' style='text-align:center; font-size:1.1rem;'>"
+        "<div class='cf-login__logo' style='margin-top:15vh'>%s</div>"
+        % theme.brand.lockup("dark", px=64)
+        + "<p dir='auto' style='text-align:center; font-size:1.1rem;'>"
         "🔒 الدخول مقفول: مفيش حسابات متظبطة على السيرفر."
         "<br>Access locked: no user accounts are configured.</p>"
         "<p dir='auto' style='text-align:center; opacity:0.7;'>"
@@ -73,13 +81,17 @@ def _render_login_screen():
     بعض. الاتجاه RTL عشان العربي هو الأساس، بس خانات الإدخال نفسها LTR لأن
     اسم المستخدم وكلمة السر بالإنجليزي."""
     theme.inject_login(st, _theme_variant)
+    # اللوجو الرسمي بدل الإيموجي + النص: الـ lockup الأفقي بنسخة الاستوديو
+    # (STUDIO مكان MEDIA، الدليل ص 04) على سطح غامق ⇒ النسخة الصفرا.
+    # الاسم العربي جنبه بخط Cairo، زي ما الدليل بيطلب بالظبط — مش جوه
+    # الـ lockup ولا ترجمة حرفية جوه الووردمارك.
     st.markdown(
         """
         <div class="cf-login" dir="rtl">
-            <h2>🎬 CimaFast Studio</h2>
+            <div class="cf-login__logo">%s</div>
             <p>تسجيل الدخول / Sign in</p>
         </div>
-        """,
+        """ % theme.brand.lockup("dark", px=80, arabic=True),
         unsafe_allow_html=True,
     )
     _, mid, _ = st.columns([1, 1.4, 1])
@@ -92,7 +104,10 @@ def _render_login_screen():
             password = st.text_input(
                 "كلمة السر / Password", type="password", key="_login_password"
             )
-            submitted = st.form_submit_button("دخول / Log in", use_container_width=True)
+            # زرار الدخول هو الحدث الأساسي في الصفحة ⇒ زرار primary،
+            # يعني تعبئة صفرا وحروف Ink زي ما الدليل بيقول (ص 08).
+            submitted = st.form_submit_button(
+                "دخول / Log in", use_container_width=True, type="primary")
         if submitted:
             user = authenticate(username, password, _auth_users())
             if user:
@@ -366,7 +381,13 @@ theme.inject_main(
 
 _brand_col, _info_col = st.sidebar.columns([4, 2])
 with _brand_col:
-    st.markdown('<div class="cf-title">🎬 CimaFast Studio</div>', unsafe_allow_html=True)
+    # الشريط الجانبي هو الحقل الأصفر بتاع البراند ⇒ النسخة الكحلي من اللوجو
+    # (الدليل ص 03: "On yellow → navy figure"). من غير ™ هنا: الدليل بيقول
+    # إنها اختيارية في كروم الواجهة، والشريط ضيق.
+    st.markdown(
+        '<div class="cf-title">%s</div>' % theme.brand.lockup("light", px=44, tm=False),
+        unsafe_allow_html=True,
+    )
 with _info_col:
     # "؟" مش إيموجي ("ℹ️") ولا حرف دائرة نادر ("ⓘ") - الاتنين ما رسمهمش
     # صحيح. علامة استفهام عادية أكيد موجودة في نفس الخط اللي بيرسم باقي

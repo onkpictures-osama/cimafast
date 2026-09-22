@@ -40,6 +40,30 @@ BASE_CSS = r'''
     
     /* Buttons: center alignment */
     button { text-align: center; }
+
+    /* زرار أساسي (primary) = تعبئة اللكنة + حروف Ink، زي جدول الأزرار في
+       الدليل ص 08. الحروف Ink مش أبيض: أبيض على الأصفر 1.54:1 وبيختفي.
+       الشريط الجانبي ليه قاعدة أخص فوق (زرار الإعدادات Royal) فمبيتأثرش. */
+    [data-testid="stBaseButton-primary"],
+    [data-testid="stBaseButton-primaryFormSubmit"] {
+        background-color: var(--cf-accent) !important;
+        border-color: var(--cf-accent) !important;
+        color: var(--cf-on-accent) !important;
+        font-weight: 600;
+    }
+    [data-testid="stBaseButton-primary"] p,
+    [data-testid="stBaseButton-primary"] span,
+    [data-testid="stBaseButton-primaryFormSubmit"] p,
+    [data-testid="stBaseButton-primaryFormSubmit"] span {
+        color: var(--cf-on-accent) !important;
+    }
+
+    /* حلقة التركيز باللكنة على أي عنصر تفاعلي - شرط في الدليل (ص 06 ·
+       Accessibility)، ومكانش موجود قبل كده غير على الروابط. */
+    .stApp :focus-visible {
+        outline: 2px solid var(--cf-accent);
+        outline-offset: 2px;
+    }
    '''
 
 LOGIN_CSS = r'''
@@ -54,6 +78,14 @@ LOGIN_CSS = r'''
            بالمفتاح بيخلي القواعد تفضل مأثرة على فورم الدخول بس، مش على كل
            الفورمات في البرنامج. */
         .cf-login h2 { text-align: center; margin-top: 12vh; }
+        /* اللوجو الرسمي بدل العنوان النصي. بياخد نفس المسافة العلوية اللي
+           كان العنوان بياخدها (12vh) عشان الفورم ميتزحش عن مكانه. */
+        .cf-login__logo {
+            display: flex;
+            justify-content: center;
+            margin-top: 12vh;
+            margin-bottom: 12px;
+        }
         .cf-login p { text-align: center; opacity: 0.75; margin-bottom: 0; }
         div[class*="st-key-_login_username"] label p,
         div[class*="st-key-_login_password"] label p { direction: rtl; text-align: right; }
@@ -83,16 +115,15 @@ MAIN_CSS = r'''
         direction: ltr;
         text-align: left;
     }
-    /* Readex Pro للعربي والإنجليزي */
-    .stApp {
-        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    /* خطوط البراند: Inter للاتيني و Cairo للعربي (الدليل ص 06).
+       الترتيب في الستاك هو كل الحيلة - Inter مفيهوش حرف عربي واحد، فأي
+       حرف عربي بيقع تلقائيًا على Cairo من غير ما نفحص اللغة في بايثون ولا
+       نلف العربي في عنصر لوحده. الاتنين مستضافين محليًا في static/fonts. */
+    .stApp, [dir="rtl"], [dir="ltr"] {
+        font-family: var(--cf-font);
     }
-    [dir="rtl"] {
-        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    [dir="ltr"] {
-        font-family: "Readex Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+    /* سلّم الوزن من الدليل: العناوين 700، التسميات والأزرار 600 */
+    .stApp h1, .stApp h2, .stApp h3 { font-weight: 700; }
     /* Streamlit نفسه بيحط text-align: left افتراضيًا على العناوين والنصوص
        التوضيحية (caption) وفقرات الـ markdown، من غير ما يهتم باتجاه
        الصفحة - فبنجبرها تتبع اتجاه اللغة الحالية (يمين للعربي، شمال
@@ -112,7 +143,7 @@ MAIN_CSS = r'''
     [data-testid="stWidgetLabel"] label {
         width: 100%;
         text-align: center;
-        color: #E8B923 !important;
+        color: var(--cf-accent) !important;
         font-weight: 600;
     }
     /* عنوان أي قايمة قابلة للطي (expander) يفضل ثابت في مكانه لما تتفتح
@@ -123,23 +154,26 @@ MAIN_CSS = r'''
         position: sticky;
         top: 0;
         z-index: 2;
-        background: #16233F;
+        background: var(--cf-glass-opaque);
     }
-    /* الشريط الجانبي أصفر - نفس اتجاه الواجهة، وبيقلب مكانه (يمين للعربي،
-       شمال للإنجليزي). تدرّج (gradient) بدل اللون المصمت عشان يهدّي حدة
-       الأصفر شوية - لسه نفس لون البراند فوق، وبيغمق تدريجيًا لدرجة أعمق
-       وأهدأ. النص الكحلي لسه واضح عند كل نقطة (أقل تباين في القاع 6.27:1،
-       فوق الحد الأدنى 4.5:1 بمسافة أمان). */
+    /* الشريط الجانبي هو "الحقل الأصفر" بتاع البراند - نفس اتجاه الواجهة،
+       وبيقلب مكانه (يمين للعربي، شمال للإنجليزي).
+
+       كان تدرّج (E8B923 → C99A2E) عشان يهدّي حدة دهبي مش مضبوط. مع لون
+       البراند الرسمي (CF Yellow #FECA05) رجع لون واحد مصمت زي ما الدليل
+       بيقول بالنص: "الحقل الأصفر هو البراند، مش سطح - نفس القيمة في
+       الوضعين". والتباين بقى أحسن كمان: Ink على الأصفر 9.67:1 (AAA) في كل
+       نقطة، بدل 6.27:1 في قاع التدرّج القديم. */
     section[data-testid="stSidebar"] {
         direction: __DIR__;
-        background: linear-gradient(160deg, #E8B923 0%, #D9A81F 50%, #C99A2E 100%);
+        background: var(--cf-yellow);
     }
     section[data-testid="stSidebar"] * {
-        color: #12203D !important;
+        color: var(--cf-on-brand) !important;
     }
     section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
     section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label {
-        color: #12203D !important;
+        color: var(--cf-on-brand) !important;
     }
     /* لو الشريط الجانبي بيتقفل/بيتفتح (أنيميشن العرض بيتغير من صفر للكامل)،
        لازم النص ميلفش رأسي حرف تحت حرف - يفضل مقصوص بالعرض بس (…) */
@@ -172,7 +206,7 @@ MAIN_CSS = r'''
         opacity: 0.9;
         margin-top: 10px;
         padding: 8px 10px;
-        border: 1px solid rgba(18, 32, 61, 0.35);
+        border: 1px solid rgba(27, 37, 75, 0.35);
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.18);
     }
@@ -184,10 +218,10 @@ MAIN_CSS = r'''
         line-height: 1.5;
         margin: 4px 0 10px 0;
         padding: 10px 12px;
-        border: 1px solid rgba(18, 32, 61, 0.25);
+        border: 1px solid rgba(27, 37, 75, 0.25);
         border-radius: 8px;
-        background: #FFFFFF;
-        color: #12203D;
+        background: var(--cf-white);
+        color: var(--cf-on-brand);
     }
     /* نصوص جوه صناديق الإدخال والأزرار (خلفيتها غامقة من الثيم) لازم تفضل
        فاتحة عشان تتقرا فوق الخلفية الغامقة بتاعتها هي (مش الأصفر اللي حواليها) */
@@ -198,25 +232,25 @@ MAIN_CSS = r'''
     section[data-testid="stSidebar"] .stButton button p,
     section[data-testid="stSidebar"] .stButton button span,
     section[data-testid="stSidebar"] .stDownloadButton button {
-        color: #F5F1E6 !important;
+        color: var(--cf-text) !important;
     }
     /* خلفية غامقة صريحة لكل الأزرار في الشريط الجانبي، عشان النص الفاتح
        يفضل واضح فوقها مهما كان لون الثيم الافتراضي للزرار */
     section[data-testid="stSidebar"] .stButton button,
     section[data-testid="stSidebar"] .stDownloadButton button {
-        background-color: #12203D !important;
-        border: 1px solid #12203D !important;
+        background-color: var(--cf-on-brand) !important;
+        border: 1px solid var(--cf-on-brand) !important;
     }
     section[data-testid="stSidebar"] .stButton button:hover,
     section[data-testid="stSidebar"] .stDownloadButton button:hover {
-        background-color: #1B2E52 !important;
-        border-color: #E8B923 !important;
-        color: #F5F1E6 !important;
+        background-color: var(--cf-navy-raised) !important;
+        border-color: var(--cf-accent) !important;
+        color: var(--cf-text) !important;
     }
     section[data-testid="stSidebar"] .stButton button:disabled,
     section[data-testid="stSidebar"] .stButton button:disabled p {
-        color: #8A93A6 !important;
-        background-color: #16233F !important;
+        color: var(--cf-mist-dark) !important;
+        background-color: var(--cf-glass-opaque) !important;
         opacity: 0.7;
     }
     /* زرار الـ popover (ℹ️ بجانب اسم البرنامج) - نفس مشكلة الـ expander
@@ -224,31 +258,34 @@ MAIN_CSS = r'''
        افتراضية (مش .stButton فمابيلحقهاش القاعدة فوق)، والنص فوقها كحلي
        من القاعدة العامة - كحلي على غامق يختفي. */
     section[data-testid="stSidebar"] [data-testid="stPopoverButton"] {
-        background-color: rgba(18, 32, 61, 0.1) !important;
-        border: 1px solid rgba(18, 32, 61, 0.3) !important;
+        background-color: rgba(27, 37, 75, 0.1) !important;
+        border: 1px solid rgba(27, 37, 75, 0.3) !important;
     }
     /* زرار الإعدادات - مربع وأزرق ومختلف شكلًا ولونًا عن باقي أزرار
-       الشريط الجانبي (زي ما طلب المستخدم)، بترس أبيض في النص */
+       الشريط الجانبي (زي ما طلب المستخدم)، بترس أبيض في النص.
+       الأزرق بقى CF Royal من بالتة البراند بدل الأزرق التقريبي: 6.24:1 على
+       الحقل الأصفر (AA) والأبيض فوقه 8.6:1، ولسه مميز تمامًا عن الكحلي
+       بتاع باقي الأزرار. */
     section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
-        background-color: #2D9CDB !important;
-        border: 1px solid #2D9CDB !important;
-        color: #FFFFFF !important;
+        background-color: var(--cf-royal) !important;
+        border: 1px solid var(--cf-royal) !important;
+        color: var(--cf-white) !important;
         width: 44px !important;
         height: 44px !important;
         min-width: 44px !important;
         padding: 0 !important;
         font-size: 20px !important;
-        border-radius: 10px !important;
+        border-radius: var(--cf-radius-md) !important;
         display: flex;
         align-items: center;
         justify-content: center;
     }
     section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover {
-        background-color: #268BC4 !important;
-        border-color: #FFFFFF !important;
+        background-color: var(--cf-navy) !important;
+        border-color: var(--cf-white) !important;
     }
     section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] p {
-        color: #FFFFFF !important;
+        color: var(--cf-white) !important;
         font-size: 20px !important;
     }
     .cf-settings-label {
@@ -272,7 +309,7 @@ MAIN_CSS = r'''
         position: absolute;
         left: 10px;
         font-size: 14px;
-        color: #F5F1E6;
+        color: var(--cf-text);
         opacity: 0.55;
         pointer-events: none;
         z-index: 1;
@@ -309,25 +346,25 @@ MAIN_CSS = r'''
        واضحة بشكل ثابت، عشان النص والسهم يفضلوا باينين في أي حالة (مقفول،
        مفتوح، عليه الماوس) من غير ما يعتمدوا على خلفية شفافة ممكن تختفي فيها */
     section[data-testid="stSidebar"] [data-testid="stExpander"] {
-        background-color: rgba(18, 32, 61, 0.07);
-        border: 1px solid rgba(18, 32, 61, 0.3);
+        background-color: rgba(27, 37, 75, 0.07);
+        border: 1px solid rgba(27, 37, 75, 0.3);
         border-radius: 10px;
         margin-bottom: 6px;
     }
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
-        color: #12203D !important;
+        color: var(--cf-on-brand) !important;
     }
     /* عنوان الـ expander ثابت (sticky) جوه الشريط الجانبي لازم خلفيته صلبة
        بلون الشريط نفسه (ذهبي) مش لون المحتوى الرئيسي الغامق - وإلا نص كحلي
        على خلفية كحلية بيختفي */
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
-        background: #E8B923 !important;
+        background: var(--cf-accent) !important;
     }
     section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover,
     section[data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary {
-        background-color: rgba(18, 32, 61, 0.14) !important;
+        background-color: rgba(27, 37, 75, 0.14) !important;
         border-radius: 8px;
     }
     /* segmented_control (زرار اللغة AR/EN) - نفس مشكلة الـ expander بالظبط:
@@ -336,17 +373,17 @@ MAIN_CSS = r'''
        غامقة بيختفي. القطعة المختارة أصلاً خلفيتها فاتحة (تينت ذهبي) فمالهاش
        نفس المشكلة، بس بنثبّتها هنا برضو عشان الاتساق. */
     section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"] {
-        background-color: rgba(18, 32, 61, 0.08) !important;
+        background-color: rgba(27, 37, 75, 0.08) !important;
     }
     section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] {
-        background-color: rgba(232, 185, 35, 0.45) !important;
+        background-color: rgba(254, 202, 5, 0.45) !important;
     }
     /* علامة "تم الحفظ" - نص رفيع بسيط على أرضية التصميم، مش شكل زرار،
        بتفضل ظاهرة بعد الحفظ لحد ما المستخدم يحفظ سجل تاني */
     .cf-saved-badge {
         font-size: 12px;
         font-weight: 400;
-        color: #F5F1E6;
+        color: var(--cf-text);
         opacity: 0.75;
         margin-top: -6px;
         margin-bottom: 8px;
@@ -355,11 +392,13 @@ MAIN_CSS = r'''
        عشان القايمة الطويلة متبقاش سايحة من غير حدود واضحة بين الأسئلة */
     hr.cf-soft-sep {
         border: none;
-        border-top: 1px solid rgba(245, 241, 230, 0.16);
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
         margin: 18px 0;
     }
-    /* بادج علامة الصح - أزرق فاتح دايمًا (مش أخضر) عشان يفضل متماشي مع
-       بالتة ألوان البراند (أصفر / أزرق فاتح / كحلي غامق / أبيض / رمادي) */
+    /* بادج علامة الصح - أزرق دايمًا (مش أخضر) عشان يفضل متماشي مع بالتة
+       البراند. الأزرق بقى CF Royal مرفوع لدرجة تتقرا على Midnight، والحرف
+       فوقه Ink مش أبيض: الأبيض على الأزرق ده 2.51:1 (كان بيفشل من غير ما
+       حد يقيسه)، و Ink عليه 5.91:1. */
     .cf-check-badge {
         display: inline-flex;
         align-items: center;
@@ -367,8 +406,8 @@ MAIN_CSS = r'''
         width: 16px;
         height: 16px;
         border-radius: 4px;
-        background: #2D9CDB;
-        color: #FFFFFF;
+        background: var(--cf-info);
+        color: var(--cf-on-info);
         font-size: 11px;
         font-weight: 800;
         line-height: 1;
@@ -380,8 +419,8 @@ MAIN_CSS = r'''
     textarea::-webkit-resizer {
         background: repeating-linear-gradient(
             135deg,
-            #E8B923, #E8B923 3px,
-            #12203D 3px, #12203D 6px
+            var(--cf-accent), var(--cf-accent) 3px,
+            var(--cf-on-brand) 3px, var(--cf-on-brand) 6px
         );
     }
     .cf-stepper {
@@ -394,52 +433,52 @@ MAIN_CSS = r'''
         text-align: center;
         padding: 14px 6px;
         border-radius: 14px;
-        background: #16233F;
+        background: var(--cf-glass-opaque);
         border: 2px solid transparent;
     }
     .cf-stage-icon { font-size: 16px; margin-bottom: 5px; }
     .cf-stage-icon .cf-check-badge { width: 20px; height: 20px; font-size: 13px; border-radius: 6px; }
-    .cf-stage-label { font-size: 12px; font-weight: 600; color: #F5F1E6; }
-    .cf-stage-done { background: rgba(45, 156, 219, 0.14); border-color: #2D9CDB; }
-    .cf-stage-current { border-color: #E8B923; box-shadow: 0 0 0 1px rgba(232, 185, 35, 0.35); }
+    .cf-stage-label { font-size: 12px; font-weight: 600; color: var(--cf-text); }
+    .cf-stage-done { background: rgba(111, 168, 224, 0.14); border-color: var(--cf-info); }
+    .cf-stage-current { border-color: var(--cf-accent); box-shadow: 0 0 0 1px rgba(254, 202, 5, 0.35); }
     .cf-stage-pending { opacity: 0.5; }
     /* سطر التقدّم اللي حل محل كروت المراحل: شريط رفيع + جملة واحدة. */
     .cf-progress { margin: 6px 0 14px 0; }
     /* روابط التنقّل في الـ sidebar (الرئيسية، الفريق، الجدول): شكل زرار، نفس التاب */
     a.cf-navlink {
-        display: block; text-align: center; text-decoration: none; color: #F5F1E6;
+        display: block; text-align: center; text-decoration: none; color: var(--cf-text);
         padding: 7px 12px; margin: 2px 0; border-radius: 8px;
-        border: 1px solid rgba(245, 241, 230, 0.18); background: rgba(245, 241, 230, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04);
     }
-    a.cf-navlink:hover, a.cf-navlink:focus-visible { border-color: #E8B923; color: #F5F1E6; }
+    a.cf-navlink:hover, a.cf-navlink:focus-visible { border-color: var(--cf-accent); color: var(--cf-text); }
     .cf-progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
     .cf-progress-seg {
         flex: 1; height: 4px; border-radius: 2px;
-        background: rgba(245, 241, 230, 0.14);
+        background: rgba(255, 255, 255, 0.14);
     }
-    .cf-progress-seg--done { background: #2D9CDB; }
-    .cf-progress-seg--current { background: #E8B923; }
-    .cf-progress-text { font-size: 0.9rem; color: rgba(245, 241, 230, 0.78); }
-    .cf-progress-text strong { color: #F5F1E6; font-weight: 600; }
+    .cf-progress-seg--done { background: var(--cf-info); }
+    .cf-progress-seg--current { background: var(--cf-accent); }
+    .cf-progress-text { font-size: 0.9rem; color: rgba(255, 255, 255, 0.78); }
+    .cf-progress-text strong { color: var(--cf-text); font-weight: 600; }
     .cf-copy-hint {
         font-weight: 700;
-        color: #E8B923;
+        color: var(--cf-accent);
         margin-bottom: 6px;
     }
     div[data-testid="stCodeBlock"] button[title="Copy to clipboard"],
     div[data-testid="stCodeBlock"] [data-testid="stCodeCopyButton"] {
         opacity: 1 !important;
         transform: scale(1.4);
-        background: #E8B923 !important;
+        background: var(--cf-accent) !important;
         border-radius: 6px !important;
     }
     /* زرار الحذف الجماعي - بيبقى أحمر تحذيري في أي مكان مستخدم فيه
        (أي عنصر container بمفتاح بيبدأ بـ bulk_delete_) */
     [class*="st-key-bulk_delete_"] button {
-        background-color: #DC2626 !important;
-        border-color: #DC2626 !important;
+        background-color: var(--cf-danger) !important;
+        border-color: var(--cf-danger) !important;
     }
     [class*="st-key-bulk_delete_"] button p {
-        color: #FFFFFF !important;
+        color: var(--cf-white) !important;
     }
     '''

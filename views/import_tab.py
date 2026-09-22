@@ -72,9 +72,9 @@ def _render_copy_button(text, label, done_label):
     st_components.html(
         f"""
         <button id="cf-copy" style="width:100%;padding:0.55rem 1rem;cursor:pointer;
-            border-radius:0.5rem;border:1px solid rgba(212,175,55,0.45);
-            background:rgba(212,175,55,0.12);color:#e8c860;font-weight:600;
-            font-family:'Readex Pro',system-ui,sans-serif;font-size:0.95rem;">
+            border-radius:12px;border:1.5px solid #FECA05;
+            background:rgba(254,202,5,0.12);color:#FECA05;font-weight:600;
+            font-family:Inter,Cairo,system-ui,sans-serif;font-size:0.95rem;">
           {label}
         </button>
         <script>

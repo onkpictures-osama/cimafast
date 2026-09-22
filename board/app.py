@@ -358,6 +358,8 @@ async def api_my_password(request: Request):
 # Caddy بيوصّل /v1/home/ هنا كـ /home/ (uri strip_prefix /v1). الروابط كلها نسبية
 # لـ /v1/home/: التطبيق "../"، جدول التصوير "../board/"، الفريق "../board/team/".
 HOME_APP, HOME_BOARD, HOME_STATIC = "../", "../board/", "../board/static/"
+# أصول البراند متركّبة على /board/brand (نفس مجلد تطبيق ستريمليت)
+HOME_BRAND = "../board/brand/"
 
 TOOL_GROUPS = [
     ("السيناريو", [("import", "📤", "إضافة سيناريو وتحليله", "ارفع الملف والذكاء الاصطناعي يطلّع المشاهد والأماكن والشخصيات")]),
@@ -405,7 +407,8 @@ async def home_page(request: Request):
         "companies": companies, "creatable": creatable, "cards": cards, "continue": cont,
         "needs": home.needs_you(role, me.get("job_title"), cards)[:12], "tools": tools,
         "focus": focus, "can_manage_team": any(permissions.can(c["role"], "manage_team") for c in companies),
-        "static": HOME_STATIC, "app": HOME_APP, "board": HOME_BOARD})
+        "static": HOME_STATIC, "app": HOME_APP, "board": HOME_BOARD,
+        "brand": HOME_BRAND})
 
 
 async def api_search(request: Request):
@@ -560,6 +563,9 @@ app = Starlette(
         Route("/api/me/password", api_my_password, methods=["POST"]),
         Mount("/static", StaticFiles(directory=str(HERE / "static")), name="static"),
         Mount("/fonts", StaticFiles(directory=str(ROOT / "static" / "fonts")), name="fonts"),
+        # أصول البراند (اللوجو والأيقونة) — نفس المجلد اللي تطبيق ستريمليت
+        # بيقرا منه، عشان تفضل نسخة واحدة على الديسك مش اتنين يتفرقوا بعدين
+        Mount("/brand", StaticFiles(directory=str(ROOT / "static" / "brand")), name="brand"),
     ],
     middleware=[Middleware(SameOriginWrites)],
     lifespan=lifespan,

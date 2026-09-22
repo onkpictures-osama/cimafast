@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1000" width="2400" height="1000">
+  
+  <g transform="translate(120,70) scale(0.45)">
+  <g fill="none" stroke="#FECA05" stroke-width="72" stroke-linecap="round" stroke-linejoin="round">
+    <!-- screen frame with a gap at the bottom where the head sits -->
+    <path d="M1090 790 H1290 A100 100 0 0 0 1390 690 V315 A100 100 0 0 0 1290 215 H630 A100 100 0 0 0 530 315 V690 A100 100 0 0 0 630 790 H830"/>
+    <!-- arms: hands grip the frame's lower corners -->
+    <path d="M700 850 L960 955 L1300 835" stroke-width="82"/>
+    <!-- torso -->
+    <path d="M960 990 L990 1185" stroke-width="151"/>
+    <!-- legs -->
+    <path d="M980 1180 L880 1430 L920 1690" stroke-width="96"/>
+    <path d="M990 1180 L1125 1470 L1230 1690" stroke-width="96"/>
+  </g>
+  <!-- play triangle (record-red) -->
+  <path d="M840 345 L1140 500 L840 655 Z" fill="#D4232B" stroke="#D4232B" stroke-width="44" stroke-linejoin="round"/>
+  <!-- head: the poster placeholder slot -->
+  
+  <circle cx="960" cy="805" r="84" fill="#FECA05"/>
+</g>
+  <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+    <text x="1060" y="460" font-size="290" font-weight="800" fill="#FECA05" letter-spacing="-8">CimaFast</text>
+    <text x="1060" y="640" font-size="150" font-weight="500" fill="#FFFFFF" letter-spacing="14">MEDIA</text>
+  </g></svg>

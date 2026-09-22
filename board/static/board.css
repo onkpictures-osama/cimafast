@@ -3,21 +3,30 @@
    أزرق/أخضر) على أرضية التطبيق الكحلي، وأرقام المشاهد مكتوبة زي الكلاكيت.
    كل حاجة حوالين الشرائط هادية. */
 
-@font-face { font-family: "Readex Pro"; src: url("../fonts/readex-pro-arabic-var.woff2") format("woff2");
-             font-weight: 160 700; unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
-@font-face { font-family: "Readex Pro"; src: url("../fonts/readex-pro-latin-var.woff2") format("woff2");
-             font-weight: 160 700; unicode-range: U+0000-00FF, U+2000-206F; }
+/* خطوط البراند: Inter للاتيني و Cairo للعربي (دليل الهوية ص 06).
+   نفس ملفات ستريمليت بالظبط - الصفحتين بيخدموا من نفس مجلد static/fonts. */
+@font-face { font-family: "Inter"; src: url("../fonts/inter-latin-var.woff2") format("woff2");
+             font-weight: 100 900; font-display: swap;
+             unicode-range: U+0000-00FF, U+2000-206F, U+2122; }
+@font-face { font-family: "Cairo"; src: url("../fonts/cairo-arabic-var.woff2") format("woff2");
+             font-weight: 200 1000; font-display: swap;
+             unicode-range: U+0600-06FF, U+0750-077F, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Cairo"; src: url("../fonts/cairo-latin-var.woff2") format("woff2");
+             font-weight: 200 1000; font-display: swap;
+             unicode-range: U+0000-00FF, U+2000-206F; }
 
 :root {
+  /* ألوان دليل هوية CimaFast v1.0، الوضع الغامق - نفس قيم theme/tokens.py
+     بتاع تطبيق ستريمليت، عشان /v1/board و/v1/home يقرأوا كنفس المنتج. */
   color-scheme: dark;
-  --ground: #0B1220;
-  --surface: #16233F;
-  --surface-2: #1D2C4D;
-  --line: rgba(245, 241, 230, 0.12);
-  --text: #F5F1E6;
-  --muted: rgba(245, 241, 230, 0.66);
-  --gold: #E8B923;
-  --danger: #F87171;
+  --ground: #0F1B45;       /* CF Midnight */
+  --surface: #1A2860;      /* CF Navy Surface */
+  --surface-2: #243677;    /* CF Navy Raised */
+  --line: rgba(255, 255, 255, 0.12);
+  --text: #FFFFFF;
+  --muted: #B8BFD9;        /* CF Mist (dark) */
+  --gold: #FECA05;         /* CF Yellow */
+  --danger: #D4232B;       /* CF Red */
   /* ورق الشرائط */
   --int-day: #F4F1E8;   --int-day-ink: #1C1A14;
   --ext-day: #F2D64B;   --ext-day-ink: #2A2206;
@@ -27,16 +36,31 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--ground); color: var(--text);
-             font: 15px/1.5 "Readex Pro", system-ui, sans-serif; }
+             font: 15px/1.5 "Inter", "Cairo", system-ui, sans-serif; }
 a { color: inherit; }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* --- الشريط العلوي --- */
 .bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px;
        padding: 16px 24px; border-bottom: 1px solid var(--line); position: sticky; top: 0;
-       background: rgba(11, 18, 32, 0.94); z-index: 5; }
+       background: rgba(15, 27, 69, 0.94); z-index: 5; }
 .bar__title { display: flex; align-items: baseline; gap: 14px; margin-inline-end: auto; }
 .bar__title h1 { margin: 0; font-size: 22px; font-weight: 600; }
+
+/* --- لوجو البراند: العلامة + الووردمارك، نسخة الاستوديو (الدليل ص 04).
+   السطح هنا غامق ⇒ الشخصية صفرا. الاتجاه ltr ثابت: اللوجو شكل مرسوم مش
+   جملة، فمبيتقلبش مع العربي. --- */
+/* النسب من الدليل ص 04: ارتفاع العلامة = 2.6 × كابيتال الكلمة، والمسافة
+   = 0.6 × عرض العلامة. الحبر جوه مربّع الماستر 81% ارتفاع و48.5% عرض،
+   فمربّع 44px ⇒ كلمة 19px، وصف 9.5px، ومسافة 2px بعد طرح فراغ المربّع. */
+.cf-logo { display: inline-flex; align-items: center; gap: 2px; direction: ltr;
+           line-height: 1; text-decoration: none; }
+.cf-logo__mark { display: block; width: 44px; height: 44px; object-fit: contain; }
+.cf-logo__type { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.cf-logo__word { font-family: "Inter", sans-serif; font-weight: 800; font-size: 19px;
+                 letter-spacing: -0.02em; color: var(--gold); }
+.cf-logo__desc { font-family: "Inter", sans-serif; font-weight: 500; font-size: 9.5px;
+                 letter-spacing: 0.1em; color: var(--text); }
 .back { color: var(--muted); text-decoration: none; font-size: 14px; }
 .back:hover { color: var(--text); }
 .bar__actions { display: flex; align-items: end; gap: 10px; }
@@ -47,7 +71,7 @@ select, input { font: inherit; color: var(--text); background: var(--surface); b
 .btn { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line);
        border-radius: 8px; padding: 7px 14px; min-height: 38px; cursor: pointer; }
 .btn:hover { border-color: var(--gold); }
-.btn--primary { background: var(--gold); color: #1A1405; border-color: var(--gold); text-decoration: none;
+.btn--primary { background: var(--gold); color: #1B254B; border-color: var(--gold); text-decoration: none;
                 display: inline-block; font-weight: 600; }
 .status { margin: 0; min-width: 9ch; font-size: 13px; color: var(--muted); }
 .status--error { color: var(--danger); }

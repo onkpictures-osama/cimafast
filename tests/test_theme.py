@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from theme import contrast as C  # noqa: E402
-from theme import flag, glass, mobile, tokens  # noqa: E402
+from theme import brand, flag, glass, mobile, tokens  # noqa: E402
 
 _results = []
 
@@ -35,10 +35,75 @@ def test_known_wcag_ratios():
     # أبيض على أسود = 21:1 بالتعريف
     assert round(C.ratio("#FFFFFF", "#000000"), 2) == 21.0
     # نفس اللون = 1:1
-    assert round(C.ratio("#E8B923", "#E8B923"), 2) == 1.0
-    # قيم مرجعية من بالتة البرنامج
-    assert round(C.ratio("#F5F1E6", "#0B1220"), 2) == 16.59
-    assert round(C.ratio("#E8B923", "#16233F"), 2) == 8.46
+    assert round(C.ratio("#FECA05", "#FECA05"), 2) == 1.0
+    # قيم مرجعية من بالتة البراند
+    assert round(C.ratio("#FFFFFF", "#0F1B45"), 2) == 16.63
+    assert round(C.ratio("#FECA05", "#1A2860"), 2) == 9.01
+
+
+@test
+def test_ratios_match_the_official_guidelines_table():
+    """جدول التباين في دليل البراند (ص 08) مش وصف — ده اختبار.
+
+    لو حد غيّر قيمة لون في ‎BRAND‎ بالسهو، الأرقام دي بتقع فورًا. القيم
+    منقولة حرف بحرف من الدليل الرسمي v1.0 — بعضها مكتوب فيه بخانة عشرية
+    واحدة (14.9 / 13.3 / 12.1)، فالسماحية 0.06 هي تقريب الدليل نفسه مش
+    تساهل في الحساب.
+    """
+    B = tokens.BRAND
+    expected = [
+        ("Ink on Yellow", B["ink"], B["yellow"], 9.67),
+        ("Navy on Yellow", B["navy"], B["yellow"], 8.01),
+        ("Royal on Yellow", B["royal"], B["yellow"], 6.24),
+        ("Red on Yellow", B["red"], B["yellow"], 3.35),
+        ("Ink on White", B["ink"], B["white"], 14.9),
+        ("Ink on Cream", B["ink"], B["cream"], 13.3),
+        ("Ink on Sand", B["ink"], B["sand"], 12.1),
+        ("White on Red", B["white"], B["red"], 5.15),
+        ("Yellow on Midnight", B["yellow"], B["midnight"], 10.8),
+        ("Yellow on Navy Surface", B["yellow"], B["navy_surface"], 9.0),
+        ("White on Midnight", B["white"], B["midnight"], 16.6),
+        ("Mist on Midnight", B["mist_dark"], B["midnight"], 9.1),
+    ]
+    for name, fg, bg, want in expected:
+        got = round(C.ratio(fg, bg), 2)
+        assert abs(got - want) <= 0.06, f"{name}: الدليل بيقول {want}، طلع {got}"
+
+
+@test
+def test_yellow_field_is_the_brand_not_a_surface():
+    """قاعدتين من الدليل ص 08، مقفولين هنا عشان ميتكسروش بالسهو:
+    الحقل الأصفر نفس القيمة في الوضعين، والحروف فوقه Ink في الوضعين."""
+    assert tokens.DARK["gold_glass"] == tokens.LIGHT["gold_glass"]
+    assert tokens.DARK["on_brand"] == tokens.LIGHT["on_brand"] == tokens.BRAND["ink"]
+    # الأحمر ممنوع يبقى لون نص صغير على الأصفر (3.35:1) — ولا مرة
+    assert C.ratio(tokens.BRAND["red"], tokens.BRAND["yellow"]) < C.BODY_FLOOR
+
+
+@test
+def test_palette_values_are_the_official_ones():
+    """التوكنز الدلالية لازم تكون خام البراند نفسه، مش تقريب ليه."""
+    B = tokens.BRAND
+    assert tokens.DARK["ground_base"] == B["midnight"]
+    assert tokens.DARK["glass_opaque"] == B["navy_surface"]
+    assert tokens.DARK["accent"] == B["yellow"]
+    assert tokens.DARK["text"] == B["white"]
+    assert tokens.DARK["text_dim"] == B["mist_dark"]
+    assert tokens.DARK["danger"] == tokens.DARK["play"] == B["red"]
+    assert tokens.LIGHT["ground_base"] == B["cream"]
+    assert tokens.LIGHT["accent"] == B["navy"]
+    assert tokens.LIGHT["text"] == B["ink"]
+
+
+@test
+def test_css_vars_expose_the_raw_brand_tokens():
+    """اللوجو والحقل الأصفر بيلمسوا الخام، فلازم ‎--cf-yellow‎ و‎--cf-ink‎
+    يبقوا موجودين في الصفحة فعلًا — مش في ‎tokens.py‎ بس."""
+    css = tokens.css_vars("dark")
+    for name in ("--cf-yellow", "--cf-navy", "--cf-ink", "--cf-red", "--cf-royal",
+                 "--cf-midnight", "--cf-white", "--cf-on-brand", "--cf-font"):
+        assert name in css, name
+    assert "#FECA05" in css and "#1B254B" in css
 
 
 @test
@@ -88,10 +153,13 @@ def _pairs(mode):
         ("label-accent/glass-regular", p["accent_ink"], reg, C.BODY_FLOOR),
         ("label-accent/glass-opaque", p["accent_ink"], opaque, C.BODY_FLOOR),
         ("heading/glass-regular", p["text"], reg, C.LARGE_FLOOR),
-        ("sidebar-body/gold-glass", p["on_accent"], gold, C.BODY_FLOOR),
-        ("sidebar-heading/gold-glass", p["on_accent"], gold, C.LARGE_FLOOR),
+        ("sidebar-body/gold-glass", p["on_brand"], gold, C.BODY_FLOOR),
+        ("sidebar-heading/gold-glass", p["on_brand"], gold, C.LARGE_FLOOR),
         ("info/glass-regular", p["info"], reg, C.LARGE_FLOOR),
+        ("on-info/info-fill", p["on_info"], p["info"], C.BODY_FLOOR),
         ("on-accent/accent-fill", p["on_accent"], p["accent"], C.BODY_FLOOR),
+        # الحقل الأصفر هو نفسه في الوضعين، فالزوج ده مبيتغيرش بين الوضعين
+        ("on-brand/yellow-field", p["on_brand"], tokens.BRAND["yellow"], C.BODY_FLOOR),
     ]
 
 
@@ -116,13 +184,13 @@ def test_gold_sidebar_floor_is_72_percent():
     بنقيس على أغمق نقطة في الأرضية (اللون الأساسي) عشان الحالة الأسوأ.
     """
     ground = tokens.DARK["ground_base"]
-    navy = tokens.DARK["on_accent"]
+    navy = tokens.DARK["on_brand"]
 
-    at_60 = C.ratio(navy, C.over("rgba(232,185,35,0.60)", ground))
-    at_72 = C.ratio(navy, C.over("rgba(232,185,35,0.72)", ground))
+    at_60 = C.ratio(navy, C.over("rgba(254,202,5,0.60)", ground))
+    at_72 = C.ratio(navy, C.over("rgba(254,202,5,0.72)", ground))
     assert at_60 < C.BODY_FLOOR, f"60% المفروض يفشل، طلع {at_60:.2f}"
     assert at_72 >= C.BODY_FLOOR, f"72% المفروض يعدّي، طلع {at_72:.2f}"
-    assert tokens.DARK["gold_glass"] == "rgba(232, 185, 35, 0.72)"
+    assert tokens.DARK["gold_glass"] == "rgba(254, 202, 5, 0.72)"
     print(f"\n  gold sidebar: 60% -> {at_60:.2f} (fail)  ·  72% -> {at_72:.2f} (pass)")
 
 
@@ -250,7 +318,10 @@ def test_glass_css_is_empty_without_flag():
     inject.inject_login(rec, flag.CLASSIC)
     inject.inject_main(rec, flag.CLASSIC, "rtl", "right", "row-reverse")
     joined = "\n".join(rec.blobs)
-    assert "cf-glass" not in joined
+    # بندوّر على سيليكتورات المادة (‎.cf-glass…‎) مش على النص ‎cf-glass‎:
+    # من بعد ما ألوان البراند دخلت، بلوك الـ ‎:root‎ بيتحقن في المسارين،
+    # وجواه توكنز اسمها ‎--cf-glass-regular‎ — دي قيم، مش مادة.
+    assert ".cf-glass" not in joined
     assert "backdrop-filter" not in joined
     assert "__DIR__" not in joined, "قوالب الاتجاه لازم تكون اتبدلت"
     assert "direction: rtl" in joined
@@ -351,6 +422,67 @@ def test_mobile_text_never_drops_below_the_body_contrast_floor():
         rows, _ = C.audit([(n, f, b, C.BODY_FLOOR) for (n, f, b, _fl) in _pairs(mode)])
         bad = [r["pair"] for r in rows if not r["pass"]]
         assert not bad, f"{mode}: {bad} تحت 4.5 — التصغير على التليفون مش آمن"
+
+
+# --------------------------------------------------------------------------
+# 5) اللوجو — قواعد الدليل اللي سهل تتكسر بالسهو
+# --------------------------------------------------------------------------
+
+@test
+def test_wordmark_is_never_restyled():
+    """الدليل ص 01: كلمة واحدة، C و F كابيتال. ممنوع "Cima Fast" ولا
+    "CIMAFAST" ولا "Cimafast". الاختبار ده بيقفل على الإملا نفسها."""
+    assert brand.WORDMARK == "CimaFast"
+    assert brand.DESCRIPTOR == "STUDIO", "نسخة الاستوديو بتستبدل MEDIA بـ STUDIO"
+    for surface in ("dark", "light"):
+        html = brand.lockup(surface)
+        assert "Cima Fast" not in html
+        assert "CIMAFAST" not in html
+        assert "Cimafast" not in html
+
+
+@test
+def test_logo_assets_exist_and_are_the_right_variant():
+    """نسخة اللوجو الصح للسطح الصح: صفرا على الغامق، كحلي على الأصفر/الفاتح
+    (الدليل ص 03 · Colour rule). وبنتأكد إن مثلث التشغيل أحمر في الاتنين —
+    المونو للطباعة بس."""
+    for name, figure in ((brand.MARK_DARK, tokens.BRAND["yellow"]),
+                         (brand.MARK_LIGHT, tokens.BRAND["navy"])):
+        with open(brand.asset_path(name), encoding="utf-8") as fh:
+            svg = fh.read()
+        assert figure in svg, f"{name}: لون الشخصية مش {figure}"
+        assert tokens.BRAND["red"] in svg, f"{name}: مثلث التشغيل مش أحمر"
+    assert os.path.exists(brand.asset_path(brand.APP_ICON))
+
+
+@test
+def test_logo_is_embedded_not_fetched():
+    """البريفيو شغال تحت ‎/v1/‎، والرابط النسبي بيتكسر لو المستخدم فتح
+    ‎/v1‎ من غير الشرطة الأخيرة. اللوجو لازم يبقى مضمّن في الصفحة."""
+    html = brand.lockup("dark")
+    assert html.count("data:image/svg+xml;base64,") == 1
+    assert "src=\"app/static" not in html and "http" not in html
+
+
+@test
+def test_logo_direction_is_locked_to_ltr():
+    """الـ lockup شكل مرسوم مش جملة: لو اتقلب مع العربي، العلامة بتروح
+    الناحية الغلط والووردمارك بيتقلب معاها."""
+    assert 'dir="ltr"' in brand.lockup("dark")
+    assert "direction: ltr;" in brand.LOGO_CSS
+
+
+@test
+def test_arabic_name_sits_beside_the_lockup_in_cairo():
+    """الدليل ص 04: الاسم العربي جنب الـ lockup بخط Cairo Bold — عمره ما
+    يدخل جوه الووردمارك ولا يتكتب ترجمة حرفية جواه."""
+    with_ar = brand.lockup("dark", arabic=True)
+    assert brand.ARABIC_NAME in with_ar
+    assert brand.ARABIC_NAME not in brand.lockup("dark", arabic=False)
+    # الاسم العربي بره العنصر اللي فيه الووردمارك
+    word_block = with_ar[with_ar.index("cf-logo__word"):with_ar.index("cf-logo__ar")]
+    assert brand.ARABIC_NAME not in word_block
+    assert 'font-family: "Cairo"' in brand.LOGO_CSS
 
 
 def _strip_comments(css):

@@ -269,19 +269,19 @@ def _cf_surface_rules():
     /* صندوق وصف البرنامج في الشريط الجانبي: الشريط نفسه دهبي، فالصندوق
        بياخد تعبئة فاتحة خفيفة بدل زجاج تاني — مفيش بلور جوه بلور. */
     section[data-testid="stSidebar"] .cf-sidebar-header .cf-desc-box {{
-        border: 1px solid rgba(18, 32, 61, 0.30);
+        border: 1px solid rgba(27, 37, 75, 0.30);
         border-radius: var(--cf-radius-sm);
         background: rgba(255, 255, 255, 0.24);
     }}
     /* كارت المستخدم الحالي — الدرجة المعتمة: نص كثيف ولازم يفضل حاد. */
     section[data-testid="stSidebar"] .cf-owner-box {{
-        background: #FFFFFF;
-        border: 1px solid rgba(18, 32, 61, 0.22);
+        background: var(--cf-white);
+        border: 1px solid rgba(27, 37, 75, 0.22);
         border-radius: var(--cf-radius-md);
         box-shadow: var(--cf-elevation-sm);
     }}
     .stApp .cf-saved-badge {{ color: var(--cf-text-dim); opacity: 1; }}
-    .stApp .cf-check-badge {{ background: var(--cf-info); color: #FFFFFF; }}
+    .stApp .cf-check-badge {{ background: var(--cf-info); color: var(--cf-on-info); }}
     .stApp .cf-copy-hint {{ color: var(--cf-accent-ink); }}
     .stApp hr.cf-soft-sep {{ border-top: 1px solid var(--cf-edge); }}
     """
@@ -314,8 +314,8 @@ def _blur_guard_rules():
     section[data-testid="stSidebar"] {inner} {{
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
-        background: rgba(18, 32, 61, 0.08) !important;
-        border: 1px solid rgba(18, 32, 61, 0.28) !important;
+        background: rgba(27, 37, 75, 0.08) !important;
+        border: 1px solid rgba(27, 37, 75, 0.28) !important;
         box-shadow: none !important;
     }}
     """

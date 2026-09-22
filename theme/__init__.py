@@ -9,12 +9,13 @@
 
     theme.glass_panel(...) / theme.glass_card(...)   # مساعدات المادة
     theme.contrast.ratio(fg, bg)                     # تدقيق التباين
-    theme.tokens.DARK / theme.tokens.LIGHT           # التوكنز
+    theme.tokens.BRAND / DARK / LIGHT                # ألوان البراند والأدوار
+    theme.brand.lockup(...) / theme.brand.mark(...)  # اللوجو
 
 الافتراضي ‎classic‎ دايمًا. مفيش حاجة هنا بتقلب الشكل من نفسها.
 """
 
-from . import classic, contrast, glass, tokens
+from . import brand, classic, contrast, glass, tokens
 from .components import glass_card, glass_panel, material_class
 from .flag import CLASSIC, GLASS, is_glass, resolve_variant
 from .inject import inject_base, inject_login, inject_main
@@ -22,6 +23,7 @@ from .inject import inject_base, inject_login, inject_main
 __all__ = [
     "CLASSIC",
     "GLASS",
+    "brand",
     "classic",
     "contrast",
     "glass",
