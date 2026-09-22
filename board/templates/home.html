@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0F1B45">
-  <link rel="icon" type="image/png" href="{{ brand }}app-icon-dark.png">
+  <link rel="icon" type="image/png" href="{{ brand }}app-icon-dark.png?v={{ asset_version }}">
   <title>الرئيسية — CimaFast Studio</title>
-  <link rel="stylesheet" href="{{ static }}board.css">
-  <link rel="stylesheet" href="{{ static }}home.css">
+  <link rel="stylesheet" href="{{ static }}board.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="{{ static }}home.css?v={{ asset_version }}">
 </head>
 <body class="home">
   <header class="bar">
     <div class="bar__title">
-      <h1><span class="cf-logo"><img class="cf-logo__mark" src="{{ brand }}cimafast-mark-dark-transparent.svg" alt="" aria-hidden="true"><span class="cf-logo__type"><span class="cf-logo__word">CimaFast</span><span class="cf-logo__desc">STUDIO</span></span></span></h1>
+      <h1><span class="cf-logo"><img class="cf-logo__mark" src="{{ brand }}cimafast-mark-dark-transparent.svg?v={{ asset_version }}" alt="" aria-hidden="true"><span class="cf-logo__type"><span class="cf-logo__word">CimaFast</span><span class="cf-logo__desc">STUDIO</span></span></span></h1>
       <span class="who">
         <strong>{{ me.display_name or user }}</strong>
         {% if me.job_title %}<span class="muted">· {{ me.job_title }}</span>{% endif %}
@@ -122,6 +122,6 @@
       </div>
     </section>
   </main>
-  <script src="{{ static }}home.js"></script>
+  <script src="{{ static }}home.js?v={{ asset_version }}"></script>
 </body>
 </html>

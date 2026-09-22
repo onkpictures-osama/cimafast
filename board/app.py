@@ -48,6 +48,23 @@ HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 
 
+def _asset_version() -> str:
+    """نسخة ثابتة وقت الإقلاع بس — بتتغيّر مع كل ديبلوي (commit جديد أو
+    إعادة تشغيل) عشان أي كاش (متصفح أو بروكسي) يضطر ياخد نسخة جديدة من
+    static/board.css وأخواتها بدل ما يفضل شايل نسخة قديمة بعد التحديث."""
+    try:
+        import subprocess
+
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return str(int(Path(__file__).stat().st_mtime))
+
+
+templates.env.globals["asset_version"] = _asset_version()
+
+
 # --- الدخول -------------------------------------------------------------------
 
 def _secrets():

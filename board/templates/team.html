@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0F1B45">
-  <link rel="icon" type="image/png" href="../brand/app-icon-dark.png">
+  <link rel="icon" type="image/png" href="../brand/app-icon-dark.png?v={{ asset_version }}">
   <title>الفريق — CimaFast Studio</title>
-  <link rel="stylesheet" href="../static/board.css">
-  <link rel="stylesheet" href="../static/team.css">
+  <link rel="stylesheet" href="../static/board.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="../static/team.css?v={{ asset_version }}">
 </head>
 <body class="team">
   <header class="bar">
@@ -96,6 +96,6 @@
 
   <template id="role-options">{% for r, label in roles %}<option value="{{ r }}">{{ label }}</option>{% endfor %}</template>
   <script>window.ROLE_LABELS = {{ roles | tojson }};</script>
-  <script src="../static/team.js"></script>
+  <script src="../static/team.js?v={{ asset_version }}"></script>
 </body>
 </html>
