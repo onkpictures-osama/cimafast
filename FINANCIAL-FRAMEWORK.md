@@ -304,3 +304,114 @@ floor-case model against list prices with 0 paying subscribers today.
 6. **Indemnified sub-pool sizing** for Enterprise once Foundry is added —
    `AI-PROVIDER-COSTS.md` §3.2/§5.7 floats ~10% of the pool as a starting
    point, not a decision.
+7. **Whether to adopt Model v2 (§11)** — usage-based overage billing, a Team
+   tier, the Go funnel reframe, and annual contracts are a structural
+   proposal, not a numbers tweak; needs its own owner+Mohamed pass.
+
+## 11. Model v2 — a best-practices rethink
+
+*Added 2026-09-22, at the owner's request to "rethink the model freely
+based on best practices" after §7 showed that no rate card (A/B/C) fixes
+revenue concentration — only the tier architecture itself can. This is a
+structural proposal on top of Cards A/B/C, not a replacement for the margin
+work in §3; it still needs its own owner+Mohamed decision, more so than a
+rate-card pick, since it changes what customers are actually buying.*
+
+Four changes, each a named, common SaaS/AI-product practice, each with a
+number behind it:
+
+### 11.1 Decouple platform access from AI usage (metered overage)
+
+Every card so far (A/B/C) sells a **flat all-inclusive price**: pay $499,
+get exactly 11,604 tokens (Card C), whether you use 500 of them or all
+11,604. That means the 30%+ margin floor is only real *if* the 100%-
+redemption floor-case assumption (§2.2, repeated on every page of the PDF)
+holds — a bet, not a guarantee.
+
+**Best practice used by most modern AI-native SaaS (metered add-on
+consumption on top of a base subscription, the same shape as AWS/Twilio/
+OpenAI API billing layered under a platform fee):** bundle only **half** of
+Card C's allotment into the base price, and bill anything beyond that as
+**metered overage at the same $0.043/token rate** (still ≥30% margin on
+every incremental token, not just the bundled half). Modeled at "the same
+total consumption Card C used to include," this doesn't cost the customer
+more for typical/light usage (most of the pool goes unused most months, per
+§5.3 lever 3) but it makes the margin floor **real at any usage level**,
+including the heaviest:
+
+| Tier | Bundled | Overage rate | Effective revenue at full Card-C-level usage | Margin at that usage |
+|---|---|---|---|---|
+| Individual Standard | 453 tokens | $0.043/token | $58.48 (vs. $39 flat) | 53.5% |
+| Individual Pro | 1,151 tokens | $0.043/token | $148.49 (vs. $99 flat) | 53.5% |
+| Enterprise Standard | 5,802 tokens | $0.043/token | $748.49 (vs. $499 flat) | 53.5% |
+| Enterprise Pro | 15,104 tokens | $0.043/token | $1,948.51 (vs. $1,299 flat) | 53.5% |
+| Enterprise Ultimate | 46,500 tokens | $0.043/token | $5,998.50 (vs. $3,999 flat) | 53.5% |
+| Go Starter | 6 clips | $0.645/clip | $13.52 (vs. $9 flat) | 56.7% |
+
+**The honest trade-off, stated plainly:** a customer who actually consumes
+everything Card C used to bundle now pays roughly 50% more than the flat
+sticker price — this is a real behavior and positioning change, not a
+same-price repackaging. It protects CimaFast from the heaviest users
+(exactly the tail risk every floor-case model in this document has been
+flagging), at the cost of a subscription that's no longer a fixed monthly
+number for power users. Needs to be marketed as "starts at $X, scales with
+usage," not "$X flat," if adopted.
+
+### 11.2 A mid-market "Team" tier closes part of the 444× gap
+
+Individual Pro ($99) to Enterprise Standard ($499) is a single 5× jump —
+the exact cliff that produces the concentration finding in §7. **Best
+practice: a mid-market tier between self-serve and enterprise, the standard
+3-tier-plus-one-bridge SaaS pattern** (e.g. Notion's Team plan between
+Personal and Enterprise). Proposed: **Team, $249/mo**, sized on the same
+Card C basis (5,790 tokens full-allotment / 2,895 bundled under §11.1).
+Seats/projects for this tier are a product-scoping question for
+production/infrastructure, not modeled here — flagging its existence, not
+its capacity numbers.
+
+Re-run against the §7 realistic long-tail scenario with Team capturing 6%
+of subscribers (taken proportionally from the tiers on either side of it):
+
+| | Enterprise's share of MRR | Team's share of MRR |
+|---|---|---|
+| Without Team (§7 Scenario B) | 67.5% | — |
+| With Team inserted | 57.3% | 14.4% |
+
+**A real, quantified improvement — not a fix.** Enterprise is still the
+largest single contributor, but the cliff is smaller and there's now a
+step for a growing customer to land on before Enterprise, instead of
+jumping straight from $99 to $499.
+
+### 11.3 Stop pricing Go/Creator as a margin center
+
+Every rate card so far has tried to make Go "work" the same way a
+subscription tier does. **Best practice for a quick/low-commitment acquisition
+tier (the standard freemium/low-ticket-funnel pattern): treat its unit
+economics as customer acquisition cost, not profit** — its job is top-of-
+funnel reach and conversion into Individual/Team/Enterprise, not standalone
+margin. Concretely: stop reporting Go's margin next to the subscription
+tiers' margin as if they were the same kind of number, and instead track
+**conversion rate from Go to a paid subscription tier** as its real KPI.
+This doesn't change any Go price — it changes what "success" means for that
+tier, which changes what it's fair to ask Go's pricing to do.
+
+### 11.4 Annual contracts, especially for Enterprise
+
+§7's core risk finding was that losing a handful of Enterprise accounts
+hurts far more than losing hundreds of Go/Individual ones, because monthly
+billing means that risk is realized every single month. **Best practice:
+an annual-billing discount (commonly ~15–17%, i.e. "2 months free" framing)**,
+pushed hardest for Team/Enterprise specifically — converts month-to-month
+churn exposure on the accounts that matter most into a contracted, forecastable
+number, in exchange for a modest margin give-up (a 15% annual discount still
+clears Card C's 30% floor on every tier by a wide margin). Standard SaaS
+practice for exactly this risk shape; not modeled here as a specific
+number since the discount rate is a negotiation/contracts decision, not a
+costing one.
+
+**Summary — this is a proposal, not a decision:** §11.1 and §11.2 are
+quantified above; §11.3 and §11.4 are named practices with a stated
+direction, not fully modeled numbers, since they're policy/contract
+decisions more than pricing math. All four need the same owner+Mohamed
+sign-off as Cards A/B/C, and more so, since together they change what a
+subscription *is* (flat price → base-plus-usage), not just what it costs.
