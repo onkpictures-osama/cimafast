@@ -179,6 +179,14 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
 - **B3 Vendors, equipment and rentals.**
 - **B4 AI-generated production module** — versioned prompts, generation settings,
   digital-asset tracking, linked to scenes and shots.
+- **B5 Subscription tiers & pricing** [orchestrator] — 🗒️ **Proposed
+  2026-09-22, not scoped, explicitly not to be deployed until the owner and
+  Mohamed El-Zayat discuss it.** Three tiers by persona — a no-subscription
+  wizard-driven tier for a non-industry user making quick ads/social video, an
+  Individual tier for freelancers/filmmakers/artists, an Enterprise tier for
+  production companies and agencies running many parallel productions.
+  Numbers, analysis and open naming/architecture questions in
+  **`SUBSCRIPTIONS-PLAN.md`**.
 
 ### Continuous
 
