@@ -4,10 +4,41 @@
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .muted { color: var(--muted); font-weight: 400; }
-.who { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 15px; }
-.chip { font-size: 12px; color: var(--gold); border: 1px solid var(--gold); border-radius: 99px; padding: 1px 9px; }
-.bar__nav { display: flex; gap: 8px; }
-.bar__nav .btn { text-decoration: none; }
+
+/* لوحة ألوان صغيرة وثابتة لشارات "محتاجك" — امتداد موثّق زي royal_lift في
+   theme/tokens.py، مش ألوان مخترعة لكل عنصر. كل مجال شغل له لون واحد بس:
+   الجدولة أزرق (نفس ورق INT NIGHT في جدول التصوير)، اللقطات أخضر (نفس ورق
+   EXT NIGHT)، الأزياء/اللوك وردي مخفف (مش أحمر التحذير --danger)، الصور
+   كهرماني، والسيناريو بنفسجي هادي. */
+:root {
+  --badge-sched: #7FA6E8;
+  --badge-shots: #7CCB93;
+  --badge-look: #E8869A;
+  --badge-photo: #F2A93B;
+  --badge-script: #B79CED;
+}
+
+/* --- هوية المستخدم: الشارة + الأفتار + الاسم، مجموعة واحدة مشدودة --- */
+.who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.chip { font-size: 12px; color: var(--gold); border: 1px solid var(--gold); border-radius: 99px; padding: 3px 11px; font-weight: 600; }
+.who__avatar { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; background: var(--gold); color: #1B254B;
+               display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+.who__id { display: flex; flex-direction: column; line-height: 1.25; }
+.who__id strong { font-size: 14px; }
+.who__id .muted { font-size: 12px; }
+
+/* --- شريط التبويبات: "التطبيق" و"إدارة الفريق" بدل زرارين مسطّحين، خط
+   تحت التبويب المفتوح زي الموك أب. الصفحة دي (H1) نفسها جزء من قسم
+   التطبيق، فتبويبها ثابت مفتوح - مفيش state لأن مفيش تبويب تالت للرئيسية
+   في البيانات. */
+.bar__nav { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 4px; }
+.tab { display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--muted);
+       font-weight: 600; font-size: 14px; padding: 10px 4px; border-bottom: 2px solid transparent;
+       margin-bottom: -1px; min-height: 44px; }
+.tab:hover, .tab:focus-visible { color: var(--text); }
+.tab--active { color: var(--text); border-bottom-color: var(--gold); }
+.tab__icon { font-size: 15px; }
+
 .home__main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 64px; display: grid; gap: 18px; }
 .home__cols { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 18px; align-items: start; }
 @media (max-width: 880px) { .home__cols { grid-template-columns: 1fr; } }
@@ -16,19 +47,24 @@
   /* الاسم والدور والزرارين كانوا بيلفوا كل واحد في سطر لوحده (مسافات
      سطح المكتب)، فالهيدر بيطلع طويل فاضي على الموبايل — نفس شكوى المستخدم.
      اللوجو ياخد سطر، والاسم+الدور+الشارة ياخدوا عرض الشاشة الكامل عشان
-     يبقوا سطر واحد بدل ما الشارة تلف لوحدها، والزرارين ياخدوا نص العرض. */
+     يبقوا سطر واحد بدل ما الشارة تلف لوحدها، والتبويبات ياخدوا سطر كامل
+     تحتهم. */
   .bar__title { flex-wrap: wrap; gap: 4px; }
-  .who { flex-basis: 100%; font-size: 13px; gap: 5px; }
-  .bar__nav { flex: 1 1 100%; gap: 8px; }
-  .bar__nav .btn { flex: 1; text-align: center; font-size: 13px; padding: 6px 10px; }
+  .who { flex-basis: 100%; font-size: 13px; gap: 6px; }
+  .who__id strong { font-size: 13px; }
+  .bar__nav { flex: 1 1 100%; gap: 14px; }
+  .tab { flex: 1; justify-content: center; font-size: 13px; padding: 10px 2px; }
 }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
 .panel h2 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
 .panel__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
 .panel__head h2 { margin: 0; }
 
-.search { position: relative; }
-.search input { width: 100%; min-height: 48px; font-size: 16px; padding: 10px 16px; border-radius: 12px; }
+.search { position: relative; display: flex; align-items: center; }
+.search__icon { position: absolute; inset-inline-start: 16px; font-size: 15px; opacity: .6; pointer-events: none; }
+.search input { width: 100%; min-height: 48px; font-size: 16px; padding: 10px 44px; border-radius: 999px;
+                background: var(--surface); border: 1px solid var(--line); color: var(--text); }
+.search input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .results { position: absolute; inset-inline: 0; top: 54px; z-index: 6; list-style: none; margin: 0; padding: 6px;
            background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; max-height: 60vh; overflow: auto; }
 .results a { display: flex; gap: 10px; padding: 8px 10px; border-radius: 8px; text-decoration: none; align-items: baseline; }
@@ -36,34 +72,57 @@
 .results .kind { font-size: 12px; color: var(--gold); min-width: 5.5em; }
 .results .proj { margin-inline-start: auto; font-size: 12px; color: var(--muted); }
 
-.continue { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-radius: 12px; text-decoration: none;
+/* كارت "كمّل من مكان ما وقفت" — نفس البيانات القديمة (المشروع/التاب
+   الأخيرين)، أيقونة دبوس/خريطة زي الموك أب بدل النص المجرّد بس. */
+.continue { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 14px; text-decoration: none;
             background: linear-gradient(90deg, rgba(254,202,5,.16), rgba(254,202,5,.04)); border: 1px solid rgba(254,202,5,.45); }
-.continue__label { color: var(--muted); font-size: 14px; }
-.continue strong { font-size: 18px; }
-.continue__go { margin-inline-start: auto; color: var(--gold); font-weight: 600; }
+.continue__icon { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; background: rgba(254,202,5,.18);
+                   display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.continue__body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.continue__label { color: var(--muted); font-size: 13px; }
+.continue strong { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.continue__go { margin-inline-start: auto; color: var(--gold); font-weight: 600; flex: 0 0 auto; }
 
-.needs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.needs a { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "n t" "n p"; column-gap: 12px;
-           padding: 9px 10px; border-radius: 10px; text-decoration: none; border: 1px solid transparent; }
+.needs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.needs a { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px;
+           text-decoration: none; border: 1px solid transparent; min-height: 44px; }
 .needs a:hover, .needs a:focus { border-color: var(--line); background: var(--surface-2); }
-.needs__n { grid-area: n; align-self: center; min-width: 2.6em; text-align: center; font-weight: 700; color: #1B254B;
+.needs__badge { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center;
+                justify-content: center; font-size: 15px; background: color-mix(in srgb, var(--badge-c) 18%, transparent);
+                border: 1px solid color-mix(in srgb, var(--badge-c) 45%, transparent); }
+.needs__badge--sched { --badge-c: var(--badge-sched); }
+.needs__badge--shots { --badge-c: var(--badge-shots); }
+.needs__badge--look { --badge-c: var(--badge-look); }
+.needs__badge--photo { --badge-c: var(--badge-photo); }
+.needs__badge--script { --badge-c: var(--badge-script); }
+.needs__t { flex: 1 1 auto; min-width: 0; }
+.needs__p { font-size: 12px; color: var(--muted); flex: 0 0 auto; }
+.needs__n { flex: 0 0 auto; min-width: 2.2em; text-align: center; font-weight: 700; color: #1B254B;
             background: var(--gold); border-radius: 8px; padding: 4px 6px; }
-.needs__t { grid-area: t; }
-.needs__p { grid-area: p; font-size: 12px; color: var(--muted); }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-.card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; }
-.card h3 { margin: 0; font-size: 17px; }
+/* --- كروت المشاريع: أعلى الكارت غلاف متدرّج بأيقونة النوع (مفيش ميزة
+   رفع بوستر حقيقي لسه — راجع تعليق home.py:_cover)، وشريط تقدّم أكتر
+   تكثيفًا بحواف دائرية. --- */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+        display: grid; gap: 8px; }
+.card__cover { height: 72px; display: flex; align-items: center; justify-content: center; }
+.card__cover-icon { font-size: 26px; opacity: .85; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.card header, .card > .prog, .card > .card__stage, .card > .card__stats, .card > .card__next, .card > footer {
+  margin-inline: 16px;
+}
+.card header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.card h3 { margin: 0; font-size: 16px; }
 .card h3 a { text-decoration: none; }
 .card h3 a:hover { color: var(--gold); }
 .prog { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-.prog__seg { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); }
+.prog__seg { height: 5px; border-radius: 99px; background: rgba(255,255,255,.12); }
 .prog__seg--done { background: var(--gold); }
 .prog__seg--current { background: rgba(254,202,5,.45); }
 .card__stage, .card__stats { margin: 0; font-size: 13px; color: var(--muted); }
 .card__next { font-size: 14px; color: var(--gold); text-decoration: none; }
 .card__next:hover { text-decoration: underline; }
-.card footer { display: flex; gap: 6px; flex-wrap: wrap; }
+.card footer { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
 .card footer .btn { text-decoration: none; min-height: 34px; padding: 5px 12px; font-size: 13px; }
 .new { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end; margin-bottom: 14px; }
 
@@ -74,3 +133,10 @@ a.tool:hover, a.tool:focus { background: var(--surface-2); }
 .tool small { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .tool__icon { font-size: 20px; line-height: 1.2; }
 .tool--off { opacity: .45; }
+
+@media (max-width: 700px) {
+  /* لازم يبقى آخر حاجة في الملف: ‎.card footer .btn‎ الأساسية (فوق) نفس
+     الأسبقية (تلات كلاسات) فمين اللي جاي أخيرًا في الملف هو اللي بيفوز -
+     هدف اللمس ٤٤px (نفس رقم mobile.TOUCH بتاع ستريمليت) لازم يفضل غالب. */
+  .card footer .btn { min-height: 44px; padding: 8px 12px; }
+}

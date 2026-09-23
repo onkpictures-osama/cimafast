@@ -419,8 +419,12 @@ async def home_page(request: Request):
         tools.append((group, row))
     audit.event("screen", target="home", company_id=next((c["id"] for c in companies), None))
     creatable = [c for c in companies if permissions.can(c["role"], "create_project")]
+    # دايرة الأفتار: مفيش صور حسابات في البرنامج لسه (زي قرار الشريط
+    # الجانبي بالظبط) — أحرف أولى من الاسم بدل صورة، مش هاش عشوائي.
+    _display_name = (me.get("display_name") or user or "?").strip()
+    initials = "".join(w[0] for w in _display_name.split()[:2]).upper() or "?"
     return templates.TemplateResponse(request, "home.html", {
-        "user": user, "me": me, "role_label": accounts.ROLE_LABELS.get(role, role),
+        "user": user, "me": me, "initials": initials, "role_label": accounts.ROLE_LABELS.get(role, role),
         "companies": companies, "creatable": creatable, "cards": cards, "continue": cont,
         "needs": home.needs_you(role, me.get("job_title"), cards)[:12], "tools": tools,
         "focus": focus, "can_manage_team": any(permissions.can(c["role"], "manage_team") for c in companies),
