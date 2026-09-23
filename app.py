@@ -503,7 +503,7 @@ with st.sidebar.container(gap=2, key="cf_sb_brand", horizontal_alignment="center
 
 _sb_projects = st.sidebar.container(gap=6, key="cf_sb_projects")
 _sb_projects.markdown(
-    '<div class="cf-sb-section-label">📁 %s</div>' % html.escape(tr("sidebar_projects")),
+    '<div class="cf-sb-section-label">%s</div>' % html.escape(tr("sidebar_projects")),
     unsafe_allow_html=True,
 )
 
@@ -593,12 +593,18 @@ if permissions.can(_role, "create_project"):
 # (تعبئة صفرا + حروف كحلي) بدل ما تخترع بالتة جديدة. الاسم تحته نوع
 # الاشتراك (Creator/Studio/Enterprise) - نفس اللي كان في الكابشن القديم،
 # مش وظيفة، غلاف بصري بس اتغيّر.
-_sb_account = st.sidebar.container(gap=6, key="cf_sb_account", horizontal_alignment="center")
+_sb_account = st.sidebar.container(gap=6, key="cf_sb_account")
 # الفاصل جوه مجموعة الحساب نفسها (مش قبلها) عشان ينزل معاها تحت
 _sb_account.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
 _display_name = ((_me_row["display_name"] if _me_row else None) or _current_user or "?").strip()
 _initials = "".join(w[0] for w in _display_name.split()[:2]).upper() or "?"
-_sb_account.markdown(
+# صف الهوية (طلب المالك 2026-09-23): الأفتار والاسم ونوع الاشتراك على
+# اليمين (بداية السطر في العربي)، وجرس التنبيهات على نفس الصف في الآخر
+# (الشمال). ‎distribute‎ = space-between؛ الاتجاه جاي من ‎direction‎ الشريط.
+_sb_me_row = _sb_account.container(
+    horizontal=True, vertical_alignment="center", wrap=False,
+    horizontal_alignment="distribute", key="cf_sb_me")
+_sb_me_row.markdown(
     '<div class="cf-sb-avatar-row">'
     '<div class="cf-sb-avatar">%s</div>'
     '<div><div class="cf-sb-avatar-name">%s</div>'
@@ -607,8 +613,10 @@ _sb_account.markdown(
     % (html.escape(_initials), html.escape(_display_name), html.escape(_tier_label)),
     unsafe_allow_html=True,
 )
+with _sb_me_row:
+    _notification_bell()
 
-# صف الأيقونات: الرئيسية 🏠 + اللغة 🌐 AR/EN جنب بعض - طلب محمد الزيات
+# صف الأيقونات: الرئيسية 🏠 + اللغة 🌐 AR/EN جنب بعض، في النص - طلب محمد الزيات
 # (2026-09-23): "نزّل بلوك اللغة جنب الرئيسية، واشيل كلمة اللغة وكلمة
 # الرئيسية، الأيقونات لوحدها واضحة".
 #
@@ -633,7 +641,6 @@ with _sb_nav_row:
     if os.environ.get("CIMAFAST_HOME_URL"):
         _nav_link("🏠", os.environ["CIMAFAST_HOME_URL"],
                   title=t("الرئيسية"), icon_only=True)
-    _notification_bell()
     st.markdown('<div class="cf-sb-globe" aria-hidden="true">🌐</div>',
                 unsafe_allow_html=True)
     # الشكل (حبتين مستقلتين مدوّرتين تمامًا، المختارة تعبئة صفرا) متفروض في

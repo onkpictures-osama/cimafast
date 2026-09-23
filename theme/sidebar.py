@@ -61,11 +61,23 @@ SIDEBAR_CSS = r'''
         margin-top: auto;
         padding-top: 24px;
     }
-    /* كل حاجة في النص جوه المجموعات */
-    section[data-testid="stSidebar"] .st-key-cf_sb_brand,
+    /* المحاذاة (تصحيح المالك 2026-09-23): الكلام العربي من اليمين -
+       بداية السطر، فبيبقى شمال في الإنجليزي لوحده. في النص بس: اللوجو
+       وتاجلاينه وأيقونة المعلومات، وصف اللغة. */
     section[data-testid="stSidebar"] .st-key-cf_sb_projects,
     section[data-testid="stSidebar"] .st-key-cf_sb_account {
-        text-align: center;
+        text-align: start;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand,
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand [data-testid="stElementContainer"],
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand .cf-sb-tagline {
+        text-align: center !important;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand [data-testid="stElementContainer"]:has(.cf-sb-tagline) {
+        width: 100% !important;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand .cf-sb-tagline {
+        width: 100%;
     }
     section[data-testid="stSidebar"] .st-key-cf_sb_brand .cf-title {
         display: flex;
@@ -75,25 +87,37 @@ SIDEBAR_CSS = r'''
         width: 100%;
         margin-top: 0;
     }
-    section[data-testid="stSidebar"] .st-key-cf_sb_account .cf-sb-avatar-row {
-        justify-content: center;
+    /* اسم المشروع/الحساب المختار جوه الخانة: من بداية السطر (يمين في
+       العربي). في Streamlit 1.64 الخانة react-aria والقيمة نص ‎<input>‎،
+       والـ input مابيورّثش الاتجاه من أبوه */
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects [data-testid="stSelectbox"] input[role="combobox"] {
+        direction: __DIR__ !important;
+        text-align: start !important;
     }
-    section[data-testid="stSidebar"] .st-key-cf_sb_account .cf-sb-avatar-row > div:last-child {
-        text-align: start;
-    }
+    /* تسمية "المشاريع": حاوية عناصر Streamlit بتفرض ‎text-align:left‎،
+       فلازم تتقال على العنصر نفسه */
     section[data-testid="stSidebar"] .st-key-cf_sb_projects .cf-sb-section-label {
-        text-align: center;
-        margin-bottom: 6px;
+        text-align: start !important;
+        margin-bottom: 8px;
     }
-    /* تسميات الخانات (الحساب، المشروع الحالي) في النص فوق خانتها */
-    section[data-testid="stSidebar"] .st-key-cf_sb_projects [data-testid="stWidgetLabel"] {
-        justify-content: center;
+    /* صف الهوية: غلاف الأفتار ياخد الباقي (يمين)، والجرس بمقاسه على الطرف */
+    section[data-testid="stSidebar"] .st-key-cf_sb_me > * {
+        flex: 0 0 auto !important;
+        width: auto !important;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_me > [data-testid="stElementContainer"]:has(.cf-sb-avatar-row) {
+        flex: 1 1 auto !important;
+        min-width: 0;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_me .cf-sb-avatar-row {
+        justify-content: flex-start;
+    }
+    /* زرار الخروج بعرض المجموعة كامل */
+    section[data-testid="stSidebar"] .st-key-cf_sb_account .stButton,
+    section[data-testid="stSidebar"] .st-key-cf_sb_account [data-testid="stElementContainer"]:has(.stButton) {
         width: 100%;
     }
-    section[data-testid="stSidebar"] .st-key-cf_sb_projects [data-testid="stWidgetLabel"] p {
-        text-align: center;
-        width: 100%;
-    }
+
     /* اللوجو: الحاوية كانت بتتقاس 23px واللوجو أطول، فكان بيركب على
        التاجلاين تحته */
     section[data-testid="stSidebar"] .st-key-cf_sb_brand .cf-title {
@@ -119,16 +143,11 @@ SIDEBAR_CSS = r'''
     }
     /* صف الأيقونات تحت: كل عنصر بمقاسه الطبيعي عشان الصف كله يتوسّط -
        غلاف جرس التنبيهات كان بياخد ‎flex-grow‎ ويزق الباقي للحرف */
-    section[data-testid="stSidebar"] .st-key-cf_sb_account [data-testid="stHorizontalBlock"] > * {
+    section[data-testid="stSidebar"] .st-key-cf_sb_account [data-testid="stHorizontalBlock"]:not(.st-key-cf_sb_me) > * {
         flex: 0 0 auto !important;
         width: auto !important;
     }
 
-    /* زرار الخروج بعرض المجموعة كامل حتى جوه حاوية متوسّطة */
-    section[data-testid="stSidebar"] .st-key-cf_sb_account .stButton,
-    section[data-testid="stSidebar"] .st-key-cf_sb_account [data-testid="stElementContainer"]:has(.stButton) {
-        width: 100%;
-    }
 
     /* الصفوف الأفقية في الشريط (اللوجو + ⓘ فوق، و🏠 🌐 AR/EN تحت) - كان
        فيهم شريط تمرير رأسي صغير بأسهم فوق/تحت، محمد صوّره (2026-09-23).
