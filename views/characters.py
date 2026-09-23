@@ -8,6 +8,8 @@ from search import matches
 from ui import IMAGE_TYPES, delete_image_file, image_abs_path, library_result_count, library_search, mark_saved, render_image_picker, safe_index, save_uploaded_image, show_saved_badge
 from ui import guarded_delete
 import repo
+import views.actors
+from ui import ltr
 from views.looks import render_looks_summary as _render_looks_summary
 
 # صورة الممثل/ة الحقيقي المتعاقد معاه/ا + صورة خلفية/مكان - نفس الفكرة
@@ -46,6 +48,13 @@ def render(project_id):
                     st.rerun()
 
     characters = repo.characters_of_project(project_id)
+    # الممثلين وأرقام الكاست لكل الشخصيات في استعلامين، مش استعلام لكل كارت
+    _cast = repo.cast_by_character(project_id)
+    if characters:
+        _render_cast_summary(project_id, list(_cast.values()))
+    # ترتيب الكارتات زي الكول شيت: بالرقم، وبعدين الأكتر مشاهد
+    _order = {cid: i for i, cid in enumerate(_cast)}
+    characters = sorted(characters, key=lambda c: _order.get(c["id"], len(_order)))
     # P5: إضافة المظهر بقت جوه كارت الشخصية نفسها (_render_looks_summary) بدل
     # expander منفصل مستخبي اسمه "إضافي" - اللي كان سبب إن محدش لاقيه.
 
@@ -60,24 +69,21 @@ def render(project_id):
         # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
         # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
         # 16 ثانية لكل rerun على الإنتاج).
-        _lazy_exp = st.expander(f"🎭 {ch['name']} ({t(ch['role_type'])})", key=f"exp_char_{ch['id']}", on_change="rerun")
+        _ce = _cast.get(ch["id"]) or {}
+        _num = f"#{_ce['cast_number']} " if _ce.get("cast_number") else ""
+        _who = (f" — 🎬 {_ce['actor']['name']}" if _ce.get("actor")
+                else f" — ⭐ {len(_ce['shortlist'])} {t('مرشح')}" if _ce.get("shortlist") else "")
+        _lazy_exp = st.expander(f"🎭 {_num}{ch['name']} ({t(ch['role_type'])}){_who}",
+                                key=f"exp_char_{ch['id']}", on_change="rerun")
         with _lazy_exp:
             if _lazy_exp.open:
                 # P9 خزانة المواهب: مين الممثل/ة المتعاقد معاه/ا لهذا الدور -
                 # لو لسه مفيش حد، بروفايل الممثل/ة نفسه (تبويب خزانة المواهب)
                 # هو اللي بيعمل التعيين (مش من هنا)، عشان نفس المنطق يفضل
                 # مكانه واحد بدل ما يتكرر جوه كل شاشة.
-                _casting = repo.casting_for_character(ch["id"])
-                if _casting:
-                    _cast_label = _casting.get("stage_name") or _casting["full_name"]
-                    _cast_title = ("الممثل/ة المتعاقد معاه/ا" if _casting["status"] == "cast"
-                                   else "الممثل/ة المرشّح/ة")
-                    _cast_img = image_abs_path(_casting["photo_path"]) if _casting.get("photo_path") else None
-                    if _cast_img:
-                        st.image(_cast_img, width=64)
-                    st.caption(f"🎬 {t(_cast_title)}: {_cast_label}")
-                else:
-                    st.caption(t("لسه مفيش ممثل/ة متعيّن لهذا الدور. عيّنه من بروفايله في تبويب «خزانة المواهب»."))
+                views.actors.render_character_casting(
+                    project_id, st.session_state.get("_cf_company"), ch, _cast.get(ch["id"]))
+                st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
 
                 st.markdown(f"**{t('🖼️ صورة الشخصية المرجعية')}**")
 
@@ -180,3 +186,20 @@ def render(project_id):
                             _save_look_image,
                             reference_slots=_CHAR_REFERENCE_SLOTS,
                         )
+
+
+def _render_cast_summary(project_id, cast):
+    """سطر واحد فوق الكروت: كام دور اتعاقد له، كام لسه، وزرار الترقيم."""
+    total = len(cast)
+    cast_n = sum(1 for c in cast if c["actor"])
+    short_n = sum(1 for c in cast if not c["actor"] and c["shortlist"])
+    numbered = sum(1 for c in cast if c["cast_number"])
+    c1, c2 = st.columns([3, 1], vertical_alignment="center")
+    c1.caption(f"🎬 {ltr(cast_n)}/{ltr(total)} {t('دور اتعاقد له ممثل/ة')} · ⭐ {ltr(short_n)} {t('فيه ترشيحات بس')}"
+               f" · #️⃣ {ltr(numbered)}/{ltr(total)} {t('ليهم رقم في التفريغ')}")
+    if numbered < total and c2.button(f"#️⃣ {t('رقّم الباقيين')}", key=f"auto_cast_num_{project_id}",
+                                      help=t("بيدّي رقم لكل شخصية مالهاش، الأكتر مشاهد الأول. الأرقام الموجودة مش بتتغيّر."),
+                                      use_container_width=True):
+        n = repo.auto_number_cast(project_id)
+        st.toast(f"{t('اترقّمت')} {n} {t('شخصية')}", icon="#️⃣")
+        st.rerun()

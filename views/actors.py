@@ -439,7 +439,9 @@ def _render_casting_section(actor, project_id):
     if not characters:
         st.caption(t("لسه مفيش شخصيات في المشروع ده. ضيف شخصيات الأول من تبويب الشخصيات."))
         return
-    char_map = {c["id"]: c["name"] for c in characters}
+    _cast = repo.cast_by_character(project_id)
+    char_map = {c["id"]: repo.cast_label(_cast[c["id"]]) if c["id"] in _cast else c["name"]
+                for c in characters}
     chosen = st.selectbox(t("اختار شخصية"), list(char_map), format_func=char_map.get,
                           key=f"actor_cast_pick_{actor_id}")
     current = repo.casting_for_character(chosen)
@@ -591,3 +593,132 @@ def render_credits(items, show_unrecognised=False):
                 components.iframe(v["embed_url"], height=340)
         if show_unrecognised and c.get("unrecognised"):
             st.caption("⚠️ " + t("لينك مش متعرف عليه كفيديو") + ": " + " · ".join(ltr(u) for u in c["unrecognised"]))
+
+
+# ---------- الكاستينج من كارت الشخصية نفسها ----------
+# نفس repo.cast_actor اللي بروفايل الممثل/ة بيستعمله - المنطق مكانه واحد،
+# بس الاختيار بقى متاح من المكان اللي المنتج بيدوّر فيه فعلًا: الشخصية.
+
+_NEW_ACTOR = "__new__"
+
+
+def _fmt_date(value):
+    return value or "—"
+
+
+def render_character_casting(project_id, company_id, ch, cast_entry):
+    """ch: صف الشخصية. cast_entry: صفها من repo.cast_by_character (فيه
+    الرقم والممثل/ة والمرشحين)."""
+    char_id = ch["id"]
+    writable = _can_write()
+    user = st.session_state.get("_auth_user")
+    actor = cast_entry.get("actor") if cast_entry else None
+    shortlist = cast_entry.get("shortlist", []) if cast_entry else []
+
+    st.markdown(f"**🎬 {t('الممثل/ة والكاستينج')}**")
+
+    # الممثل/ة المتعاقد + المرشحين، كل واحد بزرار يفتح بروفايله أو يشيله
+    people = ([(actor, "cast")] if actor else []) + [(p, "shortlisted") for p in shortlist]
+    for person, status in people:
+        c_img, c_name, c_open, c_rm = st.columns([1, 5, 2, 2], vertical_alignment="center")
+        img = image_abs_path(person["photo_path"]) if person.get("photo_path") else None
+        if img:
+            c_img.image(img, width=48)
+        else:
+            c_img.markdown("🎭")
+        badge = "✅" if status == "cast" else "⭐"
+        c_name.markdown(f"{badge} **{person['name']}** — {t(ACTOR_CASTING_STATUS_LABELS[status])}"
+                        + (f" · {person['role_note']}" if person.get("role_note") else ""))
+        if c_open.button(t("البروفايل"), key=f"chcast_open_{char_id}_{person['casting_id']}",
+                         use_container_width=True):
+            st.session_state[_SELECTED_KEY] = person["actor_id"]
+            st.toast(t("افتح تبويب «خزانة المواهب» تلاقي البروفايل مفتوح"), icon="🎭")
+        if status == "shortlisted" and not actor:
+            if c_rm.button(f"✅ {t('تعاقد')}", key=f"chcast_promote_{char_id}_{person['casting_id']}",
+                           disabled=not writable, use_container_width=True):
+                if guarded_delete(repo.cast_actor, (person["actor_id"], project_id, char_id, "cast", "", user),
+                                  t("معرفش أسجّل التعاقد ده.")):
+                    st.rerun()
+        elif c_rm.button(t("إلغاء"), key=f"chcast_rm_{char_id}_{person['casting_id']}",
+                         disabled=not writable, use_container_width=True):
+            repo.remove_casting(project_id, person["casting_id"])
+            st.rerun()
+    if not people:
+        st.caption(t("لسه مفيش ممثل/ة للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت."))
+
+    # رقم الكاست - ثابت، وبيظهر في التفريغ والجدول والكول شيت
+    n1, n2 = st.columns([2, 3], vertical_alignment="bottom")
+    number = n1.number_input(t("رقم الممثل في التفريغ"), min_value=0, max_value=999, step=1,
+                             value=int(cast_entry.get("cast_number") or 0) if cast_entry else 0,
+                             key=f"chcast_num_{char_id}", help=t("0 = من غير رقم"),
+                             disabled=not writable)
+    if number != int((cast_entry or {}).get("cast_number") or 0):
+        if guarded_delete(repo.set_cast_number, (project_id, char_id, number or None),
+                          t("معرفش أحفظ الرقم ده.")):
+            st.rerun()
+
+    # التتبع: الدور ده (وممثله) فين في الجدول
+    tr_ = repo.character_tracking(project_id, char_id)
+    lines = [f"🎞️ {ltr(tr_['scene_count'])} {t('مشهد في السكريبت')}"]
+    if tr_["work_days"]:
+        lines.append(f"📅 {ltr(tr_['work_days'])} {t('يوم تصوير')} · {ltr(tr_['hold_days'])} {t('يوم انتظار')}"
+                     f" · {t('من يوم')} {ltr(tr_['first_day'])} ({_fmt_date(tr_['first_date'])})"
+                     f" {t('لـ يوم')} {ltr(tr_['last_day'])} ({_fmt_date(tr_['last_date'])})")
+        if tr_["scheduled_scenes"] < tr_["scene_count"]:
+            lines.append(f"⚠️ {ltr(tr_['scene_count'] - tr_['scheduled_scenes'])} {t('مشهد لسه مش متجدول')}")
+    elif tr_["scene_count"]:
+        lines.append(f"📅 {t('لسه ولا مشهد من مشاهده متجدول في جدول التصوير')}")
+    n2.caption("  \n".join(lines))
+    if tr_["days"]:
+        with st.popover(f"📅 {t('أيام التصوير')}"):
+            for d in tr_["days"]:
+                st.markdown(f"- {t('يوم')} {ltr(d['day_number'])} · {_fmt_date(d['date'])} · `{d['code']}`")
+
+    # اختيار ممثل/ة - من المسبح العام + بروفايلات الشركة المخفية
+    if not writable:
+        return
+    pool = {a["id"]: a for a in repo.actors_directory()}
+    for a in repo.actors_owned_by_company(company_id):
+        pool.setdefault(a["id"], a)
+    taken = {p["actor_id"] for p, _ in people}
+    options = [_NEW_ACTOR] + sorted((i for i in pool if i not in taken),
+                                    key=lambda i: normalize(_display_name(pool[i])))
+
+    def _label(i):
+        if i == _NEW_ACTOR:
+            return f"➕ {t('ممثل/ة جديد/ة مش في الخزانة')}"
+        a = pool[i]
+        return _display_name(a) + (f" · {t(a['category'])}" if a.get("category") else "")
+
+    with st.form(f"chcast_form_{char_id}", clear_on_submit=True):
+        picked = st.selectbox(t("اختار ممثل/ة"), options, index=None, format_func=_label,
+                              placeholder=t("اكتب أول الاسم..."), key=f"chcast_pick_{char_id}")
+        q1, q2 = st.columns(2)
+        new_name = q1.text_input(t("الاسم (لو جديد/ة)"), key=f"chcast_newname_{char_id}")
+        new_phone = q2.text_input(t("رقم التواصل (اختياري)"), key=f"chcast_newphone_{char_id}")
+        note = st.text_input(t("ملاحظة عن الدور (اختياري)"), key=f"chcast_note_{char_id}")
+        b1, b2 = st.columns(2)
+        do_short = b1.form_submit_button(f"⭐ {t('رشّح')}", use_container_width=True)
+        do_cast = b2.form_submit_button(f"✅ {t('تعاقد')}", use_container_width=True)
+    if not (do_short or do_cast):
+        st.caption(t("الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بشركتك (مش ظاهر لشركات تانية) — تقدر تكمّل بياناته من هناك."))
+        return
+    if picked is None:
+        st.warning(t("اختار ممثل/ة الأول"))
+        return
+    if picked == _NEW_ACTOR:
+        if not new_name.strip():
+            st.warning(t("اكتب اسم الممثل/ة الجديد/ة"))
+            return
+        picked = repo.add_actor({"full_name": new_name.strip(), "contact_phone": new_phone.strip() or None,
+                                 "discoverable": 0}, owner_company_id=company_id, created_by=user)
+    status = "cast" if do_cast else "shortlisted"
+    if guarded_delete(repo.cast_actor, (picked, project_id, char_id, status, note, user),
+                      t("معرفش أسجّل التعاقد ده.")):
+        # أول ما حد يتعاقد، الشخصية تاخد الرقم اللي بعده لو مالهاش - عشان تظهر
+        # في التفريغ على طول من غير ما أرقام الباقيين تتحرك
+        if status == "cast" and not (cast_entry or {}).get("cast_number"):
+            repo.set_cast_number(project_id, char_id, repo.next_cast_number(project_id))
+        st.toast(t("تم تعيين الممثل/ة للشخصية") if do_cast else t("تم ترشيح الممثل/ة للشخصية"),
+                 icon="✅" if do_cast else "⭐")
+        st.rerun()

@@ -137,6 +137,7 @@ def board_scenes(project_id):
         (project_id,),
     )
     cast = {}
+    by_char = cast_by_character(project_id)
     for r in fetch_all(
         """
         SELECT sc.scene_id, c.id AS character_id, c.name
@@ -148,7 +149,12 @@ def board_scenes(project_id):
         """,
         (project_id,),
     ):
-        cast.setdefault(r["scene_id"], []).append({"id": r["character_id"], "name": r["name"]})
+        ch = by_char.get(r["character_id"], {})
+        cast.setdefault(r["scene_id"], []).append({
+            "id": r["character_id"], "name": r["name"], "num": ch.get("cast_number"),
+            "actor": (ch.get("actor") or {}).get("name")})
+    for members in cast.values():
+        members.sort(key=lambda c: (c["num"] is None, c["num"] or 0, c["id"]))
     out = []
     for r in rows:
         out.append({
@@ -386,12 +392,15 @@ def day_out_of_days(project_id):
     b = board(project_id)
     days = b["days"]
     working = {}
-    names = {}
+    scene_counts = {}
+    info = {}
     for idx, d in enumerate(days):
         for sid in d["scene_ids"]:
             for c in b["scenes"][sid]["cast"]:
                 working.setdefault(c["id"], set()).add(idx)
-                names[c["id"]] = c["name"]
+                scene_counts[c["id"]] = scene_counts.get(c["id"], 0) + 1
+                info[c["id"]] = c
+    dates = [d.get("shoot_date") or None for d in days]
     rows = []
     for cid, idxs in working.items():
         first, last = min(idxs), max(idxs)
@@ -403,11 +412,17 @@ def day_out_of_days(project_id):
                 codes.append("H")
             else:
                 codes.append("")
-        rows.append({"character_id": cid, "name": names[cid], "codes": codes,
+        c = info[cid]
+        rows.append({"character_id": cid, "name": c["name"], "codes": codes,
+                     "cast_number": c.get("num"), "actor": c.get("actor"),
                      "work_days": len(idxs), "hold_days": codes.count("H"),
-                     "first_day": first + 1, "last_day": last + 1})
-    rows.sort(key=lambda r: (-r["work_days"], r["first_day"], r["name"]))
-    return {"days": [d["day_number"] for d in days], "rows": rows}
+                     "scheduled_scenes": scene_counts[cid],
+                     "first_day": first + 1, "last_day": last + 1,
+                     "first_date": dates[first], "last_date": dates[last]})
+    # زي الكول شيت: بالرقم لو فيه، وبعدين الأكتر شغل
+    rows.sort(key=lambda r: (r["cast_number"] is None, r["cast_number"] or 0,
+                             -r["work_days"], r["first_day"], r["name"]))
+    return {"days": [d["day_number"] for d in days], "dates": dates, "rows": rows}
 
 
 # ----------------------------------------------------------------------------
@@ -1150,3 +1165,122 @@ def shortlist_count_for_character(*params):
     rows = fetch_all("SELECT COUNT(*) AS n FROM character_actor_casting "
                      "WHERE character_id=? AND status='shortlisted'", params)
     return rows[0]["n"] if rows else 0
+
+
+# --- الممثل جوه باقي السيستم (رقم الكاست، التفريغ، الجدول، التتبع) ---------------
+# التعاقد نفسه صف في character_actor_casting؛ هنا بس القراءات اللي بتلزق اسم
+# الممثل/ة ورقمه في كل شاشة وورقة فيها الشخصية، في استعلامين للمشروع كله بدل
+# استعلام لكل شخصية.
+
+class CastNumberTakenError(IntegrityError):
+    """رقم الكاست ده متحط لشخصية تانية في نفس المشروع."""
+    user_message = "الرقم ده متحط لشخصية تانية في المشروع. اختار رقم تاني أو فضّي رقمها الأول."
+
+    def __init__(self):
+        super().__init__(self.user_message)
+
+
+# ترتيب الترقيم التلقائي لما عدد المشاهد يتساوى: البطل قبل الشرير قبل المساعد...
+_ROLE_RANK = {"بطل": 0, "شرير": 1, "مساعد": 2, "غير محدد": 3, "كومبارس": 4}
+
+
+def project_cast(project_id):
+    """كل شخصيات المشروع برقمها وعدد مشاهدها والممثل/ة المتعاقد والمرشحين.
+
+    مترتبة زي الكول شيت: اللي ليها رقم بالرقم، وبعدين الباقي بعدد المشاهد."""
+    chars = fetch_all("""
+        SELECT c.id, c.name, c.role_type, c.cast_number, c.reference_image_path,
+               (SELECT COUNT(DISTINCT sc.scene_id) FROM scene_characters sc
+                 WHERE sc.character_id = c.id) AS scene_count
+        FROM characters c WHERE c.project_id = ?
+    """, (project_id,))
+    castings = fetch_all("""
+        SELECT cac.id AS casting_id, cac.character_id, cac.status, cac.actor_id, cac.role_note,
+               a.full_name, a.stage_name, a.photo_path
+        FROM character_actor_casting cac
+        JOIN actors a ON a.id = cac.actor_id
+        WHERE cac.project_id = ?
+        ORDER BY cac.created_at, cac.id
+    """, (project_id,))
+    out = {c["id"]: dict(c, actor=None, shortlist=[]) for c in chars}
+    for r in castings:
+        entry = out.get(r["character_id"])
+        if entry is None:
+            continue
+        person = {"casting_id": r["casting_id"], "actor_id": r["actor_id"],
+                  "name": r["stage_name"] or r["full_name"], "photo_path": r["photo_path"],
+                  "role_note": r["role_note"]}
+        if r["status"] == "cast":
+            entry["actor"] = person
+        else:
+            entry["shortlist"].append(person)
+    return sorted(out.values(), key=lambda c: (
+        c["cast_number"] is None, c["cast_number"] or 0, -c["scene_count"],
+        _ROLE_RANK.get(c["role_type"] or "", 3), c["id"]))
+
+
+def cast_by_character(project_id):
+    """character_id → نفس صف project_cast."""
+    return {c["id"]: c for c in project_cast(project_id)}
+
+
+def cast_label(c, with_actor=True):
+    """"#3 سلمى — اسم الممثل/ة" — الشكل الواحد اللي بيظهر في كل مكان."""
+    label = f"#{c['cast_number']} {c['name']}" if c.get("cast_number") else c["name"]
+    actor = c.get("actor")
+    if with_actor and actor:
+        label += f" — {actor['name']}"
+    return label
+
+
+def set_cast_number(project_id, character_id, number):
+    """number = None بيفضّي الرقم. الرقم لازم يبقى فريد جوه المشروع."""
+    if number is not None:
+        number = int(number)
+        if number < 1:
+            raise ValueError(number)
+        taken = fetch_all("SELECT 1 FROM characters WHERE project_id=? AND cast_number=? AND id != ?",
+                          (project_id, number, character_id))
+        if taken:
+            raise CastNumberTakenError()
+    return run_query("UPDATE characters SET cast_number=? WHERE id=? AND project_id=?",
+                     (number, character_id, project_id))
+
+
+def next_cast_number(project_id):
+    rows = fetch_all("SELECT COALESCE(MAX(cast_number), 0) AS n FROM characters WHERE project_id=?",
+                     (project_id,))
+    return rows[0]["n"] + 1
+
+
+def auto_number_cast(project_id):
+    """بيدّي رقم لكل شخصية لسه مالهاش، بعد أكبر رقم موجود: الأكتر مشاهد
+    الأول. الأرقام الموجودة عمرها ما بتتغيّر - الورق اللي اتطبع بيفضل صح.
+    بيرجّع عدد الشخصيات اللي اترقّمت."""
+    cast = project_cast(project_id)
+    next_n = max((c["cast_number"] for c in cast if c["cast_number"]), default=0)
+    todo = sorted((c for c in cast if not c["cast_number"]),
+                  key=lambda c: (-c["scene_count"], _ROLE_RANK.get(c["role_type"] or "", 3), c["id"]))
+    for c in todo:
+        next_n += 1
+        run_query("UPDATE characters SET cast_number=? WHERE id=? AND project_id=?",
+                  (next_n, c["id"], project_id))
+    return len(todo)
+
+
+def character_tracking(project_id, character_id):
+    """الشخصية (وممثلها) في الجدول: عدد مشاهدها، كام منها اتجدول، أيام
+    الشغل والانتظار، وأول وآخر يوم بتاريخه لو اليوم ليه تاريخ."""
+    scene_count = fetch_all("SELECT COUNT(DISTINCT scene_id) AS n FROM scene_characters WHERE character_id=?",
+                            (character_id,))[0]["n"]
+    dood = day_out_of_days(project_id)
+    row = next((r for r in dood["rows"] if r["character_id"] == character_id), None)
+    out = {"scene_count": scene_count, "scheduled_scenes": 0, "work_days": 0, "hold_days": 0,
+           "first_day": None, "last_day": None, "first_date": None, "last_date": None, "days": []}
+    if not row:
+        return out
+    out.update({k: row[k] for k in ("work_days", "hold_days", "first_day", "last_day",
+                                     "first_date", "last_date", "scheduled_scenes")})
+    out["days"] = [{"day_number": dood["days"][i], "date": dood["dates"][i], "code": code}
+                   for i, code in enumerate(row["codes"]) if code and code != "H"]
+    return out

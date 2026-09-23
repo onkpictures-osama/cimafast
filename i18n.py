@@ -625,6 +625,49 @@ TRANSLATIONS = {
     "بتعرض المشهد اللي اتغيّر بس.": "Showing only the scene that changed.",
     "اعرض كل المشاهد": "Show all scenes",
     "تنبيه جديد": "new notifications",
+
+    # الممثل جوه السيستم: كاستينج من كارت الشخصية، رقم الكاست، التتبع
+    "الممثل/ة والكاستينج": "Actor & casting",
+    "البروفايل": "Profile",
+    "افتح تبويب «خزانة المواهب» تلاقي البروفايل مفتوح": "Open the Talent Vault tab — the profile is waiting there",
+    "تعاقد": "Cast",
+    "رشّح": "Shortlist",
+    "لسه مفيش ممثل/ة للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت.":
+        "No actor for this role yet — pick one from the Talent Vault or add someone new below.",
+    "رقم الممثل في التفريغ": "Cast number",
+    "0 = من غير رقم": "0 = no number",
+    "معرفش أحفظ الرقم ده.": "Couldn't save that number.",
+    "مشهد في السكريبت": "scenes in the script",
+    "يوم تصوير": "shoot days",
+    "يوم انتظار": "hold days",
+    "من يوم": "from day",
+    "لـ يوم": "to day",
+    "مشهد لسه مش متجدول": "scenes not scheduled yet",
+    "لسه ولا مشهد من مشاهده متجدول في جدول التصوير": "None of these scenes is on the shooting schedule yet",
+    "أيام التصوير": "Shoot days",
+    "يوم": "Day",
+    "ممثل/ة جديد/ة مش في الخزانة": "New actor (not in the vault)",
+    "اختار ممثل/ة": "Choose an actor",
+    "اكتب أول الاسم...": "Type the start of a name...",
+    "الاسم (لو جديد/ة)": "Name (if new)",
+    "رقم التواصل (اختياري)": "Contact number (optional)",
+    "الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بشركتك (مش ظاهر لشركات تانية) — تقدر تكمّل بياناته من هناك.":
+        "A new actor is saved to the Talent Vault as a profile private to your company (hidden from other companies) — complete it there.",
+    "اختار ممثل/ة الأول": "Choose an actor first",
+    "اكتب اسم الممثل/ة الجديد/ة": "Type the new actor's name",
+    "مرشح": "shortlisted",
+    "دور اتعاقد له ممثل/ة": "roles cast",
+    "فيه ترشيحات بس": "shortlisted only",
+    "ليهم رقم في التفريغ": "have a cast number",
+    "رقّم الباقيين": "Number the rest",
+    "بيدّي رقم لكل شخصية مالهاش، الأكتر مشاهد الأول. الأرقام الموجودة مش بتتغيّر.":
+        "Gives every unnumbered character a cast number, most scenes first. Existing numbers never change.",
+    "اترقّمت": "Numbered",
+    "أرقام الكاست": "Cast #",
+    "الشخصية دي متعاقد لها ممثل/ة تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره.":
+        "This character is already cast with another actor. Remove that casting first to change it.",
+    "الرقم ده متحط لشخصية تانية في المشروع. اختار رقم تاني أو فضّي رقمها الأول.":
+        "That number belongs to another character in this project. Pick another or clear theirs first.",
 }
 
 

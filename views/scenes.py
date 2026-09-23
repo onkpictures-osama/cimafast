@@ -77,6 +77,9 @@ def render(project, project_id, _is_ar):
     _chars_by_scene = {}
     for r in repo.scene_character_names(project_id):
         _chars_by_scene.setdefault(r["scene_id"], []).append(r["name"])
+    # أرقام الكاست وأسماء الممثلين لكل مشهد - نفس اللي بيطلع في الـ strip
+    # بتاع الجدول، عشان التفريغ يتقري بالأرقام زي الكول شيت
+    _cast_by_scene = {s["id"]: s["cast"] for s in repo.board_scenes(project_id)}
     _shots_by_scene = {r["scene_id"]: r["n"] for r in repo.shot_counts_per_scene(project_id)}
 
     _scenes_shown = scenes
@@ -85,7 +88,8 @@ def render(project, project_id, _is_ar):
             sc for sc in scenes
             if matches(_scene_q, scene_label(sc), sc["int_ext"], sc["day_night"],
                        id_to_loc_label.get(sc["location_variant_id"]), sc["notes"],
-                       " ".join(_chars_by_scene.get(sc["id"], [])))
+                       " ".join(_chars_by_scene.get(sc["id"], [])),
+                       " ".join(c["actor"] or "" for c in _cast_by_scene.get(sc["id"], [])))
         ]
         _table = pd.DataFrame([{
             t("رقم"): scene_label(sc),
@@ -93,6 +97,8 @@ def render(project, project_id, _is_ar):
             t("التوقيت"): fmt_day_night(sc["day_night"] or "غير محدد"),
             t("المكان"): _loc_display(id_to_loc_label.get(sc["location_variant_id"])) or "—",
             t("الشخصيات"): len(_chars_by_scene.get(sc["id"], [])),
+            t("أرقام الكاست"): "، ".join(str(c["num"]) for c in _cast_by_scene.get(sc["id"], [])
+                                        if c["num"]) or "—",
             t("اللقطات"): _shots_by_scene.get(sc["id"], 0),
         } for sc in _scenes_shown])
         if _is_ar and not _table.empty:

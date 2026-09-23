@@ -887,6 +887,9 @@ _MIGRATIONS = {
         ("species", "TEXT"),
         ("gender", "TEXT"),
         ("reference_image_path", "TEXT"),
+        # رقم الممثل في الكول شيت والتفريغ (Cast ID): ثابت بعد ما يتحط، عشان
+        # "رقم 3" يفضل نفس الشخص في كل ورقة حتى لو شخصيات اتضافت بعدين.
+        ("cast_number", "INTEGER"),
     ],
     "character_looks": [
         ("reference_image_path", "TEXT"),

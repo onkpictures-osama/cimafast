@@ -358,11 +358,25 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
     المصدر الأساسي لمشاهد كل شخصية هو ربط scene_characters (بيتسجل من وقت
     استيراد السكريبت، أو بالإضافة اليدوية من تبويب السكريبت)، عشان التقرير
     يبقى صحيح حتى لو المشاهد ديه لسه ملهاش لقطات مفرّغة."""
+    import repo  # متأخر: التصدير بيتنادى من غير Streamlit في الاختبارات
     characters = fetch_all(
         "SELECT * FROM characters WHERE project_id=? ORDER BY id", (project_id,)
     )
+    # الرقم = رقم الكاست لو متحط (نفس رقم التفريغ والجدول)؛ الترشيح = الممثل/ة
+    # المتعاقد أو المرشحين؛ عدد الأيام = أيام الشغل من جدول التصوير.
+    cast = repo.cast_by_character(project_id)
+    work_days = {r["character_id"]: r["work_days"] for r in repo.day_out_of_days(project_id)["rows"]}
+    order = {cid: i for i, cid in enumerate(cast)}
+    characters = sorted(characters, key=lambda c: order.get(c["id"], len(order)))
     rows = []
     for idx, ch in enumerate(characters, start=1):
+        ce = cast.get(ch["id"], {})
+        if ce.get("actor"):
+            nomination = ce["actor"]["name"]
+        else:
+            nomination = "، ".join(p["name"] for p in ce.get("shortlist", []))
+            if nomination:
+                nomination += " (مرشح)"
         scene_rows = fetch_all("""
             SELECT DISTINCT s.scene_number, l.name AS location_name
             FROM scene_characters sch
@@ -375,13 +389,13 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
         scene_numbers = sorted({r["scene_number"] for r in scene_rows})
         location_names = sorted({r["location_name"] for r in scene_rows if r["location_name"]})
         rows.append({
-            "number": idx,
+            "number": ce.get("cast_number") or idx,
             "name": ch["name"],
             "description": ch["personality_notes"] or "",
-            "nomination": "",
+            "nomination": nomination,
             "scene_count": len(scene_numbers),
             "scene_numbers": "، ".join(str(n) for n in scene_numbers),
-            "day_count": "",
+            "day_count": work_days.get(ch["id"], ""),
             "locations": "، ".join(location_names),
         })
     return _build_generic_excel(
@@ -407,6 +421,14 @@ GENERAL_BREAKDOWN_COLUMNS = [
 _MAIN_ROLE_TYPES = {"بطل", "شرير"}
 
 
+def _numbered_names(rows):
+    """"1- سلمى"، "4- سامي"... بترتيب رقم الكاست، واللي مالوش رقم بالاسم آخر
+    القايمة - نفس الأرقام اللي في جدول التصوير والكول شيت."""
+    rows = {(r["name"], r["cast_number"]) for r in rows}
+    ordered = sorted(rows, key=lambda r: (r[1] is None, r[1] or 0, r[0]))
+    return [f"{n}- {name}" if n else name for name, n in ordered]
+
+
 def build_general_breakdown_excel(project, project_id, fetch_all):
     """التفريغ العام: ورقة واحدة لكل مشهد بمعلومات الديكور والمكان والتوقيت
     والشخصيات المقسّمة لرئيسية/ثانوية حسب نوع الدور، زي الورقة القياسية
@@ -426,13 +448,13 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
         # السكريبت) - ده اللي بيخلي التقرير ده يتملى بالداتا فعليًا حتى لو
         # لسه مفيش لقطات مفرّغة للمشهد
         char_rows = fetch_all("""
-            SELECT DISTINCT ch.name, ch.role_type
+            SELECT DISTINCT ch.name, ch.role_type, ch.cast_number
             FROM scene_characters sch
             JOIN characters ch ON sch.character_id = ch.id
             WHERE sch.scene_id = ?
         """, (sc["id"],))
-        main_chars = sorted({r["name"] for r in char_rows if r["role_type"] in _MAIN_ROLE_TYPES})
-        secondary_chars = sorted({r["name"] for r in char_rows if r["role_type"] not in _MAIN_ROLE_TYPES})
+        main_chars = _numbered_names(r for r in char_rows if r["role_type"] in _MAIN_ROLE_TYPES)
+        secondary_chars = _numbered_names(r for r in char_rows if r["role_type"] not in _MAIN_ROLE_TYPES)
         prop_rows = fetch_all("""
             SELECT DISTINCT p.name
             FROM scene_props sp

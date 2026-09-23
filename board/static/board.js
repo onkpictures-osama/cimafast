@@ -84,7 +84,9 @@
     if (s.episode) meta.push(`حلقة ${s.episode}`);
     $(".strip__meta", node).textContent = meta.join(" · ");
     $(".strip__cast", node).textContent = s.cast.length ? `👥 ${s.cast.length}` : "";
-    node.title = `مشهد ${s.label} — ${s.location || ""}\n${s.cast.map(c => c.name).join("، ") || "من غير شخصيات"}`;
+    const nums = s.cast.filter(c => c.num).map(c => c.num);
+    if (nums.length) $(".strip__cast", node).textContent = `👥 ${nums.join("،")}` + (nums.length < s.cast.length ? "+" : "");
+    node.title = `مشهد ${s.label} — ${s.location || ""}\n${s.cast.map(castLabel).join("\n") || "من غير شخصيات"}`;
     node.setAttribute("aria-label", `مشهد ${s.label}، ${s.location || ""}، ${meta.join("، ")}`);
     return node;
   }
@@ -223,6 +225,11 @@
     scheduleSave();
   });
 
+  // "#3 سلمى (منى)" - نفس شكل repo.cast_label في كل حتة الشخصية بتظهر فيها
+  function castLabel(c) {
+    return (c.num ? `#${c.num} ` : "") + c.name + (c.actor ? ` (${c.actor})` : "");
+  }
+
   // --- أيام شغل الممثلين --------------------------------------------------------
   async function loadDood() {
     const d = await api("GET", `api/dood?project_id=${projectId}`);
@@ -231,13 +238,18 @@
     if (!d.rows.length) { wrap.append(el("p", "hint", "لسه مفيش أيام فيها ممثلين.")); return; }
     const table = el("table");
     const head = el("tr");
-    head.append(el("th", null, "الشخصية"));
-    d.days.forEach(n => head.append(el("th", null, String(n))));
+    head.append(el("th", null, "#"), el("th", null, "الشخصية"), el("th", null, "الممثل/ة"));
+    d.days.forEach((n, i) => {
+      const th = el("th", null, String(n));
+      if (d.dates && d.dates[i]) th.title = d.dates[i];
+      head.append(th);
+    });
     head.append(el("th", null, "شغل"), el("th", null, "انتظار"));
     table.append(head);
     d.rows.forEach(r => {
       const tr = el("tr");
-      tr.append(el("td", null, r.name));
+      tr.append(el("td", null, r.cast_number ? String(r.cast_number) : ""),
+                el("td", null, r.name), el("td", null, r.actor || "—"));
       r.codes.forEach(c => tr.append(el("td", c ? `c-${c}` : null, c)));
       tr.append(el("td", null, String(r.work_days)), el("td", null, String(r.hold_days)));
       table.append(tr);
