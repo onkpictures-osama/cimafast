@@ -29,6 +29,17 @@ SIDEBAR_CSS = r'''
         background: var(--cf-midnight);
         overflow-x: hidden !important;
     }
+    /* الصفوف الأفقية في الشريط (اللوجو + ⓘ فوق، و🏠 🌐 AR/EN تحت) - كان
+       فيهم شريط تمرير رأسي صغير بأسهم فوق/تحت، محمد صوّره (2026-09-23).
+       السبب: Streamlit بيدي الحاوية الأفقية ‎overflow:auto‎، وأي
+       ‎st.markdown‎ جواها صندوقه بيطلع 16px تحت العنصر (متعوّض بـ
+       ‎margin-bottom:-16px‎ في التخطيط، بس المتصفح بيحسبه برضه "محتوى
+       زيادة" يتمرر). فالصف بيبقى أعلى من مساحته بـ 8-13px ويطلعله شريط.
+       الصفين دول قصيرين ومفيش فيهم حاجة محتاجة تمرير أصلًا، فـ ‎visible‎:
+       لا شريط، ولا قص لحلقة الفوكس أو تكبير الهوفر بتاع 🏠. */
+    section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
+        overflow: visible !important;
+    }
     /* فاصل رفيع بين المجموعات - كان Ink شفاف (مختفي على الغامق)، بقى
        نسخة الحد الغامق العامة (--cf-edge) زي باقي البرنامج */
     section[data-testid="stSidebar"] hr.cf-sb-sep {

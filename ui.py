@@ -8,7 +8,7 @@ import re
 import streamlit as st
 from database import IntegrityError
 import uuid
-from database import DAY_NIGHT_LABELS, INT_EXT_LABELS, bilingual_label
+from database import DAY_NIGHT_LABELS, INT_EXT_LABELS, FIELD_HELP, SHOT_SIZE_OPTIONS, bilingual_label
 from i18n import t
 from importer import DEFAULT_VARIANT
 import repo
@@ -226,13 +226,30 @@ IMG_SRC_CAMERA = "📷 الكاميرا"
 
 IMG_SRC_GENERATE = "✨ توليد بالذكاء الاصطناعي"
 
+# اختيار سريع لحجم الكادر جوه شاشة التوليد - نفس مفردات SHOT_SIZE_OPTIONS
+# المستخدمة أصلًا في تبويب اللقطات، مش قايمة جديدة.
+SHOT_SIZE_OPTIONS_WITH_BLANK = ["غير محدد"] + SHOT_SIZE_OPTIONS
 
-def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved):
+
+def _uploaded_mime(f):
+    """MIME من f.type لو موجود، وإلا تخمين من امتداد الاسم - عشان data URL
+    التوليد يبقى نوعه صح."""
+    if getattr(f, "type", None):
+        return f.type
+    ext = os.path.splitext(f.name or "")[1].lower().lstrip(".")
+    return f"image/{'jpeg' if ext == 'jpg' else ext or 'png'}"
+
+
+def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved, reference_slots=None):
     """صورة مرجعية بتلات طرق: رفع، كاميرا، أو توليد.
 
     برّه أي st.form عن قصد: جوه الفورم الاختيار مابيعملش rerun، فكان اختيار
-    "توليد" بيفضل عارض خانة الرفع. prompt_for(extra) بيرجّع برومبت التوليد،
-    وon_saved(rel_path أو None) بيكتب المسار في قاعدة البيانات."""
+    "توليد" بيفضل عارض خانة الرفع. prompt_for(shot_size, light) بيرجّع
+    البرومبت المتجمّع تلقائيًا من بيانات المكان/الشخصية المحفوظة (مش نص فاضي
+    اليوزر يكتبه من الصفر) - بيتعرض في خانة قابلة للتعديل قبل التوليد.
+    reference_slots: قائمة (مفتاح، تسمية) لصور مرجعية اختيارية بتتبعت للموديل
+    كصور مش نص (صورة ممثل/ة، صورة خلفية/مكان) - افتراضيًا خانة عامة واحدة.
+    on_saved(rel_path أو None) بيكتب المسار في قاعدة البيانات."""
     current_abs = image_abs_path(current_rel)
     if current_abs:
         st.image(current_abs, width=340)
@@ -250,12 +267,31 @@ def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved):
         if shot is not None and st.button(t("💾 حفظ الصورة"), key=f"{key}_save_cam"):
             new_bytes, ext = shot.getvalue(), os.path.splitext(shot.name or "")[1] or ".jpg"
     else:
-        st.caption(t("الصورة هتتولّد من اسم المكان ووصفه. ضيف أي تفاصيل تحب تشوفها فيها:"))
-        extra = st.text_input(t("تفاصيل إضافية (اختياري)"), key=f"{key}_extra")
+        st.caption(t("البرومبت اتجمّع تلقائيًا من البيانات المحفوظة — عدّله زي ما تحب."))
+        pick_col1, pick_col2 = st.columns(2)
+        with pick_col1:
+            shot_size = st.selectbox(t("حجم الكادر"), SHOT_SIZE_OPTIONS_WITH_BLANK,
+                                     format_func=t, key=f"{key}_shot_size", help=FIELD_HELP.get("shot_size"))
+        with pick_col2:
+            light = st.selectbox(t("الإضاءة"), image_gen.LIGHT_OPTIONS, format_func=t, key=f"{key}_light")
+        default_prompt = prompt_for(shot_size, light)
+        prompt_key = f"{key}_prompt"
+        if prompt_key not in st.session_state:
+            st.session_state[prompt_key] = default_prompt
+        if st.button(t("🔄 إعادة التعبئة من البيانات المحفوظة"), key=f"{key}_reset_prompt"):
+            st.session_state[prompt_key] = default_prompt
+            st.rerun()
+        prompt_text = st.text_area(t("وصف الصورة المطلوبة"), key=prompt_key, height=110)
+        ref_bytes = []
+        for slot_key, label in (reference_slots or [("ref", "صورة مرجعية توجّه الشكل (اختياري)")]):
+            rf = st.file_uploader(t(label), type=IMAGE_TYPES, key=f"{key}_ref_{slot_key}")
+            if rf is not None:
+                ref_bytes.append((rf.getvalue(), _uploaded_mime(rf)))
         if st.button(t("✨ ولّد صورة"), key=f"{key}_gen"):
             with st.spinner(t("بنولّد الصورة... ده بياخد حوالي 10 ثواني")):
                 try:
-                    new_bytes, ext = image_gen.generate_image(prompt_for(extra), _openrouter_key())
+                    new_bytes, ext = image_gen.generate_image(
+                        prompt_text, _openrouter_key(), reference_images=ref_bytes or None)
                 except image_gen.ImageGenError as e:
                     st.error(t(str(e)))
     if new_bytes:
@@ -294,6 +330,8 @@ def guarded_delete(delete_fn, params, friendly_error):
     try:
         delete_fn(*params)
         return True
-    except IntegrityError:
-        st.error(friendly_error)
+    except IntegrityError as exc:
+        # P5: لو طبقة البيانات عندها سبب أدق (زي "ده آخر مظهر للشخصية")
+        # بنوريه هو بدل الرسالة العامة بتاعت الشاشة
+        st.error(t(getattr(exc, "user_message", None) or friendly_error))
         return False

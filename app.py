@@ -14,7 +14,7 @@ import theme
 
 from i18n import t, tr
 from ui import ltr
-import views.import_tab, views.locations, views.characters, views.props, views.scenes, views.shots, views.reports
+import views.import_tab, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.project_settings
 import repo
 import accounts
@@ -514,31 +514,10 @@ if permissions.can(_role, "create_project"):
             else:
                 st.warning(t("اكتب اسم المشروع أولًا"))
 
-if not projects:
-    if permissions.can(_role, "create_project"):
-        _sb_projects.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
-    else:
-        _sb_projects.info(t("مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع."))
-    st.stop()
-
-_wanted = st.session_state.pop("_link_project_name", None)
-if _wanted in project_names:
-    st.session_state["project_selector"] = _wanted
-selected_project_name = _sb_projects.selectbox(tr("current_project_label"), list(project_names.keys()), key="project_selector")
-project_id = project_names[selected_project_name]
-st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
-project = repo.project_by_id(project_id)[0]
-
-# "الدور" - عرض للقراءة بس، مش اختيار: الدور بيتغيّر من صفحة الفريق
-# (ROLE_LABELS نفسها بتتغيّر من هناك)، مش من هنا. من غير شكل سهم/قابلية
-# ضغط عمدًا عشان الشكل ميوهمش إنه dropdown شغال.
-_sb_projects.markdown(
-    '<div class="cf-sb-field"><span class="cf-sb-field__label">%s</span>'
-    '<span class="cf-sb-field__value">%s</span></div>'
-    % (html.escape(tr("role_label")), html.escape(t(accounts.ROLE_LABELS.get(_role, _role)))),
-    unsafe_allow_html=True,
-)
-
+# الشريط ده بيتبني قبل فحص "مفيش مشاريع" تحت (مش بعد اختيار المشروع):
+# يوزر ملوش مشاريع كان بيوقف عند st.stop() من غير زرار خروج ولا مفتاح
+# لغة. ترتيب الظهور مابيتغيّرش - الحاوية دي بتتعمل بعد _sb_projects
+# فبتفضل تحتها، واختيار المشروع بيتكتب جوه _sb_projects.
 # شريط الحساب — رفيع، في الآخر خالص، بعد ما اخترت مشروعك مش قبله. فاصل
 # رفيع واحد قبل القسم ده بس - مفيش فاصل بعده، لأنه آخر حاجة في الشريط
 # الجانبي أصلًا (اللي بعده محتوى المشروع في المنطقة الرئيسية، مش هنا).
@@ -608,6 +587,32 @@ if _lang_selected.lower() != st.session_state["ui_lang"]:
 if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):
     _logout()
     st.rerun()
+
+if not projects:
+    if permissions.can(_role, "create_project"):
+        _sb_projects.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
+    else:
+        _sb_projects.info(t("مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع."))
+    st.stop()
+
+_wanted = st.session_state.pop("_link_project_name", None)
+if _wanted in project_names:
+    st.session_state["project_selector"] = _wanted
+selected_project_name = _sb_projects.selectbox(tr("current_project_label"), list(project_names.keys()), key="project_selector")
+project_id = project_names[selected_project_name]
+st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
+project = repo.project_by_id(project_id)[0]
+
+# "الدور" - عرض للقراءة بس، مش اختيار: الدور بيتغيّر من صفحة الفريق
+# (ROLE_LABELS نفسها بتتغيّر من هناك)، مش من هنا. من غير شكل سهم/قابلية
+# ضغط عمدًا عشان الشكل ميوهمش إنه dropdown شغال.
+_sb_projects.markdown(
+    '<div class="cf-sb-field"><span class="cf-sb-field__label">%s</span>'
+    '<span class="cf-sb-field__value">%s</span></div>'
+    % (html.escape(tr("role_label")), html.escape(t(accounts.ROLE_LABELS.get(_role, _role)))),
+    unsafe_allow_html=True,
+)
+
 
 # جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات — كل التفاصيل
 # التنفيذية دي بقت في تبويب "⚙️ إعدادات المشروع" (views/project_settings.py)
@@ -701,7 +706,7 @@ st.markdown(
 # on_change="rerun": التبويب المفتوح بس هو اللي بيتبني (tab.open)، بدل السبعة في
 # كل ضغطة — ومعرفة التبويب المفتوح بتخلّي شريط العنوان رابط للشاشة دي بالظبط.
 _tabs = st.tabs([tr(k) for k in links.TABS.values()], key="main_tabs", on_change="rerun")
-(tab_import, tab_locations, tab_characters, tab_props, tab_scenes, tab_breakdown,
+(tab_import, tab_locations, tab_characters, tab_actors, tab_props, tab_scenes, tab_breakdown,
  tab_dashboard, tab_settings) = _tabs
 _open_tab = next((slug for slug, tab in zip(links.TABS, _tabs) if tab.open), "import")
 # شريط العنوان = الشاشة الحالية: يتحفظ bookmark أو يتبعت لزميل
@@ -741,6 +746,9 @@ if tab_locations.open:
 if tab_characters.open:
     with tab_characters:
         _render(views.characters, project_id=project_id)
+if tab_actors.open:
+    with tab_actors:
+        _render(views.actors, project_id=project_id, company_id=company_id)
 if tab_props.open:
     with tab_props:
         _render(views.props, project_id=project_id)

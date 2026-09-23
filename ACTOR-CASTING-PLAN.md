@@ -77,21 +77,100 @@ detail.** Nothing in the product today expires or nags about stale data on a
 timer — this would be the first. Needs a decision: does a stale profile just
 get flagged, drop out of search results, or trigger a reminder to the actor?
 
-## Open questions for the discussion (not decided here)
+## Open questions — resolved 2026-09-23 [production]
 
-- Is the talent pool platform-wide (any company can search any registered
-  actor), or does each company keep its own roster, or is visibility
-  opt-in/per-actor?
-- Is "Actor" a formal role in the existing `admin/producer/manager/
-  department/viewer` set (F2), or a separate account type outside the
-  company/project permission model entirely, since an actor may belong to no
-  company until cast?
-- Who can see the sensitive fields (weight, smoking, etc.) — every
-  director/producer on the platform, or only once a conversation/shortlist
-  has started?
-- How is photo staleness enforced, and what happens to a stale profile?
-- Honest scope check: an actor directory + profile system + a matching
-  engine is a substantial subsystem on its own (accounts, profiles, search,
-  freshness tracking, cross-company visibility rules) — closer in size to P8
-  than to a single roadmap line, worth sizing that way before it's scoped as
-  buildable work.
+- **Visibility: platform-wide, visible-by-default, two tiers.** Public tier
+  (name, photo, category, headline credits, links) open to any logged-in
+  producer/director once the actor completes a minimum profile — that's the
+  whole point of a cross-company pool. Sensitive tier (exact measurements,
+  contact, habits, skill detail) gated per-company until that company has
+  shortlisted the actor for a role — protects contact info from blanket
+  exposure while matching how casting actually works today. Actor can toggle
+  "discoverable in search" off entirely, and can opt individual sensitive
+  fields (e.g. skills) to always-public if they want to be found on that
+  basis. Admin-seeded real-person profiles just render sensitive fields
+  "غير متوفر" — no separate claim/verify workflow.
+- **Actor is a platform-level account type, not an F2 company role.** A new
+  `actors` table sits beside `projects`/`companies`, not nested under one
+  company — an actor may belong to zero companies until cast. A join table
+  (e.g. `character_actor_casting`: actor_id, project_id, character_id, role/
+  date) links a specific actor to a specific character within a project once
+  cast, the same shape as the existing scene/shot join tables. The actor's
+  own cross-project dashboard is a query filtered by `actor_id` through that
+  join table — not F2 permission-table membership in every company that's
+  cast them.
+- **Sensitive fields gated to an active casting relationship** (shortlisted
+  or cast), not open to every browsing company. Log who unlocked it — gives
+  the actor visibility into who has their contact info, and costs nothing
+  extra since it's just the shortlist row.
+- **Photo staleness: visual timestamp badge only, v1.** Store
+  `last_photo_update`; show "آخر تحديث: قبل كذا شهر" once >3 months old, to
+  both the actor and browsing producers. Do not drop stale profiles from
+  search — that punishes actors silently. No notification/email nudge in
+  v1 — no notification system exists yet in this product; that's a follow-up
+  once one does, not something to bolt on one-off here.
+- **UI pattern confirmed**: the owner's alphabet-jump list with a thumbnail
+  per row is the right fit — casting is a recognition task, not a
+  data-comparison task, and a producer usually already has a name or short
+  mental list in mind. Reserve a filterable grid for a later, separate
+  AI-matching surface (ties to P7). Default the jump index to Arabic order
+  (أ ب ت ث...) since the product is Arabic-first, with English as the
+  explicit toggle — not English-first with an RTL patch after.
+- Honest scope check (from the original proposal) stands and is now being
+  acted on: this is a substantial subsystem (accounts, profiles, search,
+  freshness tracking, cross-company visibility, a new join table) — being
+  built in phases, starting with the data model + search UI + safe seed
+  data (chief-engineer, in progress 2026-09-23), matching engine (P7 tie-in)
+  deliberately deferred to a later pass.
+
+## 2026-09-23 — owner requested this be built, with a data-safety boundary
+
+Owner asked directly for this ("يا هندسة عاوزين نضيف في الشخصيات كمان اسم
+الممثل وصورته... اعمل بروفايل لابرام سمير وسارة درزاوي وأحمد زاهر... وأي
+ممثل اشتغل مع سترايك ميديا... املى الداتا بتاعة بروفايلاتهم صح... فيه
+مواقع زي elcinema.com تقدر تجمع منها معلومات"), including named real actors
+as seed/demo profiles with full detail (measurements, contact numbers,
+hobbies, smoking, driving/swimming ability) sourced from elcinema.com and
+social media, to demo and "publish" as templates.
+
+**This moves P9 from "proposed" to "being built" — the system itself is
+approved.** But the specific ask to fill named real actors' profiles with
+scraped/inferred phone numbers, body measurements and personal habits is a
+real problem, not a scoping nuance, and the orchestrator is drawing this
+line rather than deferring it:
+
+- **Real, named, identifiable people** (Ibrahim Samir, Sara Aldarzawy, Ahmed
+  Zaher, Ahmed El Rafei, Ahmed Fouad Selim, Hussein Fahmy, Kareem Afifi,
+  Tamer Hosny, and any real Strike Media roster) get **only what a
+  legitimate public source actually states** — real name, public bio,
+  filmography/credits, and a properly licensed/attributed public photo if
+  one is used, pulled from sources like elcinema.com with the source kept.
+  **Fields with no legitimate public source — phone number, body
+  measurements, smoking, driving/swimming ability, hobbies — stay empty and
+  marked "غير متوفر" for these real people, never invented.** A phone number
+  or a personal habit attributed to Tamer Hosny that CimaFast's own agents
+  made up is a defamation and privacy problem the moment anyone sees it,
+  demo or not — this isn't a company's project data, it's a real person's
+  name with fabricated personal claims attached, in a product real
+  companies use. No agent is to invent these fields for a real, named
+  person, under any framing ("just a placeholder," "just a demo").
+- To actually demo the feature's full richness (all fields filled, matching
+  working end to end) without that risk: **build 2-3 clearly fictional demo
+  actors** (invented names, AI-generated or stock photos, full fields —
+  measurements, contact, skills, habits, links) alongside the real actors'
+  public-only profiles. The fictional ones carry the rich data that shows
+  off the system; the real ones stay honest and sparse until an actor
+  actually registers and fills their own profile in, which is the real
+  product mechanism this was designed around in the first place (see "Actor
+  accounts and profiles" above).
+- This also answers one of the open questions above in practice: real actors
+  should **self-register and own their data**, not be admin-seeded with
+  invented personal details. Seed data proves the UI; it should not be the
+  product's answer to "whose data is this."
+
+[production, universal-creative] to resolve the remaining open questions
+(visibility model, formal role vs. separate account type) while
+[chief-engineer] starts on the data model and the alphabet-jump search UI
+described by the owner (type a letter → long filtered name list appears
+immediately with a small thumbnail per row; select → full profile) against
+the safe seed set above.

@@ -110,9 +110,10 @@ def render(project_id):
 
                 render_image_picker(
                     f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
-                    lambda extra, _l=l: image_gen.build_prompt(
-                        _l["name"], _l["base_description"] or "", extra=extra),
+                    lambda shot_size, light, _l=l: image_gen.build_prompt(
+                        _l["name"], _l["base_description"] or "", shot_size=shot_size, light=light),
                     _save_loc_image,
+                    reference_slots=[("bg", "صورة حقيقية للمكان (اختياري)")],
                 )
                 st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
 
@@ -196,10 +197,12 @@ def render(project_id):
 
                         render_image_picker(
                             f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",
-                            lambda extra, _l=l, _v=v: image_gen.build_prompt(
+                            lambda shot_size, light, _l=l, _v=v: image_gen.build_prompt(
                                 _l["name"], _l["base_description"] or "",
-                                _v["variant_name"], _v["description"] or "", extra=extra),
+                                _v["variant_name"], _v["description"] or "",
+                                shot_size=shot_size, light=light),
                             _save_var_image,
+                            reference_slots=[("bg", "صورة حقيقية للمكان (اختياري)")],
                         )
 
                 # فورم إضافة الحالة مقفول لحد ما اليوزر يطلبه — لو مفتوح تحت كل

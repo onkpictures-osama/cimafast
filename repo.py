@@ -12,12 +12,13 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from contextlib import contextmanager
 
 import audit
 import permissions
-from database import _adapt_query, fetch_all, get_connection, run_query, scene_label
+from database import DEFAULT_LOOK_NAME, IntegrityError, _adapt_query, fetch_all, get_connection, run_query, scene_label
 from search import normalize
 
 NIGHT_VALUES = {"ليل"}              # فجر وغروب بيتصوروا في يوم النهار عادةً
@@ -517,19 +518,53 @@ def characters_of_project(*params):
 
 
 def looks_of_character(*params):
-    return fetch_all('SELECT * FROM character_looks WHERE character_id=?', params)
+    # P5: المظهر الأساسي الأول دايمًا، وبعده الباقي بترتيب الإضافة
+    return fetch_all('SELECT * FROM character_looks WHERE character_id=? '
+                     'ORDER BY COALESCE(is_default, 0) DESC, id', params)
 
 
-def add_character(*params):
-    return run_query("""INSERT INTO characters
+def add_character(project_id, name, role_type, species, gender, personality_notes):
+    """شخصية جديدة + مظهرها الأساسي، زي الاستيراد بالظبط (P5).
+
+    من غير المظهر ده الشخصية المضافة باليد مكانتش بتظهر في اختيار شخصيات
+    اللقطة خالص. لو المظهر وقع لأي سبب، database._backfill_default_looks
+    بتكمّله مع أول تشغيل."""
+    char_id = run_query("""INSERT INTO characters
                         (project_id, name, role_type, species, gender, personality_notes)
-                        VALUES (?,?,?,?,?,?)""", params)
+                        VALUES (?,?,?,?,?,?)""",
+                        (project_id, name, role_type, species, gender, personality_notes))
+    run_query("""INSERT INTO character_looks
+                 (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, is_default)
+                 VALUES (?,?,?,?,?,?,?,1)""",
+              (char_id, DEFAULT_LOOK_NAME, '', '', '', '', ''))
+    return char_id
 
 
 def add_character_look(*params):
+    # P5: لو دي أول مظهر للشخصية (مفروض مايحصلش بعد الـ backfill) يبقى هو الأساسي
     return run_query("""INSERT INTO character_looks
-                        (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, reference_image_path)
-                        VALUES (?,?,?,?,?,?,?,?)""", params)
+                        (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, reference_image_path, is_default)
+                        VALUES (?,?,?,?,?,?,?,?,
+                                CASE WHEN EXISTS (SELECT 1 FROM character_looks WHERE character_id=?) THEN 0 ELSE 1 END)""",
+                     tuple(params) + (params[0],))
+
+
+class LastLookError(IntegrityError):
+    """P5: آخر مظهر للشخصية مينفعش يتمسح — من غيره الشخصية بتختفي من اللقطات.
+    فرع من IntegrityError عشان ui.guarded_delete يمسكه ويوري الرسالة دي."""
+    user_message = "ده المظهر الوحيد للشخصية، ومينفعش تفضل من غير مظهر. ضيف مظهر تاني الأول لو عايز تمسحه، أو امسح الشخصية نفسها."
+
+    def __init__(self):
+        super().__init__(self.user_message)
+
+
+def set_default_look(project_id, look_id):
+    """P5: يخلّي المظهر ده هو الأساسي لشخصيته، والباقي يبطل أساسي — جملة واحدة."""
+    return run_query(
+        'UPDATE character_looks SET is_default = CASE WHEN id=? THEN 1 ELSE 0 END '
+        'WHERE character_id = (SELECT character_id FROM character_looks WHERE id=?) '
+        'AND character_id IN (SELECT id FROM characters WHERE project_id=?)',
+        (look_id, look_id, project_id))
 
 
 def delete_character(project_id, *params):
@@ -547,6 +582,11 @@ def update_character(project_id, *params):
                         WHERE id=? AND project_id=?""", params + (project_id,))
 
 
+def set_character_look_image(project_id, *params):
+    return run_query('UPDATE character_looks SET reference_image_path=? WHERE id=? '
+                     'AND character_id IN (SELECT id FROM characters WHERE project_id=?)', params + (project_id,))
+
+
 def update_character_look(project_id, *params):
     return run_query("""UPDATE character_looks SET look_name=?, apparent_age=?, makeup_state=?,
                             hair_state=?, wardrobe_description=?, description=?, reference_image_path=?
@@ -554,9 +594,27 @@ def update_character_look(project_id, *params):
                      params + (project_id,))
 
 
-def delete_character_look(project_id, *params):
-    return run_query('DELETE FROM character_looks WHERE id=? '
-                     'AND character_id IN (SELECT id FROM characters WHERE project_id=?)', params + (project_id,))
+def delete_character_look(project_id, look_id):
+    """P5: آخر مظهر مبيتمسحش (LastLookError). لو المظهر الممسوح كان الأساسي،
+    أقدم مظهر فاضل بياخد مكانه في نفس الـ transaction."""
+    rows = fetch_all(
+        'SELECT cl.character_id, (SELECT COUNT(*) FROM character_looks x WHERE x.character_id = cl.character_id) AS n '
+        'FROM character_looks cl JOIN characters c ON c.id = cl.character_id '
+        'WHERE cl.id=? AND c.project_id=?', (look_id, project_id))
+    if not rows:
+        return None
+    if rows[0]["n"] <= 1:
+        raise LastLookError()
+    character_id = rows[0]["character_id"]
+    with _tx() as ex:
+        ex('DELETE FROM character_looks WHERE id=? '
+           'AND character_id IN (SELECT id FROM characters WHERE project_id=?)', (look_id, project_id))
+        ex('UPDATE character_looks SET is_default = 1 '
+           'WHERE id = (SELECT MIN(id) FROM character_looks WHERE character_id=?) '
+           'AND NOT EXISTS (SELECT 1 FROM character_looks WHERE character_id=? AND COALESCE(is_default, 0) = 1) '
+           'AND character_id IN (SELECT id FROM characters WHERE project_id=?)',
+           (character_id, character_id, project_id))
+    return None
 
 
 def character_names_of_project(*params):
@@ -856,3 +914,205 @@ def prop_ids_in_shot(*params):
 
 def other_shot_with_number(*params):
     return fetch_all('SELECT id FROM shots WHERE scene_id=? AND shot_number=? AND id != ?', params)
+
+
+# --- خزانة المواهب: الممثلين وربطهم بالشخصيات (P9) --------------------------
+# actors عابر للشركات عمدًا (مفيش company_id على الجدول) - production، القرار
+# المحسوم 2026-09-23: مسبح ممثلين واحد كل شركات المنصة بتدوّر فيه، مش جدول
+# تابع لشركة زي باقي الجداول. character_actor_casting هي حلقة الوصل
+# بالمشروع/الشخصية، وهي نفسها صف "الشورت-ليست" اللي بيفتح الحقول الحساسة.
+
+def _now_iso():
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+_ACTOR_COLUMNS = (
+    "full_name", "stage_name", "category", "gender", "bio", "credits_text",
+    "height_cm", "weight_kg", "chest_cm", "waist_cm", "hips_cm", "shoe_size_eu",
+    "hair_color", "eye_color", "contact_phone", "contact_email", "agent_name",
+    "agent_contact", "hobbies", "drives_car", "drives_motorcycle", "swims", "smokes",
+    "skills_notes", "link_showreel", "link_instagram", "link_other", "discoverable",
+    "always_public_fields",
+)
+
+
+def actors_directory():
+    """كل الممثلين الظاهرين في البحث (discoverable) - القايمة اللي شاشة البحث
+    بالحرف بتحمّلها مرة واحدة وتفلترها في الذاكرة (مفيش استعلام لكل حرف).
+
+    مفيش شرط صورة أو وسيلة تواصل عشان يظهر: الممثل/ة الحقيقي المضاف من
+    مصدر عام بيبقى من غير تواصل بالقصد (ACTOR-CASTING-PLAN)، وممثل/ة اتضاف
+    من غير صورة كان بيختفي من القايمة وكأنه اتمسح. الصورة الناقصة بتبان
+    أيقونة + تنبيه "الصورة محتاجة تحديث" بدل ما البروفايل يستخبى."""
+    return fetch_all("""
+        SELECT id, full_name, stage_name, category, photo_path, photo_updated_at, is_demo
+        FROM actors
+        WHERE discoverable=1 AND full_name IS NOT NULL AND full_name != ''
+        ORDER BY full_name
+    """)
+
+
+def all_actors():
+    """كل الممثلين من غير فلترة ظهور - للسكريبتات والاختبارات."""
+    return fetch_all("SELECT id, full_name, stage_name, photo_path, discoverable, is_demo "
+                     "FROM actors ORDER BY full_name")
+
+
+def actors_owned_by_company(company_id):
+    """بروفايلات الشركة دي أضافتها - منهم اللي مخفي من البحث، عشان
+    "مش ظاهر في البحث" ميبقاش معناه إن الشركة نفسها مش لاقياه."""
+    return fetch_all("SELECT id, full_name, stage_name, category, photo_path, photo_updated_at, is_demo "
+                     "FROM actors WHERE owner_company_id=? AND discoverable=0 ORDER BY full_name",
+                     (company_id,))
+
+
+def actor_by_id(*params):
+    rows = fetch_all("SELECT * FROM actors WHERE id=?", params)
+    return rows[0] if rows else None
+
+
+def can_edit_actor(actor, company_id, role):
+    """التعديل للشركة اللي أضافت البروفايل (بصلاحية تعديل) أو لمشغّل المنصة.
+    المسبح عابر للشركات في القراءة بس، مش في الكتابة."""
+    if not actor:
+        return False
+    if role == "operator":
+        return True
+    return (actor.get("owner_company_id") is not None
+            and actor["owner_company_id"] == company_id
+            and permissions.can(role, "edit"))
+
+
+_ACTOR_FLAG_DEFAULTS = {"drives_car": 0, "drives_motorcycle": 0, "swims": 0, "smokes": 0, "discoverable": 1}
+
+
+def _actor_params(values):
+    """قيم الأعمدة بالترتيب. الأعلام (NOT NULL) بتاخد افتراضيها لو ناقصة."""
+    out = []
+    for c in _ACTOR_COLUMNS:
+        v = values.get(c)
+        if c in _ACTOR_FLAG_DEFAULTS:
+            v = _ACTOR_FLAG_DEFAULTS[c] if v is None else int(bool(v))
+        out.append(v)
+    return tuple(out)
+
+
+def add_actor(values, owner_company_id=None, created_by=None, is_demo=0):
+    """values: dict بأعمدة _ACTOR_COLUMNS (الناقص بيتحط NULL). الصورة
+    بتتحط بعدين بـ set_actor_photo عشان تاريخها يتسجل معاها."""
+    now = _now_iso()
+    cols = list(_ACTOR_COLUMNS) + ["is_demo", "owner_company_id", "created_by", "created_at", "updated_at"]
+    params = _actor_params(values) + (int(is_demo), owner_company_id, created_by, now, now)
+    return run_query(f"INSERT INTO actors ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", params)
+
+
+def update_actor(actor_id, values, company_id, role):
+    """نفس أعمدة add_actor. الفحص جوه الجملة نفسها كمان (مش في الشاشة بس):
+    شركة تانية مينفعش تعدّل بروفايل مش بتاعها حتى لو نادت الدالة مباشرة."""
+    sets = ", ".join(f"{c}=?" for c in _ACTOR_COLUMNS)
+    params = _actor_params(values) + (
+        _now_iso(), actor_id, 1 if role == "operator" else 0, company_id)
+    return run_query(f"UPDATE actors SET {sets}, updated_at=? WHERE id=? "
+                     "AND (?=1 OR owner_company_id=?)", params)
+
+
+def set_actor_photo(actor_id, photo_path, updated_at=None):
+    """بيحدّث صورة الممثل/ة وتاريخ آخر تحديث للصورة مع بعض - ده الأساس اللي
+    تنبيه "الصورة قديمة" (أكتر من 3 شهور) بيتحسب عليه."""
+    now = _now_iso()
+    return run_query("UPDATE actors SET photo_path=?, photo_updated_at=?, updated_at=? WHERE id=?",
+                     (photo_path, updated_at or now, now, actor_id))
+
+
+def actor_unlocked_for_company(actor_id, company_id):
+    """True لو الشركة دي رشّحت أو تعاقدت مع الممثل/ة ده في أي مشروع من
+    مشاريعها، أو هي اللي أضافت البروفايل - وقتها بس الحقول الحساسة بتتعرض
+    لمستخدمينها (production، القرار المحسوم 2026-09-23). صف الكاستينج نفسه
+    بيسجل مين فتحها وإمتى (created_by/created_at)."""
+    rows = fetch_all("""
+        SELECT 1 FROM character_actor_casting cac
+        JOIN projects p ON p.id = cac.project_id
+        WHERE cac.actor_id=? AND p.company_id=? AND cac.status IN ('shortlisted', 'cast')
+        UNION ALL
+        SELECT 1 FROM actors WHERE id=? AND owner_company_id=?
+        LIMIT 1
+    """, (actor_id, company_id, actor_id, company_id))
+    return bool(rows)
+
+
+class AlreadyCastError(IntegrityError):
+    """الشخصية دي متعاقد لها ممثل/ة تاني - لازم يتشال الأول."""
+    user_message = "الشخصية دي متعاقد لها ممثل/ة تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره."
+
+    def __init__(self):
+        super().__init__(self.user_message)
+
+
+def cast_actor(actor_id, project_id, character_id, status, role_note, created_by):
+    """بيرشّح (shortlisted) أو بيتعاقد (cast) مع ممثل/ة لشخصية في مشروع.
+
+    صف واحد لكل (ممثل، شخصية): الترشيح اللي بعده تعاقد بيتحدّث مكانه بدل
+    ما يتكرر. الشخصية لازم تبقى تبع المشروع فعلًا (فحص جوه الجملة)، وتعاقد
+    شخصية متعاقد لها حد تاني بيترفض (AlreadyCastError)."""
+    if status not in ("shortlisted", "cast"):
+        raise ValueError(status)
+    if status == "cast":
+        other = fetch_all("SELECT 1 FROM character_actor_casting WHERE character_id=? AND project_id=? "
+                          "AND status='cast' AND actor_id != ?", (character_id, project_id, actor_id))
+        if other:
+            raise AlreadyCastError()
+    now = _now_iso()
+    cast_at = now if status == "cast" else None
+    existing = fetch_all("SELECT id, status FROM character_actor_casting "
+                         "WHERE actor_id=? AND project_id=? AND character_id=?",
+                         (actor_id, project_id, character_id))
+    if existing:
+        # تعاقد مبيرجعش ترشيح لو حد داس "رشّح" تاني بالغلط
+        if existing[0]["status"] == "cast" and status == "shortlisted":
+            return existing[0]["id"]
+        run_query("UPDATE character_actor_casting SET status=?, role_note=COALESCE(NULLIF(?, ''), role_note), "
+                  "cast_at=? WHERE id=? AND project_id=?",
+                  (status, role_note, cast_at, existing[0]["id"], project_id))
+        return existing[0]["id"]
+    return run_query(
+        """INSERT INTO character_actor_casting
+            (actor_id, project_id, character_id, status, role_note, created_by, created_at, cast_at)
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?
+           WHERE EXISTS (SELECT 1 FROM characters WHERE id=? AND project_id=?)""",
+        (actor_id, project_id, character_id, status, role_note, created_by, now, cast_at,
+         character_id, project_id))
+
+
+def remove_casting(project_id, casting_id):
+    """بيشيل ترشيح/تعاقد - جوه المشروع ده بس."""
+    return run_query("DELETE FROM character_actor_casting WHERE id=? AND project_id=?",
+                     (casting_id, project_id))
+
+
+def castings_of_actor_in_project(actor_id, project_id):
+    return fetch_all("""
+        SELECT cac.id, cac.status, cac.role_note, cac.created_by, cac.created_at, c.name AS character_name
+        FROM character_actor_casting cac
+        JOIN characters c ON c.id = cac.character_id
+        WHERE cac.actor_id=? AND cac.project_id=?
+        ORDER BY c.name
+    """, (actor_id, project_id))
+
+
+def casting_for_character(*params):
+    """الممثل/ة المتعاقد للشخصية لو فيه، وإلا آخر ترشيح - أو None."""
+    rows = fetch_all("""
+        SELECT cac.id AS casting_id, cac.status, cac.actor_id,
+               a.full_name, a.stage_name, a.photo_path
+        FROM character_actor_casting cac
+        JOIN actors a ON a.id = cac.actor_id
+        WHERE cac.character_id=?
+        ORDER BY CASE cac.status WHEN 'cast' THEN 0 ELSE 1 END, cac.created_at DESC
+    """, params)
+    return rows[0] if rows else None
+
+
+def shortlist_count_for_character(*params):
+    rows = fetch_all("SELECT COUNT(*) AS n FROM character_actor_casting "
+                     "WHERE character_id=? AND status='shortlisted'", params)
+    return rows[0]["n"] if rows else 0

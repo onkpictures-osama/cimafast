@@ -13,6 +13,7 @@ TABS = {
     "import": "tab_import",
     "locations": "tab_locations",
     "characters": "tab_characters",
+    "actors": "tab_actors",
     "props": "tab_props",
     "scenes": "tab_scenes",
     "shots": "tab_breakdown",

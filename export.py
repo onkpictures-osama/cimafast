@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 
 import docx
-from docx.shared import Pt, Cm
+from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -27,9 +27,57 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as pdfcanvas
 
-NAVY = "12203D"
-YELLOW = "E8B923"
-WHITE = "FFFFFF"
+from theme.brand import MASTER_ASPECT, lockup_master_path
+from theme.tokens import BRAND
+
+# --------------------------------------------------------------------------
+# ألوان التقارير — بتتقرا من بالتة البراند نفسها (‎theme/tokens.py‎) مش من
+# قيم مكتوبة بالإيد قريبة منها. الملف ده اتكتب قبل ما نظام الهوية يتعمل،
+# فكان فيه كحلي وأصفر بتوعه هو (12203D / E8B923) قريبين من الرسمي بس مش
+# هو. دلوقتي مصدر واحد للحقيقة: الواجهة والورق بيشربوا من نفس البئر.
+#
+# قاعدة الدليل الذهبية محفوظة هنا برضو: الحروف فوق الحقل الأصفر دايمًا
+# Ink (9.67:1) مش كحلي، والأبيض فوق Navy (12.31:1).
+#
+# openpyxl عايز الهكس من غير "#"، و reportlab عايزه بيها — فبنخزّن الصيغة
+# القصيرة وبنضيف "#" عند الرسم.
+# --------------------------------------------------------------------------
+
+
+def _hex6(token):
+    """لون براند بصيغة ‎RRGGBB‎ (الصيغة اللي openpyxl بيفهمها)."""
+    return BRAND[token].lstrip("#").upper()
+
+
+NAVY = _hex6("navy")        # #212F70 — شريط أسماء الأعمدة، الحروف البارزة
+INK = _hex6("ink")          # #1B254B — الحروف فوق الحقل الأصفر ونص الجدول
+YELLOW = _hex6("yellow")    # #FECA05 — بانر العنوان (الحقل الأصفر)
+WHITE = _hex6("white")
+CREAM = _hex6("cream")      # #F3F3ED — الصف المظلل في الجدول المتبدّل
+MIST = _hex6("mist")        # #D9D9D4 — حدود الخانات والخطوط الفاصلة
+
+# python-docx بياخد ‎RGBColor‎ مش سترنج، فبنحوّل مرة واحدة هنا
+_WORD_INK = RGBColor.from_string(INK)
+_WORD_NAVY = RGBColor.from_string(NAVY)
+_WORD_WHITE = RGBColor.from_string(WHITE)
+
+# --------------------------------------------------------------------------
+# اللوجو على الورق — نفس ماستر الـ lockup الرسمي اللي الواجهة بتستخدمه، من
+# ‎static/brand/‎ زي ما هو. الدليل (ص 06 · Logo rules) بيمنع إعادة التلوين
+# أو التنميط أو القص: إحنا بنغيّر المقاس بس وبنختار النسخة حسب السطح —
+#   ورق أبيض أو الحقل الأصفر  →  الشخصية كحلي  →  النسخة "light"
+#   شريط كحلي/غامق            →  الشخصية صفرا  →  النسخة "dark"
+# --------------------------------------------------------------------------
+
+
+def _logo_file(surface="light"):
+    """مسار ماستر الـ lockup، أو ‎None‎ لو الأصل مش موجود.
+
+    التقرير نفسه أهم من اللوجو: لو الأصل ناقص لأي سبب بنكمّل التصدير من
+    غيره بدل ما شغل المستخدم كله يقع على استيراد صورة.
+    """
+    path = lockup_master_path(surface)
+    return path if os.path.exists(path) else None
 
 COLUMNS = [
     ("scene_number", "مشهد", 8),
@@ -142,7 +190,38 @@ _BOLD_NAME_KEYS = {
     "name", "location", "decor", "characters", "main_characters",
     "secondary_characters", "locations",
 }
-_THIN_BORDER = Border(*(Side(style="thin", color="BFBFBF") for _ in range(4)))
+_THIN_BORDER = Border(*(Side(style="thin", color=MIST) for _ in range(4)))
+
+# ارتفاع اللوجو جوه البانر الأصفر بالبكسل — البانر نفسه 60px (26+20+14)،
+# فبنسيب هامش بسيط فوق وتحت بدل ما يلزق في حرف الجدول
+_EXCEL_LOGO_H_PX = 46
+
+
+def _place_excel_logo(ws):
+    """بيحط ماستر اللوجو فوق البانر الأصفر في أول الورقة.
+
+    الورقة ‎rightToLeft‎، يعني إكسل بيقلب الشبكة نفسها وعمود A بيبقى في
+    أقصى اليمين — فالمرساة ‎A1‎ بتوقّع اللوجو في ركن البداية بالنسبة للقارئ
+    العربي، بعيد عن العنوان المتوسّط. والنسخة "light" لأن الحقل الأصفر
+    بياخد الشخصية الكحلي (الدليل ص 06).
+
+    الصورة عائمة فوق الخانات المدموجة، فمش بتزق أي صف ولا بتكسر تنسيق
+    الجدول تحتها.
+    """
+    path = _logo_file("light")
+    if not path:
+        return
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+        img = XLImage(path)
+    except Exception:
+        # openpyxl بيحتاج Pillow عشان يقرا أبعاد الصورة — لو مش متسطّب
+        # بنكمّل من غير لوجو بدل ما التصدير كله يفشل
+        return
+    img.height = _EXCEL_LOGO_H_PX
+    img.width = round(_EXCEL_LOGO_H_PX * MASTER_ASPECT)
+    img.anchor = "A1"
+    ws.add_image(img)
 
 
 def _project_type_name_line(project):
@@ -170,9 +249,11 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
 
     header_fill = PatternFill(start_color=NAVY, end_color=NAVY, fill_type="solid")
     header_font = Font(color=WHITE, bold=True, size=10)
-    title_font = Font(color=NAVY, bold=True, size=16)
-    subtitle_font = Font(color=NAVY, bold=True, size=12)
-    version_font = Font(color=NAVY, size=8, italic=True)
+    # فوق الحقل الأصفر الحروف Ink مش Navy — ده نص الدليل (ص 05)، وبيدي
+    # 9.67:1 بدل 7.4:1
+    title_font = Font(color=INK, bold=True, size=16)
+    subtitle_font = Font(color=INK, bold=True, size=12)
+    version_font = Font(color=INK, size=8, italic=True)
     title_fill = PatternFill(start_color=YELLOW, end_color=YELLOW, fill_type="solid")
 
     n_cols = len(columns)
@@ -197,6 +278,8 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
     version_cell.fill = title_fill
     version_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[3].height = 14
+
+    _place_excel_logo(ws)
 
     header_row = 5
     for col_idx, (key, label, width) in enumerate(columns, start=1):
@@ -237,12 +320,12 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
                 cell.font = Font(bold=True)
             else:
                 cell.alignment = Alignment(horizontal="right", vertical="top", wrap_text=True)
-            # صفوف متبدلة الألوان (رصاصي فاتح / أبيض) عشان العين تتابع السطر
-            # بسهولة في الأوراق الطويلة
+            # صفوف متبدلة الألوان (كريم البراند / أبيض) عشان العين تتابع
+            # السطر بسهولة في الأوراق الطويلة
             if r % 2 == 0:
-                cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+                cell.fill = PatternFill(start_color=CREAM, end_color=CREAM, fill_type="solid")
             else:
-                cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+                cell.fill = PatternFill(start_color=WHITE, end_color=WHITE, fill_type="solid")
 
     buf = BytesIO()
     wb.save(buf)
@@ -485,6 +568,44 @@ def _set_rtl_center(paragraph):
     pPr.append(bidi)
 
 
+def _shade_cell(cell, hex6):
+    """تظليل خانة في وورد. python-docx مفيهوش API للتظليل، فبنحقن عنصر
+    ‎w:shd‎ في خصائص الخانة بنفسنا زي ما بنعمل مع ‎w:bidi‎."""
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), hex6)
+    cell._tc.get_or_add_tcPr().append(shd)
+
+
+def _brand_table_borders(table, hex6):
+    """حدود الجدول بلون البراند بدل الأسود اللي ‎Table Grid‎ بيجي بيه.
+
+    نفس السُمك (نص نقطة = 4 ثُمن النقطة في وحدة وورد) في الست نواحي عشان
+    الشبكة تبقى موحّدة زي جدول الإكسل بالظبط."""
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        el = OxmlElement("w:%s" % edge)
+        el.set(qn("w:val"), "single")
+        el.set(qn("w:sz"), "4")
+        el.set(qn("w:space"), "0")
+        el.set(qn("w:color"), hex6)
+        borders.append(el)
+    table._tbl.tblPr.append(borders)
+
+
+def _add_word_logo(document):
+    """ماستر اللوجو متوسّط فوق عنوان المستند، على الورق الأبيض — يعني
+    النسخة "light" (الشخصية كحلي). الارتفاع 1.1 سم، والعرض بيتحسب من نسبة
+    الماستر لوحده عشان ميتمطّش."""
+    path = _logo_file("light")
+    if not path:
+        return
+    logo_p = document.add_paragraph()
+    logo_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    logo_p.add_run().add_picture(path, height=Cm(1.1))
+
+
 def build_shot_list_word(project, project_id, fetch_all):
     rows = _fetch_breakdown_rows(project_id, fetch_all)
 
@@ -497,47 +618,64 @@ def build_shot_list_word(project, project_id, fetch_all):
     section.top_margin = Cm(1)
     section.bottom_margin = Cm(1)
 
+    _add_word_logo(document)
+
     title = document.add_paragraph()
     _set_rtl_center(title)
-    run = title.add_run("🎬 تفريغ اللقطات (Shooting List)")
+    # اتشال الإيموجي 🎬: اللوجو الرسمي بقى فوق العنوان، والدليل بيمنع أي
+    # علامة بديلة تقف جنبه
+    run = title.add_run("تفريغ اللقطات (Shooting List)")
     run.bold = True
     run.font.size = Pt(20)
+    run.font.color.rgb = _WORD_INK
 
     subtitle = document.add_paragraph()
     _set_rtl_center(subtitle)
     sub_run = subtitle.add_run(_project_type_name_line(project))
     sub_run.bold = True
     sub_run.font.size = Pt(13)
+    sub_run.font.color.rgb = _WORD_INK
 
     version_p = document.add_paragraph()
     _set_rtl_center(version_p)
     v_run = version_p.add_run(_version_line(project))
     v_run.italic = True
     v_run.font.size = Pt(8)
+    v_run.font.color.rgb = _WORD_NAVY
 
     document.add_paragraph()
 
     headers = [label for _key, label, _width in COLUMNS]
     table = document.add_table(rows=1, cols=len(headers))
-    table.style = "Light Grid Accent 1"
+    # كان ‎Light Grid Accent 1‎ — ستايل أوفيس الجاهز بلونه الأزرق الفاتح،
+    # وده كان بيخلي نسخة الوورد هي التقرير الوحيد اللي مش بلون البراند جنب
+    # الإكسل والـ PDF. ‎Table Grid‎ ستايل محايد، والألوان بنحطها بنفسنا من
+    # نفس التوكنز: شريط كحلي بحروف بيضا، وصفوف متبدلة بالكريم.
+    table.style = "Table Grid"
+    _brand_table_borders(table, MIST)
     for i, label in enumerate(headers):
         cell = table.rows[0].cells[i]
         cell.text = label
+        _shade_cell(cell, NAVY)
         for p in cell.paragraphs:
             _set_rtl(p)
             for r in p.runs:
                 r.bold = True
+                r.font.color.rgb = _WORD_WHITE
 
-    for row in rows:
+    for row_idx, row in enumerate(rows):
         cells = table.add_row().cells
         for i, (key, _label, _width) in enumerate(COLUMNS):
             value = row.get(key, "")
             cells[i].text = str(value) if value != "" else "—"
+            if row_idx % 2 == 1:
+                _shade_cell(cells[i], CREAM)
             is_bold_cell = key in {"scene_number", "shot_number"} | _DIALOGUE_KEYS
             for p in cells[i].paragraphs:
                 _set_rtl(p)
-                if is_bold_cell:
-                    for r in p.runs:
+                for r in p.runs:
+                    r.font.color.rgb = _WORD_INK
+                    if is_bold_cell:
                         r.bold = True
 
     buf = BytesIO()
@@ -671,23 +809,40 @@ def build_shot_list_pdf(project, project_id, fetch_all):
     row_v_pad = 4
     header_height = 26
     title_block_height = 56
+    logo_height = 30  # نقطة — جوه بلوك العنوان، مش بيزوّده
 
     buf = BytesIO()
     c = pdfcanvas.Canvas(buf, pagesize=(page_w, page_h))
 
+    def draw_logo():
+        """اللوجو في بلوك العنوان، ناحية اليمين — بداية القراءة بالعربي.
+        reportlab بياخد مسار الملف على طول (مش محتاج ‎data:‎ URI زي
+        المتصفح)، و‎mask="auto"‎ بيخلي الشفافية في الـ PNG تفضل شفافة بدل
+        ما تطلع مربع أسود."""
+        path = _logo_file("light")   # الصفحة بيضا → الشخصية كحلي
+        if not path:
+            return
+        w = logo_height * MASTER_ASPECT
+        c.drawImage(
+            path, page_w - margin - w, page_h - margin - logo_height - 6,
+            width=w, height=logo_height, mask="auto",
+        )
+
     def draw_title_block():
-        c.setFillColor(colors.HexColor(f"#{NAVY}"))
+        draw_logo()
+        c.setFillColor(colors.HexColor(f"#{INK}"))
         c.setFont(bold_font_name, 15)
         c.drawCentredString(page_w / 2, page_h - margin - 14, _ar("تفريغ اللقطات (Shooting List)"))
         c.setFont(bold_font_name, 10.5)
         c.drawCentredString(page_w / 2, page_h - margin - 29, _ar(_project_type_name_line(project)))
+        c.setFillColor(colors.HexColor(f"#{NAVY}"))
         c.setFont(font_name, 7.5)
         c.drawCentredString(page_w / 2, page_h - margin - 42, _ar(_version_line(project)))
 
     def draw_header_row(top_y):
         c.setFillColor(colors.HexColor(f"#{NAVY}"))
         c.rect(margin, top_y - header_height, usable_w, header_height, stroke=0, fill=1)
-        c.setFillColor(colors.white)
+        c.setFillColor(colors.HexColor(f"#{WHITE}"))
         c.setFont(bold_font_name, header_font_size)
         for i, (_key, label, _w) in enumerate(COLUMNS):
             # اسم العمود بيتلف بس على حدود الكلمات (كل كلمة في سطر لو
@@ -721,10 +876,12 @@ def build_shot_list_pdf(project, project_id, fetch_all):
             y = new_page(with_title=False)
 
         if row_idx % 2 == 1:
-            c.setFillColor(colors.HexColor("#F2F2F2"))
+            c.setFillColor(colors.HexColor(f"#{CREAM}"))
             c.rect(margin, y - row_height, usable_w, row_height, stroke=0, fill=1)
 
-        c.setFillColor(colors.black)
+        # نص الجدول Ink مش أسود خام — 14.86:1 على الأبيض، وبيخلي الورقة
+        # كلها في نفس عيلة اللون بتاعة البراند
+        c.setFillColor(colors.HexColor(f"#{INK}"))
         for i, lines in enumerate(cell_lines):
             key = col_keys[i]
             is_numeric = key in numeric_keys
@@ -742,7 +899,7 @@ def build_shot_list_pdf(project, project_id, fetch_all):
                         c.drawRightString(col_right_edges[i] - 3, ly, line)
                 ly -= line_height
 
-        c.setStrokeColor(colors.HexColor("#CCCCCC"))
+        c.setStrokeColor(colors.HexColor(f"#{MIST}"))
         c.line(margin, y - row_height, page_w - margin, y - row_height)
         y -= row_height
 

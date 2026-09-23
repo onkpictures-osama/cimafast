@@ -1,0 +1,473 @@
+"""تبويب خزانة المواهب (P9 - Talent Vault): بحث كاستينج بالحرف الأول + بروفايل
+كل ممثل/ة + ترشيح/تعاقد لشخصيات المشروع المفتوح.
+
+عابر للشركات عمدًا (production، القرار المحسوم 2026-09-23): القايمة والبروفايل
+العام هنا مش مفلترين بشركة المستخدم الحالي - مسبح ممثلين واحد كل شركات المنصة
+بتدوّر فيه. الحقول الحساسة (مقاسات، تواصل، عادات) بس هي اللي بتتفلتر حسب
+الشركة (رشّحت/تعاقدت مع الممثل/ة ده قبل كده ولا لأ) - repo.actor_unlocked_for_company.
+التعديل للشركة اللي أضافت البروفايل أو مشغّل المنصة بس - repo.can_edit_actor.
+
+حدود البيانات (ACTOR-CASTING-PLAN.md، محسومة): الممثلين الحقيقيين المعروفين
+بياخدوا بس اللي مصدر عام موثوق بيقوله (اسم، بيو، أعمال). رقم تليفون، مقاسات،
+عادات شخصية لشخص حقيقي عمرها ما بتتخترع - بتفضل فاضية وتتعرض "غير متوفر".
+"""
+
+import datetime as dt
+
+import streamlit as st
+
+import permissions
+import repo
+from database import (ACTOR_CASTING_STATUS_LABELS, ACTOR_CATEGORY_OPTIONS,
+                      ACTOR_SENSITIVE_FIELDS, FIELD_HELP, GENDER_OPTIONS)
+from i18n import t, tr
+from search import normalize
+from ui import IMAGE_TYPES, guarded_delete, image_abs_path, ltr, multiselect, save_uploaded_image
+
+# قفز بالحرف الأول: عربي هو الافتراضي (المنتج عربي أولًا)، إنجليزي بس لما
+# الواجهة إنجليزي - مش لاتيني وبعدين ترقيع RTL (production، 2026-09-23).
+_AR_ALPHABET = list("أبتثجحخدذرزسشصضطظعغفقكلمنهوي")
+_EN_ALPHABET = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+_STALE_DAYS = 90  # تقريبًا 3 شهور - مهلة تحديث الصورة اللي المالك طلبها
+
+_SELECTED_KEY = "_cf_selected_actor_id"
+
+# أسماء الحقول الحساسة للعرض (البروفايل، واختيار "ظاهر للكل")
+_SENSITIVE_LABELS = {
+    "height_cm": "الطول", "weight_kg": "الوزن", "chest_cm": "محيط الصدر",
+    "waist_cm": "محيط الخصر", "hips_cm": "محيط الورك", "shoe_size_eu": "مقاس الحذاء",
+    "hair_color": "لون الشعر", "eye_color": "لون العين", "contact_phone": "رقم التواصل",
+    "contact_email": "البريد الإلكتروني", "agent_name": "اسم الوكيل/ة",
+    "agent_contact": "وسيلة تواصل الوكيل/ة", "hobbies": "الهوايات",
+    "drives_car": "يقود عربية", "drives_motorcycle": "يقود موتوسيكل", "swims": "يعرف يعوم",
+    "smokes": "مدخّن/ة", "skills_notes": "مهارات إضافية",
+}
+
+
+def _display_name(actor):
+    return actor.get("stage_name") or actor["full_name"]
+
+
+def _matches(query, actor):
+    """فلترة فورية بأول الاسم (الشهرة أو الحقيقي) - في الذاكرة، من غير نداء
+    لقاعدة البيانات في كل ضغطة. normalize بيوحّد أ/إ/آ/ا والتشكيل."""
+    nq = normalize(query)
+    if not nq:
+        return True
+    return any(normalize(n).startswith(nq)
+               for n in (actor.get("stage_name"), actor.get("full_name")) if n)
+
+
+def _photo_age_days(photo_updated_at):
+    """عدد الأيام من آخر تحديث للصورة، أو None لو مفيش تاريخ."""
+    if not photo_updated_at:
+        return None
+    try:
+        updated = dt.datetime.fromisoformat(str(photo_updated_at))
+    except ValueError:
+        return None
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=dt.timezone.utc)
+    return (dt.datetime.now(dt.timezone.utc) - updated).days
+
+
+def _is_stale(actor):
+    if not actor.get("photo_path"):
+        return True
+    age = _photo_age_days(actor.get("photo_updated_at"))
+    return age is None or age > _STALE_DAYS
+
+
+def _can_write():
+    role = permissions.current_role()
+    return role is None or permissions.can(role, "edit")
+
+
+def render(project_id, company_id):
+    st.subheader(tr("tab_actors"))
+    st.caption(tr("sub_actors"))
+
+    selected_id = st.session_state.get(_SELECTED_KEY)
+    if selected_id:
+        _render_profile(selected_id, project_id, company_id)
+        return
+
+    _render_search_and_list(company_id)
+    st.divider()
+    _render_add_actor_form(company_id)
+
+
+# ---------- الفورم (إضافة وتعديل نفس الحقول) ----------
+
+def _num(label, value, max_value, help_text=None, key=None):
+    return st.number_input(t(label), min_value=0, max_value=max_value,
+                           value=int(value) if value not in (None, "") else None,
+                           step=1, help=help_text, key=key)
+
+
+def _actor_fields(prefix, a=None):
+    """الحقول نفسها للإضافة والتعديل. بيرجّع (values dict، الصورة المرفوعة).
+    لازم يتنده جوه st.form."""
+    a = a or {}
+    c1, c2 = st.columns(2)
+    with c1:
+        name = st.text_input(t("الاسم الحقيقي"), value=a.get("full_name") or "",
+                             placeholder=t("مثال: أحمد محمد"), key=f"{prefix}_name")
+        cat_opts = ACTOR_CATEGORY_OPTIONS
+        category = st.selectbox(t("التصنيف"), cat_opts, format_func=t, help=FIELD_HELP["actor_category"],
+                                index=cat_opts.index(a["category"]) if a.get("category") in cat_opts else 0,
+                                key=f"{prefix}_cat")
+        bio = st.text_area(t("نبذة تعريفية (بيو)"), value=a.get("bio") or "", key=f"{prefix}_bio")
+    with c2:
+        stage = st.text_input(t("اسم الشهرة (اختياري)"), value=a.get("stage_name") or "",
+                              placeholder=t("لو مختلف عن الاسم الحقيقي"), key=f"{prefix}_stage")
+        gender = st.selectbox(t("الجنس"), GENDER_OPTIONS, format_func=t,
+                              index=GENDER_OPTIONS.index(a["gender"]) if a.get("gender") in GENDER_OPTIONS else 0,
+                              key=f"{prefix}_gender")
+        credits = st.text_area(t("أعمال سابقة (سطر لكل عمل)"), value=a.get("credits_text") or "",
+                               placeholder=t("مثال: فيلم كذا (2023) - دور كذا"), key=f"{prefix}_credits")
+
+    st.markdown(f"**{t('المقاسات (لإدارة الأزياء)')}**")
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        height = _num("الطول (سم)", a.get("height_cm"), 250, FIELD_HELP["actor_measurements"], f"{prefix}_h")
+        chest = _num("محيط الصدر (سم)", a.get("chest_cm"), 200, key=f"{prefix}_chest")
+    with m2:
+        weight = _num("الوزن (كجم)", a.get("weight_kg"), 250, key=f"{prefix}_w")
+        waist = _num("محيط الخصر (سم)", a.get("waist_cm"), 200, key=f"{prefix}_waist")
+    with m3:
+        shoe = _num("مقاس الحذاء (أوروبي)", a.get("shoe_size_eu"), 60, key=f"{prefix}_shoe")
+        hips = _num("محيط الورك (سم)", a.get("hips_cm"), 200, key=f"{prefix}_hips")
+    hc1, hc2 = st.columns(2)
+    hair = hc1.text_input(t("لون الشعر"), value=a.get("hair_color") or "", key=f"{prefix}_hair")
+    eyes = hc2.text_input(t("لون العين"), value=a.get("eye_color") or "", key=f"{prefix}_eyes")
+
+    st.markdown(f"**{t('التواصل')}**")
+    tc1, tc2 = st.columns(2)
+    phone = tc1.text_input(t("رقم التواصل"), value=a.get("contact_phone") or "",
+                           help=FIELD_HELP["actor_sensitive_gate"], key=f"{prefix}_phone")
+    email = tc2.text_input(t("البريد الإلكتروني"), value=a.get("contact_email") or "", key=f"{prefix}_email")
+    agent = tc1.text_input(t("اسم الوكيل/ة (اختياري)"), value=a.get("agent_name") or "", key=f"{prefix}_agent")
+    agent_contact = tc2.text_input(t("وسيلة تواصل الوكيل/ة"), value=a.get("agent_contact") or "",
+                                   key=f"{prefix}_agent_c")
+
+    st.markdown(f"**{t('مهارات الكاستينج')}**")
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    car = sc1.checkbox(t("يقود عربية"), value=bool(a.get("drives_car")), key=f"{prefix}_car")
+    moto = sc2.checkbox(t("يقود موتوسيكل"), value=bool(a.get("drives_motorcycle")), key=f"{prefix}_moto")
+    swims = sc3.checkbox(t("يعرف يعوم"), value=bool(a.get("swims")), key=f"{prefix}_swim")
+    smokes = sc4.checkbox(t("مدخّن/ة"), value=bool(a.get("smokes")), key=f"{prefix}_smoke")
+    hk1, hk2 = st.columns(2)
+    hobbies = hk1.text_area(t("الهوايات"), value=a.get("hobbies") or "", key=f"{prefix}_hobbies")
+    skills = hk2.text_area(t("مهارات إضافية"), value=a.get("skills_notes") or "", key=f"{prefix}_skills")
+
+    st.markdown(f"**{t('روابط')}**")
+    lc1, lc2 = st.columns(2)
+    showreel = lc1.text_input(t("رابط الشوريل"), value=a.get("link_showreel") or "", key=f"{prefix}_reel")
+    insta = lc2.text_input(t("رابط إنستجرام أو سوشيال ميديا"), value=a.get("link_instagram") or "",
+                           key=f"{prefix}_insta")
+    other = st.text_area(t("روابط تانية (سطر لكل رابط)"), value=a.get("link_other") or "", key=f"{prefix}_other")
+
+    st.markdown(f"**{t('الخصوصية')}**")
+    discoverable = st.checkbox(t("ظاهر في بحث الكاستينج؟"), value=bool(a.get("discoverable", 1)),
+                               help=FIELD_HELP["actor_discoverable"], key=f"{prefix}_disc")
+    current_public = [f for f in (a.get("always_public_fields") or "").split(",") if f in ACTOR_SENSITIVE_FIELDS]
+    public = multiselect(t("بيانات تظهر للكل من غير ترشيح (اختياري)"), ACTOR_SENSITIVE_FIELDS,
+                            default=current_public, format_func=lambda f: t(_SENSITIVE_LABELS[f]),
+                            key=f"{prefix}_public")
+    photo = st.file_uploader(t("صورة شخصية (لازم تتجدد كل 3 شهور تقريبًا)"), type=IMAGE_TYPES,
+                             help=FIELD_HELP["actor_photo_freshness"], key=f"{prefix}_photo")
+
+    values = {
+        "full_name": name.strip(), "stage_name": stage.strip() or None, "category": category,
+        "gender": gender, "bio": bio.strip(), "credits_text": credits.strip(),
+        "height_cm": height, "weight_kg": weight, "chest_cm": chest, "waist_cm": waist,
+        "hips_cm": hips, "shoe_size_eu": shoe, "hair_color": hair.strip(), "eye_color": eyes.strip(),
+        "contact_phone": phone.strip(), "contact_email": email.strip(), "agent_name": agent.strip(),
+        "agent_contact": agent_contact.strip(), "hobbies": hobbies.strip(),
+        "drives_car": int(car), "drives_motorcycle": int(moto), "swims": int(swims), "smokes": int(smokes),
+        "skills_notes": skills.strip(), "link_showreel": showreel.strip(), "link_instagram": insta.strip(),
+        "link_other": other.strip(), "discoverable": int(discoverable),
+        "always_public_fields": ",".join(public),
+    }
+    return values, photo
+
+
+def _render_add_actor_form(company_id):
+    with st.expander(f"➕ {t('إضافة ممثل/ة جديد/ة')}", expanded=False):
+        st.caption(t("الحقول اللي مالهاش مصدر عام موثوق (زي رقم التواصل أو المقاسات) سيبها فاضية - متخترعش قيم لها، خصوصًا لو الممثل/ة شخص حقيقي معروف."))
+        with st.form("add_actor_form", clear_on_submit=True):
+            values, photo = _actor_fields("new_actor")
+            submitted = st.form_submit_button(t("إضافة الممثل/ة"), disabled=not _can_write())
+        if submitted:
+            if not values["full_name"]:
+                st.warning(t("اسم الممثل/ة مينفعش يبقى فاضي"))
+                return
+            new_id = repo.add_actor(values, owner_company_id=company_id,
+                                    created_by=st.session_state.get("_auth_user"))
+            if photo is not None:
+                repo.set_actor_photo(new_id, save_uploaded_image(photo, f"actors/{new_id}"))
+            st.session_state[_SELECTED_KEY] = new_id
+            st.toast(t("تم إضافة الممثل/ة"), icon="✅")
+            st.rerun()
+
+
+# ---------- البحث بالحرف ----------
+
+def _render_search_and_list(company_id):
+    directory = repo.actors_directory()
+    hidden_own = repo.actors_owned_by_company(company_id)
+    if not directory and not hidden_own:
+        st.info(t("لسه مفيش ممثلين في خزانة المواهب"))
+        return
+
+    is_ar = st.session_state.get("ui_lang", "ar") == "ar"
+    alphabet = _AR_ALPHABET if is_ar else _EN_ALPHABET
+    search_key = "actor_search_q"
+    letter_key = "actor_letter_pill"
+    applied_key = f"{letter_key}_applied"
+
+    selected_letter = st.pills(
+        t("قفز بالحرف الأول"), alphabet, key=letter_key,
+        selection_mode="single", label_visibility="collapsed",
+    )
+    # الحرف بيكتب نفسه في خانة البحث (قبل ما الخانة تتبني في نفس الـ run).
+    # لو الحرف اتشال، خانة البحث تفضى معاه.
+    if selected_letter != st.session_state.get(applied_key):
+        st.session_state[search_key] = selected_letter or ""
+        st.session_state[applied_key] = selected_letter
+
+    query = st.text_input(
+        t("بحث"), key=search_key, label_visibility="collapsed", live=True,
+        # live=True: القايمة بتتفلتر مع كل ضغطة حرف فورًا - مش لما تدوس Enter.
+        # المالك طلب فلترة فورية للكاستينج، عكس خانات البحث التانية
+        # (library_search) اللي بتستنى Enter/فقدان التركيز.
+        placeholder=f"🔍 {t('اكتب اسم الممثل أو أول حرف')} — {ltr(len(directory))} {t('ممثل متاح')}",
+    )
+    shown = [a for a in directory if _matches(query, a)]
+    if query:
+        st.caption(f"{ltr(len(shown))} {t('من')} {ltr(len(directory))}")
+    if not shown:
+        st.caption(t("مفيش نتايج — جرّب حرف تاني"))
+    for a in shown:
+        _actor_row(a)
+
+    shown_hidden = [a for a in hidden_own if _matches(query, a)]
+    if shown_hidden:
+        st.markdown(f"**{t('بروفايلات شركتك المخفية من البحث')}**")
+        for a in shown_hidden:
+            _actor_row(a)
+
+
+def _actor_row(a):
+    with st.container(key=f"cf_actor_row_{a['id']}"):
+        cols = st.columns([1, 7], vertical_alignment="center")
+        with cols[0]:
+            img = image_abs_path(a.get("photo_path")) if a.get("photo_path") else None
+            if img:
+                st.image(img, width=48)
+            else:
+                st.markdown("🎭")
+        with cols[1]:
+            bits = [_display_name(a)]
+            if a.get("category"):
+                bits.append(t(a["category"]))
+            if a.get("is_demo"):
+                bits.append(f"🧪 {t('تجريبي')}")
+            if _is_stale(a):
+                bits.append(f"📷 {t('الصورة محتاجة تحديث')}")
+            if st.button("  ·  ".join(bits), key=f"actor_pick_{a['id']}", use_container_width=True):
+                st.session_state[_SELECTED_KEY] = a["id"]
+                st.rerun()
+
+
+# ---------- البروفايل ----------
+
+def _photo_freshness_text(actor):
+    """نص التنبيه لو الصورة ناقصة أو أقدم من 3 شهور، وإلا None."""
+    if not actor.get("photo_path"):
+        return f"📷 {t('مفيش صورة لسه')}"
+    age = _photo_age_days(actor.get("photo_updated_at"))
+    if age is None:
+        return f"📷 {t('تاريخ الصورة مش معروف — محتاجة تحديث')}"
+    if age > _STALE_DAYS:
+        return "📷 " + t("آخر تحديث للصورة من {n} شهور — محتاجة تحديث").format(n=ltr(age // 30))
+    return None
+
+
+def _render_profile(actor_id, project_id, company_id):
+    actor = repo.actor_by_id(actor_id)
+    if not actor:
+        st.warning(t("الملف الشخصي ده مش موجود"))
+        st.session_state.pop(_SELECTED_KEY, None)
+        return
+
+    if st.button(f"⬅️ {t('العودة لقايمة الممثلين')}", key="actor_back_btn"):
+        st.session_state.pop(_SELECTED_KEY, None)
+        st.rerun()
+
+    col_photo, col_info = st.columns([1, 3], vertical_alignment="top")
+    with col_photo:
+        img = image_abs_path(actor.get("photo_path")) if actor.get("photo_path") else None
+        if img:
+            st.image(img, width=180)
+        else:
+            st.markdown("### 🎭")
+        stale = _photo_freshness_text(actor)
+        if stale:
+            st.warning(stale)
+        elif actor.get("photo_updated_at"):
+            st.caption(f"{t('آخر تحديث للصورة')}: {ltr(str(actor['photo_updated_at'])[:10])}")
+        if actor.get("is_demo"):
+            st.caption(f"🧪 {t('بيانات تجريبية آمنة — مش شخص حقيقي')}")
+
+    with col_info:
+        st.markdown(f"## 🎬 {_display_name(actor)}")
+        if actor.get("stage_name") and actor.get("stage_name") != actor.get("full_name"):
+            st.caption(f"{t('الاسم الحقيقي')}: {actor['full_name']}")
+        meta_bits = [t(v) for v in (actor.get("category"), actor.get("gender")) if v]
+        if meta_bits:
+            st.caption(" · ".join(meta_bits))
+        if not actor.get("discoverable"):
+            st.caption(f"🙈 {t('مخفي من بحث الكاستينج')}")
+        if actor.get("bio"):
+            st.write(actor["bio"])
+
+    st.markdown(f"**{t('أعمال سابقة')}**")
+    if actor.get("credits_text"):
+        for line in str(actor["credits_text"]).splitlines():
+            if line.strip():
+                st.markdown(f"- {line.strip()}")
+    else:
+        st.caption(t("غير متوفر"))
+
+    links = [(t("شوريل"), actor.get("link_showreel")),
+             (t("إنستجرام / سوشيال ميديا"), actor.get("link_instagram"))]
+    links = [(label, url) for label, url in links if url]
+    if links or actor.get("link_other"):
+        st.markdown(f"**{t('روابط')}**")
+        for label, url in links:
+            st.markdown(f"- [{label}]({url})")
+        for line in str(actor.get("link_other") or "").splitlines():
+            if line.strip():
+                st.markdown(f"- {line.strip()}")
+
+    st.divider()
+    _render_sensitive_section(actor, company_id)
+    st.divider()
+    _render_casting_section(actor, project_id)
+    _render_edit_section(actor, company_id)
+
+
+def _render_sensitive_section(actor, company_id):
+    unlocked = repo.actor_unlocked_for_company(actor["id"], company_id)
+    always_public = {f.strip() for f in (actor.get("always_public_fields") or "").split(",") if f.strip()}
+
+    def visible(key):
+        return unlocked or key in always_public
+
+    st.markdown(f"**{t('بيانات القياس والكاستينج')}**")
+    if not unlocked and not always_public:
+        st.info(t("البيانات دي بتفضل مخفية لحد ما شركتك ترشّح أو تتعاقد مع الممثل/ة ده لدور في أحد مشاريعك."))
+    elif not unlocked:
+        st.caption(t("جزء من البيانات دي ظاهر لأن الممثل/ة اختار يبينه للكل — الباقي محتاج ترشيح أول."))
+
+    def field(key, formatter=str):
+        label = t(_SENSITIVE_LABELS[key])
+        if not visible(key):
+            st.markdown(f"- {label}: 🔒 {t('مخفي لحد الترشيح')}")
+            return
+        raw = actor.get(key)
+        st.markdown(f"- {label}: {formatter(raw) if raw not in (None, '') else t('غير متوفر')}")
+
+    def bool_field(key):
+        label = t(_SENSITIVE_LABELS[key])
+        if not visible(key):
+            st.markdown(f"- {label}: 🔒 {t('مخفي لحد الترشيح')}")
+            return
+        st.markdown(f"- {label}: {t('نعم') if actor.get(key) else t('لا')}")
+
+    def cm(v):
+        return f"{ltr(v)} {t('سم')}"
+
+    mc1, mc2 = st.columns(2)
+    with mc1:
+        field("height_cm", cm)
+        field("weight_kg", lambda v: f"{ltr(v)} {t('كجم')}")
+        field("chest_cm", cm)
+        field("waist_cm", cm)
+        field("hips_cm", cm)
+        field("shoe_size_eu", ltr)
+        field("hair_color")
+        field("eye_color")
+        field("hobbies")
+    with mc2:
+        field("contact_phone", ltr)
+        field("contact_email", ltr)
+        field("agent_name")
+        field("agent_contact")
+        bool_field("drives_car")
+        bool_field("drives_motorcycle")
+        bool_field("swims")
+        bool_field("smokes")
+        field("skills_notes")
+
+
+def _render_casting_section(actor, project_id):
+    actor_id = actor["id"]
+    st.markdown(f"**{t('الترشيح والتعاقد في المشروع ده')}**")
+    for r in repo.castings_of_actor_in_project(actor_id, project_id):
+        c1, c2 = st.columns([4, 1], vertical_alignment="center")
+        c1.markdown(f"- {r['character_name']} — {t(ACTOR_CASTING_STATUS_LABELS.get(r['status'], r['status']))}"
+                    + (f" · {r['role_note']}" if r.get("role_note") else ""))
+        if c2.button(t("إلغاء"), key=f"uncast_{r['id']}", disabled=not _can_write(), use_container_width=True):
+            repo.remove_casting(project_id, r["id"])
+            st.rerun()
+
+    characters = repo.characters_of_project_by_id(project_id)
+    if not characters:
+        st.caption(t("لسه مفيش شخصيات في المشروع ده. ضيف شخصيات الأول من تبويب الشخصيات."))
+        return
+    char_map = {c["id"]: c["name"] for c in characters}
+    chosen = st.selectbox(t("اختار شخصية"), list(char_map), format_func=char_map.get,
+                          key=f"actor_cast_pick_{actor_id}")
+    current = repo.casting_for_character(chosen)
+    if current and current["status"] == "cast" and current["actor_id"] != actor_id:
+        st.caption(f"{t('الشخصية دي متعاقد لها')}: {current.get('stage_name') or current['full_name']}")
+    role_note = st.text_input(t("ملاحظة عن الدور (اختياري)"), key=f"actor_cast_note_{actor_id}")
+    b1, b2 = st.columns(2)
+    user = st.session_state.get("_auth_user")
+    if b1.button(f"⭐ {t('رشّح للدور ده')}", key=f"actor_shortlist_btn_{actor_id}",
+                 disabled=not _can_write(), use_container_width=True):
+        repo.cast_actor(actor_id, project_id, chosen, "shortlisted", role_note, user)
+        st.toast(t("تم ترشيح الممثل/ة للشخصية"), icon="⭐")
+        st.rerun()
+    if b2.button(f"✅ {t('تعاقد للدور ده')}", key=f"actor_cast_btn_{actor_id}",
+                 disabled=not _can_write(), use_container_width=True):
+        # guarded_delete بيمسك IntegrityError ويعرض رسالته (AlreadyCastError)
+        if guarded_delete(repo.cast_actor, (actor_id, project_id, chosen, "cast", role_note, user),
+                          t("معرفش أسجّل التعاقد ده.")):
+            st.toast(t("تم تعيين الممثل/ة للشخصية"), icon="✅")
+            st.rerun()
+    st.caption(t("الترشيح بيفتح لشركتك بيانات القياس والتواصل، ومتسجّل باسمك."))
+
+
+def _render_edit_section(actor, company_id):
+    role = permissions.current_role()
+    if not repo.can_edit_actor(actor, company_id, role):
+        return
+    st.divider()
+    with st.expander(f"✏️ {t('تعديل البروفايل')}", expanded=False):
+        with st.form(f"edit_actor_{actor['id']}"):
+            values, photo = _actor_fields(f"edit_actor_{actor['id']}", actor)
+            saved = st.form_submit_button(f"💾 {t('حفظ التعديل')}")
+        if saved:
+            if not values["full_name"]:
+                st.warning(t("اسم الممثل/ة مينفعش يبقى فاضي"))
+                return
+            repo.update_actor(actor["id"], values, company_id, role)
+            if photo is not None:
+                repo.set_actor_photo(actor["id"], save_uploaded_image(photo, f"actors/{actor['id']}"))
+            st.toast(t("تم حفظ التعديل"), icon="💾")
+            st.rerun()

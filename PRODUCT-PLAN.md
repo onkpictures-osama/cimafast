@@ -198,6 +198,62 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   same file; show AI spend per project and company.
 - **P5 Looks and continuity** [universal-creative] — scenes that note a look
   change create or link a look; continuity-sensitive props tracked across scenes.
+  🔎 **Scoped 2026-09-23**, after an owner report that "adding a state to a
+  character doesn't work well." Read `views/characters.py`, `repo.py`,
+  `views/shots.py`, `views/scenes.py`, `importer.py`, `database.py` end to end;
+  the look feature is half-built, not absent:
+  - `character_looks` already has `is_default`, but no code path ever sets or
+    shows it except `importer.py`'s AI-import, which auto-creates one
+    `'المظهر الافتراضي'` row per character. A character added by hand from
+    "➕ إضافة شخصية جديدة" in `views/characters.py` gets **zero** looks — and
+    with zero looks it cannot be cast in a shot at all (`look_labels_of_project`
+    only returns rows that exist), which is very likely the "مش شغال كويس"
+    the report is about: the character exists, but nothing tells the user why
+    it's missing from every shot's cast picker until they find the separately
+    hidden "➕ إضافة مظهر إضافي لشخصية" expander.
+  - There is no way anywhere in the UI to mark a look as the primary one or to
+    change which look is primary once a character has more than one — the
+    `is_default` flag is write-only from one code path (import) and read
+    nowhere.
+  - `scene_characters` only stores `character_id` — it has no `look_id`.
+    Looks can only be assigned at the **shot** level
+    (`shot_characters.look_id`), so "which state is this character in for this
+    scene" is not representable at all until the user builds a shot; a scene
+    with no shots yet (most scenes, per P1) has no recorded look for anyone in
+    it, and per-scene continuity/costume reports have nothing to read.
+  - The shot-level look picker (`views/shots.py`) is a flat, unscoped
+    `look_labels_of_project(project_id)` — every look of every character in
+    the whole project, not filtered to the cast already chosen for that scene.
+    On a real feature-length project this is a long unsorted list to search
+    every time, and nothing stops a shot from casting a character/look that
+    was never added to the scene.
+  - The AI already detects this exact problem — `ai_prompt.py`'s
+    `look_change_notes` ("لو أي شخصية غيّرت شكلها أو ملابسها أو حالتها الجسدية
+    خلال المشهد") — but the note is dead text: `importer.py` stores it on the
+    scene, `repo.py` only ever counts it (`scenes_with_look_change`), and
+    `home.py` shows just that count as a dashboard tile. The actual sentence
+    the AI wrote about *what* changed is never shown to the user and never
+    turns into a look.
+  - **Proposed shape**, in order of dependency: (1) every character always has
+    exactly one default look — create it automatically on manual add too, and
+    block deleting the last remaining look; (2) put looks on the character
+    card itself as first-class — "المظهر الرئيسي" plus a list of additional
+    looks, each with a "خليه الأساسي" action, instead of a separate hidden
+    expander named "إضافي"; (3) add `scene_characters.look_id` (nullable →
+    defaults to the character's current default look), with a per-scene
+    picker so wardrobe/continuity has an answer at the scene grain, not only
+    once shots exist; (4) scope the shot-level look picker to the scene's cast
+    and default each character to whatever look was set for the scene, with
+    an explicit override only when a shot needs a different look than the
+    rest of its scene; (5) turn `look_change_notes` into an action, not a
+    stat — surface it on the scene as "الذكاء الاصطناعي رصد تغيير مظهر لـ
+    [الشخصية] هنا، تحب تضيف مظهر جديد؟", pre-filling the new look's
+    description from the AI's own sentence and offering to set it as this
+    scene's look going forward. *Downstream cost of not doing this:* every
+    costume/continuity report the product could offer (`export.py`) has
+    nothing to group by below "whole character," so a wardrobe department
+    still needs to rebuild this by hand from the script exactly as if
+    CimaFast never analyzed it.
 - ⭐ **P6 "Production Memory" (ذاكرة الإنتاج) — learn from users' own
   linking choices, feed it back into analysis**
   [universal-creative, infrastructure] — 🗒️ **Proposed 2026-09-22, not

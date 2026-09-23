@@ -206,6 +206,70 @@ def init_db():
             reference_image_path TEXT
         );
 
+        -- P9 "خزانة المواهب": ممثل حقيقي (بحسابه أو مضاف من الإدارة)، مش
+        -- تابع لمشروع ولا شركة بعينها - العزل بين الشركات (F1) خاص
+        -- بالمشاريع، وده استثناء متعمّد (production، القرار المحسوم بتاريخ
+        -- 2026-09-23): مسبح ممثلين واحد كل الشركات على المنصة بتدوّر فيه.
+        -- discoverable: تبديل الممثل/ة "ظاهر في البحث" من إيقافه. always_public_fields:
+        -- أسماء حقول حساسة (مفصولة بفاصلة) اختار الممثل/ة يفضلوا ظاهرين
+        -- للكل من غير ما يستنوا ترشيح. is_demo: علامة بيانات تجريبية آمنة
+        -- (مش شخص حقيقي) - مايتلخبطش مع بروفايلات حقيقية.
+        CREATE TABLE IF NOT EXISTS actors (
+            id SERIAL PRIMARY KEY,
+            full_name TEXT NOT NULL,
+            stage_name TEXT,
+            category TEXT,
+            gender TEXT,
+            bio TEXT,
+            credits_text TEXT,
+            photo_path TEXT,
+            photo_updated_at TEXT,
+            height_cm INTEGER,
+            weight_kg INTEGER,
+            chest_cm INTEGER,
+            waist_cm INTEGER,
+            hips_cm INTEGER,
+            shoe_size_eu INTEGER,
+            hair_color TEXT,
+            eye_color TEXT,
+            contact_phone TEXT,
+            contact_email TEXT,
+            agent_name TEXT,
+            agent_contact TEXT,
+            hobbies TEXT,
+            drives_car INTEGER NOT NULL DEFAULT 0,
+            drives_motorcycle INTEGER NOT NULL DEFAULT 0,
+            swims INTEGER NOT NULL DEFAULT 0,
+            smokes INTEGER NOT NULL DEFAULT 0,
+            skills_notes TEXT,
+            link_showreel TEXT,
+            link_instagram TEXT,
+            link_other TEXT,
+            discoverable INTEGER NOT NULL DEFAULT 1,
+            always_public_fields TEXT,
+            is_demo INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        -- ربط ممثل بشخصية جوه مشروع معيّن (كاستينج) - نفس شكل جداول الربط
+        -- التانية (scene_characters...) بس عابر للشركات: actor_id من جدول
+        -- actors المنصّي، وproject_id بيحدد شركة مين طلبت الربط. الصف ده
+        -- نفسه هو "الشورت-ليست" اللي بيفتح الحقول الحساسة لشركة الـ
+        -- project_id ده (نفس القرار)، فمفيش داعي لجدول منفصل بس عشان نسجل
+        -- مين شاف بيانات الاتصال.
+        CREATE TABLE IF NOT EXISTS character_actor_casting (
+            id SERIAL PRIMARY KEY,
+            actor_id INTEGER NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+            status TEXT NOT NULL DEFAULT 'shortlisted',
+            role_note TEXT,
+            created_by TEXT,
+            created_at TEXT,
+            cast_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS episodes (
             id SERIAL PRIMARY KEY,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -464,6 +528,61 @@ def init_db():
             FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
         );
 
+        -- P9 "خزانة المواهب" - نفس الجدولين بتوع نسخة Postgres فوق، بشرحهم
+        -- هناك. مفيش FOREIGN KEY على شركة عمدًا - المسبح عابر للشركات.
+        CREATE TABLE IF NOT EXISTS actors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            stage_name TEXT,
+            category TEXT,
+            gender TEXT,
+            bio TEXT,
+            credits_text TEXT,
+            photo_path TEXT,
+            photo_updated_at TEXT,
+            height_cm INTEGER,
+            weight_kg INTEGER,
+            chest_cm INTEGER,
+            waist_cm INTEGER,
+            hips_cm INTEGER,
+            shoe_size_eu INTEGER,
+            hair_color TEXT,
+            eye_color TEXT,
+            contact_phone TEXT,
+            contact_email TEXT,
+            agent_name TEXT,
+            agent_contact TEXT,
+            hobbies TEXT,
+            drives_car INTEGER NOT NULL DEFAULT 0,
+            drives_motorcycle INTEGER NOT NULL DEFAULT 0,
+            swims INTEGER NOT NULL DEFAULT 0,
+            smokes INTEGER NOT NULL DEFAULT 0,
+            skills_notes TEXT,
+            link_showreel TEXT,
+            link_instagram TEXT,
+            link_other TEXT,
+            discoverable INTEGER NOT NULL DEFAULT 1,
+            always_public_fields TEXT,
+            is_demo INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS character_actor_casting (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_id INTEGER NOT NULL,
+            project_id INTEGER NOT NULL,
+            character_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'shortlisted',
+            role_note TEXT,
+            created_by TEXT,
+            created_at TEXT,
+            cast_at TEXT,
+            FOREIGN KEY (actor_id) REFERENCES actors(id) ON DELETE CASCADE,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS episodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL,
@@ -688,12 +807,20 @@ def init_db():
         """)
     conn.commit()
     _migrate_schema(conn)
+    _backfill_default_looks(conn)
     conn.close()
 
 
 # أعمدة اتضافت بعد أول نسخة من قاعدة البيانات - المهاجرة دي بتضيفها لأي
 # قاعدة بيانات قديمة موجودة عند المستخدم من غير ما تأثر على بياناته
 _MIGRATIONS = {
+    # P9: مين أضاف بروفايل الممثل/ة. المسبح عابر للشركات في القراءة، بس
+    # التعديل للشركة اللي أضافته (أو مشغّل المنصة) بس. NULL = اتضاف من
+    # الإدارة (زي بيانات العرض التجريبية) - المشغّل بس يعدّله.
+    "actors": [
+        ("owner_company_id", "INTEGER"),
+        ("created_by", "TEXT"),
+    ],
     "companies": [
         # B5: نوع الاشتراك (creator / studio / enterprise). مبدئي — لحد ما
         # B5 يتقفل مع المالك، كل الشركات الموجودة بتاخد creator.
@@ -793,6 +920,12 @@ _INDEXES = [
     # كل قراءة مشاريع بتفلتر بالشركة (accounts.projects_for)، فده الفهرس اللي
     # العزل بين الشركات بيقف عليه.
     ("idx_projects_company", "projects (company_id)"),
+    # قايمة خزانة المواهب بتفلتر بـ discoverable، وصف الكاستينج بيتقري
+    # بالممثل/بالمشروع/بالشخصية - نفس منطق شركة المشاريع فوق.
+    ("idx_actors_discoverable", "actors (discoverable)"),
+    ("idx_casting_actor", "character_actor_casting (actor_id)"),
+    ("idx_casting_project", "character_actor_casting (project_id)"),
+    ("idx_casting_character", "character_actor_casting (character_id)"),
 ]
 
 
@@ -815,6 +948,42 @@ def _migrate_schema(conn):
     conn.commit()
 
 
+# P5: اسم المظهر اللي بيتعمل أوتوماتيك لكل شخصية - نفس الاسم اللي الاستيراد
+# (importer.py) بيستعمله من الأول، عشان الشخصية المضافة باليد تبان زي المستوردة.
+DEFAULT_LOOK_NAME = "المظهر الافتراضي"
+
+
+def _backfill_default_looks(conn):
+    """P5: كل شخصية لازم يبقى ليها مظهر أساسي واحد بالظبط.
+
+    من غير مظهر الشخصية مبتظهرش في اختيار الشخصيات بتاع اللقطة خالص - ده
+    كان البلاغ ("إضافة مظهر لشخصية مش شغالة كويس"): الشخصية المضافة باليد
+    كانت بتتعمل من غير أي مظهر. الدالة دي بتتنده مع كل تشغيل، ومش بتعمل أي
+    حاجة لو كل حاجة سليمة (idempotent):
+    1) شخصية ملهاش ولا مظهر → بيتعملها المظهر الافتراضي وعليه is_default=1.
+    2) شخصية ليها مظاهر بس ولا واحد أساسي → أقدم مظهر يبقى الأساسي.
+    3) شخصية ليها أكتر من مظهر أساسي → أقدمهم بس يفضل أساسي.
+    SQL عادي بيشتغل على SQLite وPostgres الاتنين زي ما هو.
+    """
+    statements = [
+        ("INSERT INTO character_looks (character_id, look_name, apparent_age, makeup_state, "
+         "hair_state, wardrobe_description, description, is_default) "
+         "SELECT c.id, ?, '', '', '', '', '', 1 FROM characters c "
+         "WHERE NOT EXISTS (SELECT 1 FROM character_looks l WHERE l.character_id = c.id)",
+         (DEFAULT_LOOK_NAME,)),
+        ("UPDATE character_looks SET is_default = 1 WHERE id IN ("
+         "SELECT MIN(id) FROM character_looks GROUP BY character_id "
+         "HAVING SUM(COALESCE(is_default, 0)) = 0)", ()),
+        ("UPDATE character_looks SET is_default = 0 WHERE COALESCE(is_default, 0) <> 0 "
+         "AND id NOT IN (SELECT MIN(id) FROM character_looks "
+         "WHERE COALESCE(is_default, 0) <> 0 GROUP BY character_id)", ()),
+    ]
+    cur = conn.cursor()
+    for sql, params in statements:
+        cur.execute(_adapt_query(sql), params)
+    conn.commit()
+
+
 # ---------- نصوص شرح الحقول (نظام field_definitions المبسط) ----------
 FIELD_HELP = {
     "project_type": "نوع المشروع: فيلم طويل، مسلسل، إعلان، أو فيديو قصير. ده بيأثر على القيم الافتراضية زي المدة والنسبة.",
@@ -833,6 +1002,13 @@ FIELD_HELP = {
     "confirmed": "علّم هنا بعد ما تراجع كل تفاصيل اللقطة وتتأكد إنها جاهزة فعليًا للتوليد.",
     "species": "نوع الكائن: إنسان، حيوان، أو كائن خيالي.",
     "gender": "جنس الشخصية. تفاصيل زي الوزن والبنية الجسمانية اكتبها في الملاحظات العامة عن الشخصية.",
+    # P9 - خزانة المواهب
+    "actor_category": "تصنيف الممثل/ة الأساسي: بطولة، أدوار مساعدة، كومبارس، أطفال.",
+    "actor_measurements": "مقاسات قياسية بتستخدمها إدارة الأزياء والكاستينج وقت الترشيح: الطول والوزن ومحيط الصدر والخصر والورك ومقاس الحذاء.",
+    "actor_skills": "مهارات بتفرق في اختيار الدور: قيادة عربية أو موتوسيكل، سباحة، تدخين.",
+    "actor_sensitive_gate": "البيانات دي (المقاسات، التواصل، العادات) بتفضل مخفية عن أي شركة لحد ما ترشّح أو تتعاقد مع الممثل/ة لدور في مشروع عندها - أو لحد ما الممثل/ة نفسه يختار يبينها للكل.",
+    "actor_discoverable": "لو متبوّت، البروفايل ميظهرش في بحث الكاستينج لأي شركة تانية - يفضل موجود بس مش قابل للاكتشاف.",
+    "actor_photo_freshness": "الصورة لازم تتجدد كل 3 شهور تقريبًا عشان تفضل ممثلة الشكل الحالي للممثل/ة وقت الترشيح.",
 }
 
 CAMERA_MOVEMENT_OPTIONS = [
@@ -851,6 +1027,28 @@ CAMERA_ANGLE_OPTIONS = ["مستوى العين (Eye Level)", "منخفضة (Low 
 
 SPECIES_OPTIONS = ["إنسان", "حيوان", "كائن خيالي", "غير محدد"]
 GENDER_OPTIONS = ["ذكر", "أنثى", "غير محدد"]
+
+# P9 "خزانة المواهب" -------------------------------------------------------
+ACTOR_CATEGORY_OPTIONS = ["بطولة", "أدوار مساعدة", "كومبارس", "أطفال", "غير محدد"]
+
+# حقول حساسة (production، القرار المحسوم 2026-09-23): مخفية عن أي شركة لحد ما
+# ترشّح/تتعاقد مع الممثل/ة لدور في مشروع عندها (character_actor_casting)، إلا
+# لو الممثل/ة نفسه ضايفها في actors.always_public_fields. اسم الحقل هنا لازم
+# يبقى نفس اسم العمود بالظبط في جدول actors.
+ACTOR_SENSITIVE_FIELDS = [
+    "height_cm", "weight_kg", "chest_cm", "waist_cm", "hips_cm", "shoe_size_eu",
+    "hair_color", "eye_color", "contact_phone", "contact_email", "agent_name",
+    "agent_contact", "hobbies", "drives_car", "drives_motorcycle", "swims", "smokes",
+    "skills_notes",
+]
+
+# حالات صف الكاستينج. "شورت-ليست" هو نفسه اللي بيفتح الحقول الحساسة (فوق)،
+# "تم التعاقد" بعد ما يتأكد الدور فعليًا.
+ACTOR_CASTING_STATUS_OPTIONS = ["shortlisted", "cast"]
+ACTOR_CASTING_STATUS_LABELS = {
+    "shortlisted": "مرشّح/ة",
+    "cast": "متعاقد/ة",
+}
 
 PROJECT_ROLE_OPTIONS = [
     "صانع أفلام (Filmmaker)",
