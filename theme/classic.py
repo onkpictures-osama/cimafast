@@ -206,6 +206,17 @@ MAIN_CSS = r'''
     section[data-testid="stSidebar"] {
         overflow-x: hidden !important;
     }
+    /* إعادة تصميم الشريط الجانبي 2026-09-23: الإيقاع الرأسي بين عناصر
+       st.sidebar بقى متحكَّم فيه من بايثون (st.container(gap=...)) بدل
+       ما يتكرر فراغ ~16px افتراضي فوق كل عنصر من غير قصد - وده كان أكبر
+       سبب في الفراغات الفاضية اللي طلعت في الصورة. القاعدة هنا بس للفاصل
+       المخصص الرفيع اللي بيفصل قسم "مشاريعي" عن "شريط الحساب" - مفيش
+       فاصل تاني تحته لأنه آخر حاجة في الشريط الجانبي أصلًا. */
+    section[data-testid="stSidebar"] hr.cf-sb-sep {
+        margin: 10px 0;
+        border: none;
+        border-top: 1px solid rgba(27, 37, 75, 0.22);
+    }
     /* صندوق صغير حوالين وصف البرنامج - بيوضح إنه مجرد تنويه، مش اختيار قابل للضغط */
     section[data-testid="stSidebar"] .cf-sidebar-header .cf-desc-box {
         font-size: 11px;

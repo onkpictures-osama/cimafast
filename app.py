@@ -370,25 +370,37 @@ theme.inject_main(
 
 
 # ---------------- الشريط الجانبي ----------------
-# إعادة تصميم 2026-09-22 (تانية): "مشاريعي" أول حاجة تحت لوجو مختصر —
-# مش قسم "إعدادات" كامل فوقها. كل حاجة عن الحساب (اللغة، نوع الاشتراك،
-# الرئيسية، الخروج) بقت شريط واحد رفيع تحت خالص، بعد ما تختار مشروعك، مش
-# قبله. صندوق الوصف الطويل بقى بطاقة popover تتفتح بالطلب (ℹ️) وتتقفل
-# لوحدها — مش صندوق ثابت دايمًا ظاهر. أي تفاصيل تنفيذية خاصة بمشروع معيّن
-# (تعديل/حذف، الحلقات، الفريق، جدول التصوير) في تبويب "⚙️ إعدادات المشروع"
-# جوه المشروع نفسه (views/project_settings.py) — مش هنا. وكلمة "شركة" مش
+# إعادة تصميم 2026-09-23 (تالتة): نفس الترتيب المنطقي من المرة اللي فاتت
+# ("مشاريعي" أول حاجة، شريط الحساب في الآخر رفيع)، بس اتحل سبب الفراغات
+# الكبيرة اللي كانت طالعة على التليفون تحديدًا: st.columns بتتحول تلقائيًا
+# لعمود واحد تحت الآخر لما عرض الشاشة يبقى ضيق (نفس isMobile اللي مكتوب
+# عنها في theme/mobile.py) — وده اللي كان مخلّي "؟" يطلع لوحده منعزل تحت
+# اللوجو، وزرار "خروج" ياخد صف كامل لوحده. البديل st.container(horizontal=
+# True, wrap=False) هو API تاني تمامًا (مش st.columns) ومابيعملش ستاك على
+# الموبايل، فالصف بيفضل صف. الفراغات التانية (بين الأقسام) اتقفلت بـ
+# gap=رقم بالبكسل بدل الافتراضي (~16px) اللي كان بيتكرر فوق كل حاجة.
+#
+# ثلاث مجموعات بصرية بس، كل مجموعة صف/عمود واحد مرصوص - عشان الفراغ بين
+# المجموعات يبقى فاصل قسم مقصود، مش فراغ عشوائي جوه القسم نفسه:
+#   1) الهيدر: اللوجو + "؟" في صف واحد
+#   2) مشاريعي: الحساب (لو أكتر من واحد) + إنشاء مشروع + اختيار المشروع
+#   3) شريط الحساب: الاسم/الاشتراك + اللغة + الرئيسية/خروج
+#
+# صندوق الوصف الطويل لسه بطاقة popover تتفتح بالطلب (؟) وتتقفل لوحدها —
+# مش صندوق ثابت دايمًا ظاهر. أي تفاصيل تنفيذية خاصة بمشروع معيّن (تعديل/
+# حذف، الحلقات، الفريق، جدول التصوير) في تبويب "⚙️ إعدادات المشروع" جوه
+# المشروع نفسه (views/project_settings.py) — مش هنا. وكلمة "شركة" مش
 # بتظهر في أي مكان غير نوع الاشتراك.
 
-_brand_col, _info_col = st.sidebar.columns([4, 2])
-with _brand_col:
+with st.sidebar.container(horizontal=True, gap="small",
+                           vertical_alignment="center", wrap=False):
     # الشريط الجانبي هو الحقل الأصفر بتاع البراند ⇒ النسخة الكحلي من اللوجو
     # (الدليل ص 03: "On yellow → navy figure"). من غير ™ هنا: الدليل بيقول
     # إنها اختيارية في كروم الواجهة، والشريط ضيق.
     st.markdown(
-        '<div class="cf-title">%s</div>' % theme.brand.lockup_master("light", height=44),
+        '<div class="cf-title">%s</div>' % theme.brand.lockup_master("light", height=40),
         unsafe_allow_html=True,
     )
-with _info_col:
     # "؟" مش إيموجي ("ℹ️") ولا حرف دائرة نادر ("ⓘ") - الاتنين ما رسمهمش
     # صحيح. علامة استفهام عادية أكيد موجودة في نفس الخط اللي بيرسم باقي
     # نص الواجهة كله صح.
@@ -396,7 +408,8 @@ with _info_col:
         st.markdown(f"**{tr('studio_tagline')}**")
         st.caption(t(_APP_DESCRIPTION))
 
-st.sidebar.caption(f"📁 {tr('sidebar_projects')}")
+_sb_projects = st.sidebar.container(gap=6)
+_sb_projects.caption(f"📁 {tr('sidebar_projects')}")
 
 _current_user = st.session_state.get("_auth_user")
 
@@ -404,7 +417,7 @@ _current_user = st.session_state.get("_auth_user")
 # حساب (أو المشغّل)، بيختار واحد.
 _my_companies = accounts.companies_for(_current_user or "")
 if not _my_companies:
-    st.sidebar.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
+    _sb_projects.error(t("حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك."))
     st.stop()
 # H2: رابط مباشر (?project=&tab=) من الصفحة الرئيسية أو تنبيه أو بوست. بيتطبّق
 # مرة واحدة لما يوصل؛ بعد كده اليوزر حر يتنقّل، وشريط العنوان بيتبعه (تحت).
@@ -426,7 +439,7 @@ if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_sta
 
 if len(_my_companies) > 1:
     _company_names = {c["name"]: c for c in _my_companies}
-    _company = _company_names[st.sidebar.selectbox(t("الحساب"), list(_company_names), key="company_selector")]
+    _company = _company_names[_sb_projects.selectbox(t("الحساب"), list(_company_names), key="company_selector")]
 else:
     _company = _my_companies[0]
 company_id = _company["id"]
@@ -442,13 +455,13 @@ st.session_state["_cf_role"] = _role
 st.session_state["_cf_company"] = company_id
 _can_edit = permissions.can(_role, "edit")
 if not _can_edit:
-    st.sidebar.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
+    _sb_projects.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
 
 projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
 if permissions.can(_role, "create_project"):
-    with st.sidebar.expander(tr("new_project")):
+    with _sb_projects.expander(tr("new_project")):
         new_name = st.text_input(t("اسم المشروع"), placeholder=t("مثال: عروسة البحر"))
         new_type = st.selectbox(t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"], format_func=t, help=FIELD_HELP["project_type"])
         new_res = st.selectbox(t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"], help=FIELD_HELP["default_resolution"])
@@ -464,31 +477,36 @@ if permissions.can(_role, "create_project"):
 
 if not projects:
     if permissions.can(_role, "create_project"):
-        st.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
+        _sb_projects.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
     else:
-        st.info(t("مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع."))
+        _sb_projects.info(t("مفيش مشاريع في الشركة دي لسه. مدير الشركة أو المنتج هو اللي بينشئ المشاريع."))
     st.stop()
 
 _wanted = st.session_state.pop("_link_project_name", None)
 if _wanted in project_names:
     st.session_state["project_selector"] = _wanted
-selected_project_name = st.sidebar.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
+selected_project_name = _sb_projects.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
 
 # شريط الحساب — رفيع، في الآخر خالص، بعد ما اخترت مشروعك مش قبله. اسمك
 # ونوع اشتراكك في سطر، اللغة سطر لوحدها (لازمة مسافة لقطعتين)، والرئيسية/
-# الخروج جنب بعض تحت (أيقونات + tooltip بدل عناصر كل واحد ياخد سطر لوحده).
-st.sidebar.divider()
-st.sidebar.caption(f"{_current_user} · **{_tier_label}**")
+# الخروج جنب بعض في صف واحد ماينكسرش (st.container(horizontal=True،
+# wrap=False) زي الهيدر فوق، مش st.columns) بدل ما "خروج" ياخد صف كامل
+# لوحده على التليفون. فاصل رفيع واحد قبل القسم ده بس - مفيش فاصل بعده،
+# لأنه آخر حاجة في الشريط الجانبي أصلًا (اللي بعده محتوى المشروع في
+# المنطقة الرئيسية، مش هنا)، فمفيش حاجة يفصلها عنها.
+st.sidebar.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
+_sb_account = st.sidebar.container(gap=6)
+_sb_account.caption(f"{_current_user} · **{_tier_label}**")
 
 # segmented_control عنصر واحد مدمج بحجمه الطبيعي — بديل الزرارين الكبيرين
-# اللي كانوا نص عرض الشريط لكل واحد. سطر لوحده عشان قطعتين محتاجين مساحة.
+# اللي كانوا نص عرض الشريط لكل واحد.
 _lang_widget_key = "lang_toggle"
 if _lang_widget_key not in st.session_state:
     st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
-_lang_selected = st.sidebar.segmented_control(
+_lang_selected = _sb_account.segmented_control(
     "Language", options=["AR", "EN"], key=_lang_widget_key,
     required=True, label_visibility="collapsed",
 )
@@ -496,19 +514,16 @@ if _lang_selected.lower() != st.session_state["ui_lang"]:
     st.session_state["ui_lang"] = _lang_selected.lower()
     st.rerun()
 
-_prof_home, _prof_out = st.sidebar.columns(2)
-with _prof_home:
+with _sb_account.container(horizontal=True, gap="small", wrap=False):
     if os.environ.get("CIMAFAST_HOME_URL"):
         _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
-with _prof_out:
     # نص قصير بس ("خروج") مش tr("logout") الكامل ("🚪 تسجيل الخروج") - ده
-    # عمود ضيق نص عرض الشريط، والنص الطويل كان بيتقطع. من غير إيموجي عمدًا:
+    # صف ضيق نص عرض الشريط، والنص الطويل كان بيتقطع. من غير إيموجي عمدًا:
     # إيموجي الألوان بتتجاهل لون النص اللي الـ CSS بيحطه، فلو خلفية غامقة
     # وإيموجي غامق (زي البني/البرتقالي بتاع الباب) بيبقى شبه مختفي.
     if st.button(t("خروج"), key="logout_btn", help=tr("logout")):
         _logout()
         st.rerun()
-st.sidebar.divider()
 
 # جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات — كل التفاصيل
 # التنفيذية دي بقت في تبويب "⚙️ إعدادات المشروع" (views/project_settings.py)
