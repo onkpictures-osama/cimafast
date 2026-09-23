@@ -227,6 +227,37 @@ Performance, the Arabic/RTL design system (glass redesign phases 3–5), test
 coverage, security review, and moving screens from Streamlit to the new frontend
 one at a time as they are rebuilt.
 
+- **Redesign the Streamlit app sidebar** [chief-engineer] —
+  🗒️ **Found 2026-09-23** (owner shared a reference mockup, approved the
+  direction: "Yes"). Current sidebar (just tightened for spacing on
+  2026-09-23) keeps the documented brand rule — sidebar = the yellow field,
+  navy mark (`theme/brand.py`: "سطح فاتح أو الحقل الأصفر → الشخصية كحلي").
+  The owner's reference is a deliberate departure from that: dark/navy
+  background with the yellow-mark variant, a user avatar photo (no such
+  feature exists yet — accounts have no photo field or upload path), English
+  taglines not present anywhere in the brand system ("IDEAS TO SCREEN",
+  "GOOD STORIES GO FURTHER" — need Arabic-first equivalents, this product is
+  Arabic-first per CLAUDE.md), and "الرئيسية"/"المشاريع" as top-level
+  drill-down nav items instead of the current flat "مشاريعي أول حاجة تحت
+  اللوجو" structure from the 2026-09-22 redesign. *Done when* the sidebar
+  matches the approved direction, `theme/brand.py`'s documented surface rule
+  is updated to record the sidebar as an intentional exception (not left to
+  read as a bug), avatar is a placeholder (initials) rather than real photo
+  upload unless the owner asks for upload as its own feature, and the
+  MEDIA/STUDIO wordmark inconsistency (flagged 2026-09-23, still open) is
+  resolved as part of the same pass since the logo is being touched anyway.
+
+- **Bring exported reports onto the brand guide** [chief-engineer] —
+  🗒️ **Found 2026-09-23** (owner: "use branding guidelines for reports").
+  `export.py`'s Excel/Word/PDF reports use hardcoded colours (`NAVY #12203D`,
+  `YELLOW #E8B923`) from before the brand system existed, and carry no
+  CimaFast logo at all — while `theme/brand.py` and `theme/tokens.py` already
+  hold the official palette (Navy `#212F70`, Yellow `#FECA05`, Ink `#1B254B`)
+  and the approved logo assets (`static/brand/`) used everywhere else in the
+  app. *Done when* every exported report (Excel, Word, PDF) uses the official
+  brand colours and carries the approved logo, per the brand guide already
+  encoded in `theme/brand.py`, with the classic screens' look untouched.
+
 ## On /v1, awaiting the owner's approval for production
 
 - Faster clicks (16 s → about 2.5 s): editors built only when opened.
@@ -250,3 +281,7 @@ never a decision for the owner.
 4. **Daily decisions/milestones log** — decided 2026-09-22: archive it on
    GitHub, one dated file per day in `logs/` (see `logs/README.md`), sourced
    from commit history and this plan. [infrastructure] to automate.
+5. **Sidebar redesign direction** — decided 2026-09-23: owner shared a dark-
+   background reference mockup and approved it ("Yes") over the yellow-field
+   look the brand guide currently documents for the sidebar. Treated as an
+   intentional, scoped exception to that rule, not a reversal of it elsewhere.
