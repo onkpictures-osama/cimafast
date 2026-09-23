@@ -184,15 +184,25 @@ def _logout():
     st.session_state["_just_logged_out"] = True
 
 
-def _nav_link(label, href):
+def _nav_link(label, href, title=None, icon_only=False):
     """لينك بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا بيفتح تاب
     جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب.
 
     ‎st.markdown‎ عادي مش ‎st.sidebar.markdown‎ عمدًا: بيترسم في أي حاوية
     (عمود، شريط جانبي...) اللي بينادي عليها من جواها، مش الشريط الجانبي
-    دايمًا."""
+    دايمًا.
+
+    ‎title‎: لما اللينك يبقى أيقونة لوحدها من غير كلام (زي 🏠 بعد تعديل
+    2026-09-23)، الأيقونة مش اسم يقراه قارئ الشاشة. فبنحط الكلمة في
+    ‎aria-label‎ (الاسم المنطوق) و‎title‎ (تلميح الماوس) - الكلمة اتشالت من
+    الشاشة بس، مش من الوصول."""
+    attrs = ""
+    if title:
+        esc = html.escape(title, quote=True)
+        attrs = f' title="{esc}" aria-label="{esc}"'
+    cls = "cf-navlink cf-navlink--icon" if icon_only else "cf-navlink"
     st.markdown(
-        f'<a class="cf-navlink" href="{html.escape(href, quote=True)}" target="_self">{html.escape(label)}</a>',
+        f'<a class="{cls}" href="{html.escape(href, quote=True)}" target="_self"{attrs}>{html.escape(label)}</a>',
         unsafe_allow_html=True)
 
 
@@ -387,10 +397,17 @@ theme.inject_main(
 #
 # ترتيب رأسي عدّله المالك بعد ما شاف النتيجة على الهوا (2026-09-23): "ارفع
 # بلوك اللغه فوق ونزل زرار الرييسية تحت". فبدّلنا الاتنين مكان بعض حرفيًا -
-# مفتاح اللغة (segmented_control) بقى هنا تحت التاجلاين مباشرة (أول تحكم
-# ملموس في الشريط)، ورابط "الرئيسية" نزل تحت جوه قسم الحساب جنب الأفتار
-# والخروج (مكان مفتاح اللغة القديم بالظبط). "أول حاجة ملموسة في الشريط"
-# بقت بتنطبق على اللغة مش الرئيسية.
+# مفتاح اللغة (segmented_control) طلع تحت التاجلاين مباشرة، ورابط
+# "الرئيسية" نزل تحت جوه قسم الحساب.
+#
+# تعديل تاني من محمد الزيات في نفس اليوم بعد ما شاف النتيجة: "نزّل بلوك
+# اللغة تحت جنب الرئيسية، واشيل كلمة (اللغة) وكلمة (الرئيسية) - الأيقونات
+# لوحدها واضحة". فالاتنين بقوا **صف واحد** في آخر الشريط جنب الأفتار
+# (الكود تحت، قبل زرار الخروج)، وكل واحد فيهم أيقونته بس: 🏠 للرئيسية و🌐
+# للغة جنب حبتين AR/EN. الكلام ما اتشالش من الوصول - اتنقل لـ
+# ‎aria-label/title‎ (اللينك) و‎label_visibility="collapsed"‎ (المفتاح،
+# Streamlit بيفضل يستخدم التسمية كاسم منطوق)، فقارئ الشاشة لسه بيقول
+# "الرئيسية" و"اللغة". مفيش مفتاح لغة فوق خالص دلوقتي.
 #
 # كل التحكمات الشغالة فضلت زي ما هي (نفس المنطق، نفس session_state):
 # اختيار الحساب (لو أكتر من واحد)، إنشاء مشروع، اختيار المشروع، اللغة،
@@ -422,22 +439,8 @@ with st.sidebar.container(gap=2):
         '<div class="cf-sb-tagline">%s</div>' % html.escape(tr("studio_tagline")),
         unsafe_allow_html=True,
     )
-    # مفتاح اللغة (AR/EN) - نزل هنا فوق (كان تحت جنب الأفتار قبل تعديل
-    # المالك). segmented_control عنصر واحد مدمج بحجمه الطبيعي، والتسمية
-    # ظاهرة (🌐 اللغة) عشان تبقى واضحة وهي أول تحكم في الشريط. الشكل نفسه
-    # (حبتين مستقلتين مدوّرتين تمامًا، المختارة تعبئة صفرا) متفروض في
-    # theme/sidebar.py - شكل segmented_control الافتراضي (زرارين ملزّقين،
-    # اختيار بحد بس) بيتغيّر هناك، مش هنا.
-    _lang_widget_key = "lang_toggle"
-    if _lang_widget_key not in st.session_state:
-        st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
-    _lang_selected = st.segmented_control(
-        tr("language_label"), options=["AR", "EN"], key=_lang_widget_key,
-        required=True, label_visibility="visible",
-    )
-    if _lang_selected.lower() != st.session_state["ui_lang"]:
-        st.session_state["ui_lang"] = _lang_selected.lower()
-        st.rerun()
+    # مفيش مفتاح لغة هنا فوق خالص بعد تعديل محمد (2026-09-23) - نزل تحت في
+    # صف واحد جنب أيقونة الرئيسية، شوف قسم الحساب في آخر الشريط.
 
 _sb_projects = st.sidebar.container(gap=6)
 _sb_projects.markdown(
@@ -559,16 +562,45 @@ _sb_account.markdown(
     unsafe_allow_html=True,
 )
 
-# رابط "الرئيسية" - نزل هنا تحت (كان فوق أول حاجة في الشريط قبل تعديل
-# المالك 2026-09-23) - مكان مفتاح اللغة القديم بالظبط، جنب الأفتار وقبل
-# الخروج مباشرة. ‎_nav_link()‎ نفسها زي ما هي (رابط حقيقي بـ target=_self،
-# مش st.link_button)، وبرضه ورا نفس شرط CIMAFAST_HOME_URL - لو الشرط ده
-# مش متظبط (تشغيلة من غير رابط رئيسية) الصف مش بيتكوّن خالص. ‎with
-# _sb_account:‎ عشان ‎_nav_link()‎ داخليًا بتنادي ‎st.markdown‎ عادي (مقصود -
-# شوف تعليقها)، فمحتاجة حاوية مفتوحة بـ ‎with‎ ترسم جواها.
-if os.environ.get("CIMAFAST_HOME_URL"):
-    with _sb_account:
-        _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
+# صف الأيقونات: الرئيسية 🏠 + اللغة 🌐 AR/EN جنب بعض - طلب محمد الزيات
+# (2026-09-23): "نزّل بلوك اللغة جنب الرئيسية، واشيل كلمة اللغة وكلمة
+# الرئيسية، الأيقونات لوحدها واضحة".
+#
+# ‎horizontal=True‎ (حاوية أفقية، Streamlit 1.64) مش ‎st.columns‎: الأعمدة
+# بتقسم العرض بالنسب فبتسيب فراغ ميت جنب أيقونة عرضها 44px، والحاوية
+# الأفقية بتحط العناصر جنب بعض بمقاسها الطبيعي. و‎vertical_alignment=
+# "center"‎ عشان اللينك (ارتفاع 44) يقع في نص حبتين AR/EN (44 كمان).
+# الترتيب بيتبع اتجاه اللغة تلقائيًا (‎direction‎ على الشريط في
+# theme/sidebar.py) فالرئيسية بتقع ناحية بداية السطر في اللغتين.
+#
+# الكلام اتشال من الشاشة بس مش من الوصول: اللينك بياخد ‎aria-label/title‎
+# ("الرئيسية")، ومفتاح اللغة تسميته لسه ‎language_label‎ بس
+# ‎label_visibility="collapsed"‎ - Streamlit بيفضل يستخدمها كاسم منطوق
+# للمجموعة. الجلوب نفسه ‎aria-hidden‎ عشان ميتقريش مرتين.
+#
+# لو ‎CIMAFAST_HOME_URL‎ مش متظبط (تشغيلة من غير رئيسية) الأيقونة مش
+# بتتكوّن خالص ومفتاح اللغة بياخد الصف لوحده - زي ما كان بالظبط.
+_sb_nav_row = _sb_account.container(
+    horizontal=True, gap="small", vertical_alignment="center", wrap=False)
+with _sb_nav_row:
+    if os.environ.get("CIMAFAST_HOME_URL"):
+        _nav_link("🏠", os.environ["CIMAFAST_HOME_URL"],
+                  title=t("الرئيسية"), icon_only=True)
+    st.markdown('<div class="cf-sb-globe" aria-hidden="true">🌐</div>',
+                unsafe_allow_html=True)
+    # الشكل (حبتين مستقلتين مدوّرتين تمامًا، المختارة تعبئة صفرا) متفروض في
+    # theme/sidebar.py - شكل segmented_control الافتراضي (زرارين ملزّقين،
+    # اختيار بحد بس) بيتغيّر هناك، مش هنا.
+    _lang_widget_key = "lang_toggle"
+    if _lang_widget_key not in st.session_state:
+        st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
+    _lang_selected = st.segmented_control(
+        tr("language_label"), options=["AR", "EN"], key=_lang_widget_key,
+        required=True, label_visibility="collapsed",
+    )
+if _lang_selected.lower() != st.session_state["ui_lang"]:
+    st.session_state["ui_lang"] = _lang_selected.lower()
+    st.rerun()
 
 # زرار خروج بعرض الشريط كامل - آخر حاجة في الشريط زي ما كان دايمًا.
 if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):

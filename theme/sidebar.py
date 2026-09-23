@@ -56,8 +56,9 @@ SIDEBAR_CSS = r'''
         padding: 4px 4px 2px;
     }
 
-    /* رابط "الرئيسية" - صف كامل العرض بدل الشكل المتوسط القديم، عشان
-       يبقى أول عنصر ملموس في الشريط زي الموك أب */
+    /* الشكل الأساسي لرابط التنقّل (القاعدة دي لسه بتخدم أي لينك بنص).
+       رابط "الرئيسية" نفسه بقى أيقونة لوحدها في آخر الشريط - شوف
+       ‎cf-navlink--icon‎ تحت. */
     section[data-testid="stSidebar"] a.cf-navlink {
         display: flex;
         align-items: center;
@@ -72,6 +73,54 @@ SIDEBAR_CSS = r'''
     section[data-testid="stSidebar"] a.cf-navlink:hover,
     section[data-testid="stSidebar"] a.cf-navlink:focus-visible {
         border-color: var(--cf-accent);
+    }
+    /* نسخة الأيقونة لوحدها (🏠 من غير كلمة "الرئيسية" - طلب محمد
+       2026-09-23): أيقونة **عريانة من غير كارت** - لا حد ولا خلفية، نفس
+       شكل الجلوب (🌐) اللي جنبها بالظبط. ده طلب محمد الصريح لما شاف الصف
+       على الهوا ("شيل الكارت اللي حوالين الأيقونة")، فبنلغي هنا الحد
+       والخلفية اللي القاعدة العامة فوق بتحطهم.
+
+       الشكل هو اللي اتشال، مش هدف اللمس: المساحة فاضلة ٤٤×٤٤ بس شفافة،
+       عشان الأيقونة تفضل تتمسك بالصباع على التليفون (theme/mobile.py:
+       TOUCH=44، وقاعدتها بتمسك ‎.stButton button‎ مش ‎a‎ فبتتفرض هنا).
+       ‎flex:0 0 auto‎ عشان الحاوية الأفقية بتاعة Streamlit متمططهاش. */
+    section[data-testid="stSidebar"] a.cf-navlink--icon {
+        flex: 0 0 auto;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 6px;
+        font-size: 17px;
+        line-height: 1;
+        border: none;
+        background: transparent;
+    }
+    /* من غير كارت، الإشارة الوحيدة إنها بتتضغط هي الحركة عند الهوفر.
+       والفوكس المرئي لازم يفضل للتنقّل بالكيبورد - بس ‎outline‎ بره العنصر
+       بدل حد كارت راجع تاني. */
+    section[data-testid="stSidebar"] a.cf-navlink--icon:hover {
+        border: none;
+        background: transparent;
+        transform: scale(1.12);
+    }
+    section[data-testid="stSidebar"] a.cf-navlink--icon:focus-visible {
+        border: none;
+        outline: 2px solid var(--cf-accent);
+        outline-offset: 2px;
+        border-radius: var(--cf-radius-md);
+    }
+
+    /* أيقونة اللغة (🌐) - بقت الأيقونة بس من غير كلمة "اللغة" (نفس الطلب).
+       مش تسمية Streamlit عشان تسمية المكوّن بتترسم فوقه في سطر لوحدها،
+       وإحنا عايزينها جنبه في نفس السطر. الكلمة نفسها لسه في
+       ‎aria-label‎ بتاع المفتاح (label_visibility="collapsed")، فدي زينة
+       بحتة و‎aria-hidden‎ في الـ HTML. */
+    section[data-testid="stSidebar"] .cf-sb-globe {
+        flex: 0 0 auto;
+        font-size: 15px;
+        line-height: 44px;
+        opacity: 0.75;
+        padding: 0 2px;
     }
 
     /* زرار "إنشاء مشروع جديد" - تعبئة صفرا صريحة (اللكنة) بدل شكل
@@ -164,7 +213,7 @@ SIDEBAR_CSS = r'''
        بيمسك مفتاح اللغة بس - لو ظهر segmented_control تاني في مكان تاني
        من البرنامج (مفيش حاليًا، اتفحص) مش هيتأثر. */
     section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] [role="radiogroup"] {
-        gap: 8px !important;
+        gap: 6px !important;
     }
     section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] button[role="radio"] {
         border-radius: var(--cf-radius-pill) !important;
@@ -172,11 +221,26 @@ SIDEBAR_CSS = r'''
         background: var(--cf-navy-raised) !important;
         color: var(--cf-text) !important;
         font-weight: 700 !important;
-        /* هدف لمس ٤٤ بكسل - نفس سبب التعليق فوق الـ expander summary:
-           الزرار ده مش .stButton button فمبيتغطاش بـ TOUCH_CSS العامة في
-           theme/mobile.py، فلازم يتفرض هنا صراحةً. الحجم الافتراضي كان
-           32px بس. */
-        min-height: 44px !important;
+        /* حبتين صغيرتين - محمد شافهم على الهوا وقال إنهم أكبر من اللازم
+           (2026-09-23). دلوقتي المفتاح أيقونة صغيرة في آخر الشريط، مش أول
+           تحكم كبير فيه، فالمقاس بقى ٢٨ بارتفاع وخط ١١ وحشو ضيق بدل
+           الافتراضي. الحجم ده للماوس بس - على التليفون بيرجع ٤٤ في
+           الميديا كويري تحت (هدف اللمس مش بيتفاوض عليه). */
+        min-height: 28px !important;
+        height: 28px !important;
+        padding: 0 12px !important;
+        font-size: 11px !important;
+        line-height: 1 !important;
+    }
+    /* تحت ٧٦٨ بكسل (تليفون/تابلت صغير) هدف اللمس بيرجع ٤٤ زي
+       theme/mobile.py بالظبط - المكوّن ده مش ‎.stButton button‎ فمبيتغطاش
+       بقاعدتها العامة. */
+    @media (max-width: 768px) {
+        section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] button[role="radio"] {
+            min-height: 44px !important;
+            height: 44px !important;
+            font-size: 13px !important;
+        }
     }
     section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] button[role="radio"]:hover {
         border-color: var(--cf-yellow) !important;
