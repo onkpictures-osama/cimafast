@@ -153,4 +153,37 @@ SIDEBAR_CSS = r'''
     }
     section[data-testid="stSidebar"] .cf-sb-field__label { opacity: 0.6; }
     section[data-testid="stSidebar"] .cf-sb-field__value { font-weight: 700; }
+
+    /* مفتاح اللغة (AR/EN) - شكل segmented_control الافتراضي بيطلع حبة
+       واحدة ملزّقة (نصف قطر بس على الحرف البرّاني لكل زرار، الاتنين
+       مشتركين في حد نص شفاف في النص، والمختار بحد صفرا مش تعبئة) - ده شكل
+       المكوّن الجاهز في Streamlit 1.64، مش اللي في الموك أب المعتمد
+       (حبتين مستقلتين مدوّرتين بالكامل، فاصل واضح بينهم، المختارة تعبئة
+       صفرا صريحة + حروف كحلي، الغير مختارة حد خفيف + حروف عادية).
+       ‎[class*="st-key-lang_toggle"]‎ بدل ‎key=‎ عادي عشان نضمن إن الستايل ده
+       بيمسك مفتاح اللغة بس - لو ظهر segmented_control تاني في مكان تاني
+       من البرنامج (مفيش حاليًا، اتفحص) مش هيتأثر. */
+    section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] [role="radiogroup"] {
+        gap: 8px !important;
+    }
+    section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] button[role="radio"] {
+        border-radius: var(--cf-radius-pill) !important;
+        border: 1px solid var(--cf-edge) !important;
+        background: var(--cf-navy-raised) !important;
+        color: var(--cf-text) !important;
+        font-weight: 700 !important;
+        /* هدف لمس ٤٤ بكسل - نفس سبب التعليق فوق الـ expander summary:
+           الزرار ده مش .stButton button فمبيتغطاش بـ TOUCH_CSS العامة في
+           theme/mobile.py، فلازم يتفرض هنا صراحةً. الحجم الافتراضي كان
+           32px بس. */
+        min-height: 44px !important;
+    }
+    section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] button[role="radio"]:hover {
+        border-color: var(--cf-yellow) !important;
+    }
+    section[data-testid="stSidebar"] [class*="st-key-lang_toggle"] button[role="radio"][aria-checked="true"] {
+        background: var(--cf-yellow) !important;
+        border-color: var(--cf-yellow) !important;
+        color: var(--cf-ink) !important;
+    }
 '''

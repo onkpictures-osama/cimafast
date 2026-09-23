@@ -221,6 +221,11 @@ def test_sidebar_dark_surface_contrast():
         # نفس زوج on-accent/accent-fill المُتحقق منه فوق، بس بنسجّله هنا
         # كمان صراحةً عشان يبقى واضح إنه زوج الشريط الجانبي مش بس زوج عام
         ("sidebar-cta-ink/yellow-fill", p["on_accent"], p["accent"], C.BODY_FLOOR),
+        # مفتاح اللغة (AR/EN) بعد إعادة التصميم لحبتين مستقلتين
+        # (theme/sidebar.py): المختارة نفس زوج yellow-fill فوق (تعبئة صفرا
+        # + on_accent)، والغير مختارة نص عادي على Navy Raised - زوج جديد،
+        # أغمق شوية من Navy Surface المُتحقق منه فوق فمحتاج قياس مستقل.
+        ("sidebar-lang-inactive/navy-raised", p["text"], tokens.BRAND["navy_raised"], C.BODY_FLOOR),
     ]
     results, failures = C.audit(rows)
     print("\n--- sidebar (dark surface) ---\n" + C.fmt(results))

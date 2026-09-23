@@ -381,10 +381,16 @@ theme.inject_main(
 # مش راوتر صفحات متداخلة، و"المشاريع" في الموك أب مالوش أي محتوى غير
 # اختيار/إنشاء المشروع اللي أصلًا موجودين تحت - فمفيش داعي لسهم بيوعد
 # بحاجة مش موجودة (mystery-meat nav). القرار هنا: "الرئيسية" فضلت رابط
-# فعلي (بيودّي فعلاً لصفحة تانية) في شكل صف تنقّل حقيقي أول حاجة في
-# الشريط؛ "المشاريع" بقت عنوان قسم غير قابل للنقر فوق نفس عناصر
-# اختيار/إنشاء المشروع اللي كانت موجودة أصلًا - نفس الوظيفة بالظبط، غلاف
-# بصري بس اتغيّر.
+# فعلي (بيودّي فعلاً لصفحة تانية)، و"المشاريع" بقت عنوان قسم غير قابل
+# للنقر فوق نفس عناصر اختيار/إنشاء المشروع اللي كانت موجودة أصلًا - نفس
+# الوظيفة بالظبط، غلاف بصري بس اتغيّر.
+#
+# ترتيب رأسي عدّله المالك بعد ما شاف النتيجة على الهوا (2026-09-23): "ارفع
+# بلوك اللغه فوق ونزل زرار الرييسية تحت". فبدّلنا الاتنين مكان بعض حرفيًا -
+# مفتاح اللغة (segmented_control) بقى هنا تحت التاجلاين مباشرة (أول تحكم
+# ملموس في الشريط)، ورابط "الرئيسية" نزل تحت جوه قسم الحساب جنب الأفتار
+# والخروج (مكان مفتاح اللغة القديم بالظبط). "أول حاجة ملموسة في الشريط"
+# بقت بتنطبق على اللغة مش الرئيسية.
 #
 # كل التحكمات الشغالة فضلت زي ما هي (نفس المنطق، نفس session_state):
 # اختيار الحساب (لو أكتر من واحد)، إنشاء مشروع، اختيار المشروع، اللغة،
@@ -416,8 +422,22 @@ with st.sidebar.container(gap=2):
         '<div class="cf-sb-tagline">%s</div>' % html.escape(tr("studio_tagline")),
         unsafe_allow_html=True,
     )
-    if os.environ.get("CIMAFAST_HOME_URL"):
-        _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
+    # مفتاح اللغة (AR/EN) - نزل هنا فوق (كان تحت جنب الأفتار قبل تعديل
+    # المالك). segmented_control عنصر واحد مدمج بحجمه الطبيعي، والتسمية
+    # ظاهرة (🌐 اللغة) عشان تبقى واضحة وهي أول تحكم في الشريط. الشكل نفسه
+    # (حبتين مستقلتين مدوّرتين تمامًا، المختارة تعبئة صفرا) متفروض في
+    # theme/sidebar.py - شكل segmented_control الافتراضي (زرارين ملزّقين،
+    # اختيار بحد بس) بيتغيّر هناك، مش هنا.
+    _lang_widget_key = "lang_toggle"
+    if _lang_widget_key not in st.session_state:
+        st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
+    _lang_selected = st.segmented_control(
+        tr("language_label"), options=["AR", "EN"], key=_lang_widget_key,
+        required=True, label_visibility="visible",
+    )
+    if _lang_selected.lower() != st.session_state["ui_lang"]:
+        st.session_state["ui_lang"] = _lang_selected.lower()
+        st.rerun()
 
 _sb_projects = st.sidebar.container(gap=6)
 _sb_projects.markdown(
@@ -539,22 +559,18 @@ _sb_account.markdown(
     unsafe_allow_html=True,
 )
 
-# segmented_control عنصر واحد مدمج بحجمه الطبيعي — بديل الزرارين الكبيرين
-# اللي كانوا نص عرض الشريط لكل واحد. التسمية بقت ظاهرة (🌐 اللغة) بدل
-# مخفية - الشريط بقى فيه مساحة تكفي بعد ما "الرئيسية" اتنقلت لفوق.
-_lang_widget_key = "lang_toggle"
-if _lang_widget_key not in st.session_state:
-    st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
-_lang_selected = _sb_account.segmented_control(
-    tr("language_label"), options=["AR", "EN"], key=_lang_widget_key,
-    required=True, label_visibility="visible",
-)
-if _lang_selected.lower() != st.session_state["ui_lang"]:
-    st.session_state["ui_lang"] = _lang_selected.lower()
-    st.rerun()
+# رابط "الرئيسية" - نزل هنا تحت (كان فوق أول حاجة في الشريط قبل تعديل
+# المالك 2026-09-23) - مكان مفتاح اللغة القديم بالظبط، جنب الأفتار وقبل
+# الخروج مباشرة. ‎_nav_link()‎ نفسها زي ما هي (رابط حقيقي بـ target=_self،
+# مش st.link_button)، وبرضه ورا نفس شرط CIMAFAST_HOME_URL - لو الشرط ده
+# مش متظبط (تشغيلة من غير رابط رئيسية) الصف مش بيتكوّن خالص. ‎with
+# _sb_account:‎ عشان ‎_nav_link()‎ داخليًا بتنادي ‎st.markdown‎ عادي (مقصود -
+# شوف تعليقها)، فمحتاجة حاوية مفتوحة بـ ‎with‎ ترسم جواها.
+if os.environ.get("CIMAFAST_HOME_URL"):
+    with _sb_account:
+        _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
 
-# زرار خروج بعرض الشريط كامل - النص الكامل ("🚪 تسجيل الخروج") بقى ملائم
-# دلوقتي إن الصف بقى لوحده (مش متقاسم مع "الرئيسية" اللي اتنقلت لفوق).
+# زرار خروج بعرض الشريط كامل - آخر حاجة في الشريط زي ما كان دايمًا.
 if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):
     _logout()
     st.rerun()
