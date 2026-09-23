@@ -696,7 +696,20 @@ if not projects:
 _wanted = st.session_state.pop("_link_project_name", None)
 if _wanted in project_names:
     st.session_state["project_selector"] = _wanted
-selected_project_name = _sb_projects.selectbox(tr("current_project_label"), list(project_names.keys()), key="project_selector")
+# ⚙️ جنب اسم المشروع بتفتح تبويب "إعدادات المشروع" على طول (تعديل/حذف
+# المشروع، الفريق، الحلقات) - طلب المالك 2026-09-23 لما دوّر على الحذف
+# وملقاهوش. الكولباك بيتنفذ قبل الـ run الجاي، فالتبويب بيتفتح قبل ما
+# ‎st.tabs(key="main_tabs")‎ يتبني.
+def _open_settings_tab():
+    st.session_state["main_tabs"] = tr(links.TABS["settings"])
+
+
+_sb_proj_row = _sb_projects.container(
+    horizontal=True, vertical_alignment="bottom", gap="small", wrap=False, key="cf_sb_proj_row")
+selected_project_name = _sb_proj_row.selectbox(tr("current_project_label"), list(project_names.keys()), key="project_selector")
+_sb_proj_row.button("", icon=":material/settings:", key="sb_open_settings",
+                    help=t("إعدادات المشروع: تعديل، حذف، الفريق، الحلقات"),
+                    on_click=_open_settings_tab)
 project_id = project_names[selected_project_name]
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]

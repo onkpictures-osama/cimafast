@@ -719,6 +719,7 @@ TRANSLATIONS = {
     "0 = من غير رقم": "0 = no number",
     "معرفش أحفظ الرقم ده.": "Couldn't save that number.",
     "مشهد في السكريبت": "scenes in the script",
+    "إعدادات المشروع: تعديل، حذف، الفريق، الحلقات": "Project settings: edit, delete, team, episodes",
     "يوم تصوير": "shoot days",
     "يوم انتظار": "hold days",
     "من يوم": "from day",

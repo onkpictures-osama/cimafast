@@ -100,6 +100,28 @@ SIDEBAR_CSS = r'''
         text-align: start !important;
         margin-bottom: 8px;
     }
+    /* خانة المشروع + ⚙️ الإعدادات في صف واحد: الخانة تاخد العرض كله،
+       والترس بمقاسه (٤٤ = هدف اللمس) على الطرف */
+    section[data-testid="stSidebar"] .st-key-cf_sb_proj_row > * {
+        flex: 0 0 auto !important;
+        width: auto !important;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_proj_row > [data-testid="stElementContainer"]:has([data-testid="stSelectbox"]) {
+        flex: 1 1 auto !important;
+        min-width: 0;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_proj_row .stButton button {
+        min-width: 44px;
+        min-height: 40px;
+        padding: 0 10px;
+        background: var(--cf-navy-raised);
+        border: 1px solid var(--cf-edge);
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_proj_row .stButton button:hover,
+    section[data-testid="stSidebar"] .st-key-cf_sb_proj_row .stButton button:focus-visible {
+        border-color: var(--cf-yellow);
+        color: var(--cf-yellow);
+    }
     /* صف الهوية: غلاف الأفتار ياخد الباقي (يمين)، والجرس بمقاسه على الطرف */
     section[data-testid="stSidebar"] .st-key-cf_sb_me > * {
         flex: 0 0 auto !important;
