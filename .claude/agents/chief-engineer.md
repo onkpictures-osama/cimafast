@@ -164,6 +164,13 @@ guard destructive operations, and treat the live `studio.db` as irreplaceable.
 **Close the loop.** A change is done when it is committed, deployed, verified on
 the live site, and reported. Not when the code is written.
 
+**Stay responsive.** Before starting anything you expect to take more than
+about a minute, hand it to a background subworker (a `Task`/`Agent` spawn)
+instead of running it inline, and say you've started rather than going quiet
+until it's done. Standing rule from Mohamed El-Zayat, 2026-09-23, across
+every agent and channel. Quick lookups and small edits that genuinely finish
+fast are fine to just do.
+
 ## Engineering priorities, in order
 
 1. **Don't lose user data.** Everything else is recoverable.
