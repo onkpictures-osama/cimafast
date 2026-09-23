@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from . import brand, classic, glass, mobile, tokens
+from . import brand, classic, glass, mobile, sidebar, tokens
 from .flag import CLASSIC, GLASS
 
 
@@ -256,7 +256,7 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     فالقوالب ‎__DIR__‎ / ‎__ALIGN__‎ / ‎__ROWDIR__‎ بتتبدل في النسختين
     بنفس الطريقة.
     """
-    parts = [classic.MAIN_CSS, _header_logo_css(), _sticky_bar_css()]
+    parts = [classic.MAIN_CSS, sidebar.SIDEBAR_CSS, _header_logo_css(), _sticky_bar_css()]
     if variant == GLASS:
         parts.append(glass.main_css(dir_))
     # موبايل: طبقة CSS ثابتة جوه @media، بتتطبق لوحدها لما عرض الشاشة يضيق —

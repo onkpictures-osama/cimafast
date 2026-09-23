@@ -82,7 +82,39 @@ def main_css(dir_="rtl"):
         # الاتجاه (وقت ‎base_css‎ لسه مش عارفينه — لغة الواجهة بتتقرا بعد
         # الدخول). شاشة الدخول دايمًا RTL فنسخة الـ base صح لها.
         _ground_rules("dark", dir_),
+        _sidebar_glass_css(),
     ])
+
+
+def _sidebar_glass_css():
+    """الشريط الجانبي كلوح زجاج واحد (درجة regular) بدل التعبئة الكحلي
+    المصمتة (‎theme/sidebar.py‎) - تجربة صاحب المنتج ("زي Liquid Glass بتاع
+    Apple") تحت الفلاج بس، جنب النسخة المصمتة الافتراضية، مش بديل ليها.
+
+    لوح واحد بس، مفيش بلور تاني جواه: الشريط عنصر ‎_CHROME_SURFACES‎ مسجّل
+    أصلًا (فوق) يقدر يعلن بلور، بس البادجات والكروت جواه (حقل "الدور"،
+    زرار "إنشاء مشروع جديد"...) فضلت مصمتة عمدًا - نفس لغة الزجاج الحقيقية
+    (macOS/iOS): لوح مادة واحد ثابت، وصفوف محتوى عادية فوقه، مش كل صف
+    بلور لوحده. كده الميزانية (طبقتين بلور متداخلين كحد أقصى،
+    ‎tests/visual/blur_depth.py‎) مستخدمة طبقة واحدة بس من اتنين.
+
+    الأرضية اللي بتتكسر من خلاله هي نفس ميش ‎body‎ اللي ‎_ground_rules‎ بناه
+    فوق (ثابت في الفيوبورت، بيمتد تحت الشريط الجانبي زي أي حتة تانية في
+    الصفحة) - فمفيش داعي لأرضية منفصلة، تعبئة الشريط الجانبي المصمتة اللي
+    كانت بتغطيها هي اللي بتتشال هنا بس (نفس السيليكتور، ترتيب حقن أخّر
+    فبيكسب زي ما هو موضّح في ‎theme/inject.py‎).
+    """
+    # ‎[aria-expanded="true"]‎ فقط: Streamlit بيقفل الشريط بعرض 0 على
+    # الموبايل (مقاسه في tests/visual/mobile_ui.py: "الشريط الجانبي مقفول
+    # على التليفون"). حد ‎1px‎ من ‎_tier_decls‎ بيفرض حد أدنى ~2px حتى لو
+    # المحتوى بعرض صفر (الحد مش بيتقلّص تحت سمكه هو) - فبيفشّل الفحص ده
+    # (‎visible: true, width: 2‎ بدل مقفول تمامًا). سكوب بالحالة المفتوحة
+    # بيمنع الحد يتحقن أصلًا وقت القفل، فمفيش سليڤر 2px يفضل ظاهر.
+    return f"""
+    section[data-testid="stSidebar"][aria-expanded="true"] {{
+        {_tier_decls("regular")}
+    }}
+    """
 
 
 def inject_runtime(st):
@@ -177,8 +209,15 @@ _BLUR_SURFACES = (
 
 # إطار البرنامج — سطح بلور من درجة تانية. بيتعامل لوحده عشان الشريط
 # الجانبي بيغطي المحتوى على الموبايل، فأي بلور جوّاه بيبقى فوق بلور.
+#
+# سيليكتور الشريط الجانبي مقيّد بـ ‎[aria-expanded="true"]‎: القاعدة الفعلية
+# اللي بتعلن البلور (‎_sidebar_glass_css‎) مقيّدة بنفس الشرط عشان الحد
+# (‎border‎) اللي المادة بتحطه ميفرضش حد أدنى ~2px وقت الشريط مقفول على
+# الموبايل (بيبوّظ فحص "الشريط الجانبي مقفول" في mobile_ui.py). السيليكتور
+# هنا لازم يطابق حرفيًا اللي بيعلن البلور فعلًا — الاختبار بيقارن سترنج
+# بسترنج.
 _CHROME_SURFACES = (
-    'section[data-testid="stSidebar"]',
+    'section[data-testid="stSidebar"][aria-expanded="true"]',
     'header[data-testid="stHeader"]',
 )
 
@@ -266,20 +305,6 @@ def _cf_surface_rules():
     .stApp .cf-stage-pending {{ opacity: 0.55; }}
     .stApp .cf-stage-label {{ color: var(--cf-text); }}
 
-    /* صندوق وصف البرنامج في الشريط الجانبي: الشريط نفسه دهبي، فالصندوق
-       بياخد تعبئة فاتحة خفيفة بدل زجاج تاني — مفيش بلور جوه بلور. */
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-desc-box {{
-        border: 1px solid rgba(27, 37, 75, 0.30);
-        border-radius: var(--cf-radius-sm);
-        background: rgba(255, 255, 255, 0.24);
-    }}
-    /* كارت المستخدم الحالي — الدرجة المعتمة: نص كثيف ولازم يفضل حاد. */
-    section[data-testid="stSidebar"] .cf-owner-box {{
-        background: var(--cf-white);
-        border: 1px solid rgba(27, 37, 75, 0.22);
-        border-radius: var(--cf-radius-md);
-        box-shadow: var(--cf-elevation-sm);
-    }}
     .stApp .cf-saved-badge {{ color: var(--cf-text-dim); opacity: 1; }}
     .stApp .cf-check-badge {{ background: var(--cf-info); color: var(--cf-on-info); }}
     .stApp .cf-copy-hint {{ color: var(--cf-accent-ink); }}
@@ -308,14 +333,17 @@ def _blur_guard_rules():
     [data-testid="stMain"] {all_s} {all_s} {all_s} {{
         background: var(--cf-glass-opaque) !important;
     }}
-    /* جوه الشريط الجانبي الدهبي مفيش بلور تاني خالص: الشريط بيقف فوق
-       المحتوى على الموبايل، فأي بلور جوّاه بيبقى بلور فوق بلور فوق
-       المحتوى — والتكلفة دي على جهاز المستخدم مش علينا. */
+    /* جوه الشريط الجانبي مفيش بلور تاني خالص: الشريط بيقف فوق المحتوى على
+       الموبايل، فأي بلور جوّاه بيبقى بلور فوق بلور فوق المحتوى — والتكلفة
+       دي على جهاز المستخدم مش علينا.
+
+       من غير تلوين تعبئة/حدود قسري هنا (كان تينت كحلي خفيف مصمم للحقل
+       الأصفر القديم؛ فوق سطح الشريط الغامق الجديد كحلي-على-كحلي كان هيبهّت
+       التمييز اللوني بين تنبيه (‎stAlert‎) وخطأ ونجاح - فبنسيب كل عنصر
+       يستخدم لون الوضع الغامق الافتراضي بتاعه زي أي مكان تاني في البرنامج،
+       وبنطفي البلور بس. */
     section[data-testid="stSidebar"] {inner} {{
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
-        background: rgba(27, 37, 75, 0.08) !important;
-        border: 1px solid rgba(27, 37, 75, 0.28) !important;
-        box-shadow: none !important;
     }}
     """

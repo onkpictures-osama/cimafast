@@ -370,46 +370,60 @@ theme.inject_main(
 
 
 # ---------------- الشريط الجانبي ----------------
-# إعادة تصميم 2026-09-23 (تالتة): نفس الترتيب المنطقي من المرة اللي فاتت
-# ("مشاريعي" أول حاجة، شريط الحساب في الآخر رفيع)، بس اتحل سبب الفراغات
-# الكبيرة اللي كانت طالعة على التليفون تحديدًا: st.columns بتتحول تلقائيًا
-# لعمود واحد تحت الآخر لما عرض الشاشة يبقى ضيق (نفس isMobile اللي مكتوب
-# عنها في theme/mobile.py) — وده اللي كان مخلّي "؟" يطلع لوحده منعزل تحت
-# اللوجو، وزرار "خروج" ياخد صف كامل لوحده. البديل st.container(horizontal=
-# True, wrap=False) هو API تاني تمامًا (مش st.columns) ومابيعملش ستاك على
-# الموبايل، فالصف بيفضل صف. الفراغات التانية (بين الأقسام) اتقفلت بـ
-# gap=رقم بالبكسل بدل الافتراضي (~16px) اللي كان بيتكرر فوق كل حاجة.
+# إعادة تصميم 2026-09-23 (رابعة، سطح غامق): موافقة صاحب المنتج ("Yes") على
+# موك أب مرجعي شاركه — خلفية كحلي غامقة بدل الحقل الأصفر، بدل ما تبقى
+# تعديل مسافات زي المرة اللي فاتت. الاستثناء موثّق ومؤرّخ في
+# theme/brand.py وستايله في theme/sidebar.py — للشريط الجانبي بس، باقي
+# البرنامج زي ما هو بالحقل الأصفر حيثما استُخدم.
 #
-# ثلاث مجموعات بصرية بس، كل مجموعة صف/عمود واحد مرصوص - عشان الفراغ بين
-# المجموعات يبقى فاصل قسم مقصود، مش فراغ عشوائي جوه القسم نفسه:
-#   1) الهيدر: اللوجو + "؟" في صف واحد
-#   2) مشاريعي: الحساب (لو أكتر من واحد) + إنشاء مشروع + اختيار المشروع
-#   3) شريط الحساب: الاسم/الاشتراك + اللغة + الرئيسية/خروج
+# تفسير بنية الموك أب: "الرئيسية" و"المشاريع" ظاهرين فيه كصفين متوازيين
+# بسهم (›) يوحي بصفحات فرعية تتفتح تحتهم. البرنامج ده صفحة Streamlit واحدة
+# مش راوتر صفحات متداخلة، و"المشاريع" في الموك أب مالوش أي محتوى غير
+# اختيار/إنشاء المشروع اللي أصلًا موجودين تحت - فمفيش داعي لسهم بيوعد
+# بحاجة مش موجودة (mystery-meat nav). القرار هنا: "الرئيسية" فضلت رابط
+# فعلي (بيودّي فعلاً لصفحة تانية) في شكل صف تنقّل حقيقي أول حاجة في
+# الشريط؛ "المشاريع" بقت عنوان قسم غير قابل للنقر فوق نفس عناصر
+# اختيار/إنشاء المشروع اللي كانت موجودة أصلًا - نفس الوظيفة بالظبط، غلاف
+# بصري بس اتغيّر.
 #
-# صندوق الوصف الطويل لسه بطاقة popover تتفتح بالطلب (؟) وتتقفل لوحدها —
-# مش صندوق ثابت دايمًا ظاهر. أي تفاصيل تنفيذية خاصة بمشروع معيّن (تعديل/
-# حذف، الحلقات، الفريق، جدول التصوير) في تبويب "⚙️ إعدادات المشروع" جوه
-# المشروع نفسه (views/project_settings.py) — مش هنا. وكلمة "شركة" مش
-# بتظهر في أي مكان غير نوع الاشتراك.
+# كل التحكمات الشغالة فضلت زي ما هي (نفس المنطق، نفس session_state):
+# اختيار الحساب (لو أكتر من واحد)، إنشاء مشروع، اختيار المشروع، اللغة،
+# الرئيسية، الخروج. الجديد بس عناصر عرض إضافية: صف أفتار بالحروف الأولى
+# (مفيش ميزة صور حسابات لسه - PRODUCT-PLAN)، وحقل "الدور" للقراءة بس
+# (الدور نفسه كان معروف من قبل، بس مش ظاهر في الشريط).
 
-with st.sidebar.container(horizontal=True, gap="small",
-                           vertical_alignment="center", wrap=False):
-    # الشريط الجانبي هو الحقل الأصفر بتاع البراند ⇒ النسخة الكحلي من اللوجو
-    # (الدليل ص 03: "On yellow → navy figure"). من غير ™ هنا: الدليل بيقول
-    # إنها اختيارية في كروم الواجهة، والشريط ضيق.
+with st.sidebar.container(gap=2):
+    with st.container(horizontal=True, gap="small",
+                       vertical_alignment="center", wrap=False):
+        # سطح غامق دلوقتي ⇒ نسخة العلامة الصفرا (mark-dark). و‎lockup()‎
+        # المركّبة مش ‎lockup_master()‎ الماستر عشان يطلع "CimaFast STUDIO"
+        # زي كل سطح تاني في التطبيق، مش "MEDIA" بتاعة الماستر الجامد.
+        st.markdown(
+            '<div class="cf-title">%s</div>' % theme.brand.lockup("dark", px=36),
+            unsafe_allow_html=True,
+        )
+        # "؟" مش إيموجي ("ℹ️") ولا حرف دائرة نادر ("ⓘ") - الاتنين ما رسمهمش
+        # صحيح. علامة استفهام عادية أكيد موجودة في نفس الخط اللي بيرسم باقي
+        # نص الواجهة كله صح.
+        with st.popover("؟"):
+            st.markdown(f"**{tr('studio_tagline')}**")
+            st.caption(t(_APP_DESCRIPTION))
+    # تاجلاين تحت اللوجو - نفس نص "؟" (studio_tagline)، مش ترجمة حرفية
+    # لتاجلاين إنجليزي جديد ("IDEAS TO SCREEN") مالوش وجود في نظام الهوية.
+    # مفيش تاجلاين تانية في آخر الشريط (كان فيها "GOOD STORIES GO FURTHER"
+    # في الموك أب) - نفس الجملة مكررة مرتين في شريط بالطول ده زحمة مش زينة.
     st.markdown(
-        '<div class="cf-title">%s</div>' % theme.brand.lockup_master("light", height=40),
+        '<div class="cf-sb-tagline">%s</div>' % html.escape(tr("studio_tagline")),
         unsafe_allow_html=True,
     )
-    # "؟" مش إيموجي ("ℹ️") ولا حرف دائرة نادر ("ⓘ") - الاتنين ما رسمهمش
-    # صحيح. علامة استفهام عادية أكيد موجودة في نفس الخط اللي بيرسم باقي
-    # نص الواجهة كله صح.
-    with st.popover("؟"):
-        st.markdown(f"**{tr('studio_tagline')}**")
-        st.caption(t(_APP_DESCRIPTION))
+    if os.environ.get("CIMAFAST_HOME_URL"):
+        _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
 
 _sb_projects = st.sidebar.container(gap=6)
-_sb_projects.caption(f"📁 {tr('sidebar_projects')}")
+_sb_projects.markdown(
+    '<div class="cf-sb-section-label">📁 %s</div>' % html.escape(tr("sidebar_projects")),
+    unsafe_allow_html=True,
+)
 
 _current_user = st.session_state.get("_auth_user")
 
@@ -485,45 +499,65 @@ if not projects:
 _wanted = st.session_state.pop("_link_project_name", None)
 if _wanted in project_names:
     st.session_state["project_selector"] = _wanted
-selected_project_name = _sb_projects.selectbox(tr("select_project"), list(project_names.keys()), key="project_selector")
+selected_project_name = _sb_projects.selectbox(tr("current_project_label"), list(project_names.keys()), key="project_selector")
 project_id = project_names[selected_project_name]
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
 
-# شريط الحساب — رفيع، في الآخر خالص، بعد ما اخترت مشروعك مش قبله. اسمك
-# ونوع اشتراكك في سطر، اللغة سطر لوحدها (لازمة مسافة لقطعتين)، والرئيسية/
-# الخروج جنب بعض في صف واحد ماينكسرش (st.container(horizontal=True،
-# wrap=False) زي الهيدر فوق، مش st.columns) بدل ما "خروج" ياخد صف كامل
-# لوحده على التليفون. فاصل رفيع واحد قبل القسم ده بس - مفيش فاصل بعده،
-# لأنه آخر حاجة في الشريط الجانبي أصلًا (اللي بعده محتوى المشروع في
-# المنطقة الرئيسية، مش هنا)، فمفيش حاجة يفصلها عنها.
+# "الدور" - عرض للقراءة بس، مش اختيار: الدور بيتغيّر من صفحة الفريق
+# (ROLE_LABELS نفسها بتتغيّر من هناك)، مش من هنا. من غير شكل سهم/قابلية
+# ضغط عمدًا عشان الشكل ميوهمش إنه dropdown شغال.
+_sb_projects.markdown(
+    '<div class="cf-sb-field"><span class="cf-sb-field__label">%s</span>'
+    '<span class="cf-sb-field__value">%s</span></div>'
+    % (html.escape(tr("role_label")), html.escape(t(accounts.ROLE_LABELS.get(_role, _role)))),
+    unsafe_allow_html=True,
+)
+
+# شريط الحساب — رفيع، في الآخر خالص، بعد ما اخترت مشروعك مش قبله. فاصل
+# رفيع واحد قبل القسم ده بس - مفيش فاصل بعده، لأنه آخر حاجة في الشريط
+# الجانبي أصلًا (اللي بعده محتوى المشروع في المنطقة الرئيسية، مش هنا).
+#
+# صف الأفتار: مفيش ميزة صور حسابات في البرنامج لسه (مفيش عمود صورة في
+# جدول users، ولا مسار رفع) - ده خارج نطاق الشغلانة دي عمدًا (تخزين/
+# اعتدال/خصوصية محتاجين قرار لوحدهم). بدالها دايرة بالحروف الأولى من
+# display_name (أو اسم الدخول لو مفيش)، بنفس لغة ألوان العلامة
+# (تعبئة صفرا + حروف كحلي) بدل ما تخترع بالتة جديدة. الاسم تحته نوع
+# الاشتراك (Creator/Studio/Enterprise) - نفس اللي كان في الكابشن القديم،
+# مش وظيفة، غلاف بصري بس اتغيّر.
 st.sidebar.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
 _sb_account = st.sidebar.container(gap=6)
-_sb_account.caption(f"{_current_user} · **{_tier_label}**")
+_display_name = ((_me_row["display_name"] if _me_row else None) or _current_user or "?").strip()
+_initials = "".join(w[0] for w in _display_name.split()[:2]).upper() or "?"
+_sb_account.markdown(
+    '<div class="cf-sb-avatar-row">'
+    '<div class="cf-sb-avatar">%s</div>'
+    '<div><div class="cf-sb-avatar-name">%s</div>'
+    '<div class="cf-sb-avatar-role">%s</div></div>'
+    "</div>"
+    % (html.escape(_initials), html.escape(_display_name), html.escape(_tier_label)),
+    unsafe_allow_html=True,
+)
 
 # segmented_control عنصر واحد مدمج بحجمه الطبيعي — بديل الزرارين الكبيرين
-# اللي كانوا نص عرض الشريط لكل واحد.
+# اللي كانوا نص عرض الشريط لكل واحد. التسمية بقت ظاهرة (🌐 اللغة) بدل
+# مخفية - الشريط بقى فيه مساحة تكفي بعد ما "الرئيسية" اتنقلت لفوق.
 _lang_widget_key = "lang_toggle"
 if _lang_widget_key not in st.session_state:
     st.session_state[_lang_widget_key] = st.session_state["ui_lang"].upper()
 _lang_selected = _sb_account.segmented_control(
-    "Language", options=["AR", "EN"], key=_lang_widget_key,
-    required=True, label_visibility="collapsed",
+    tr("language_label"), options=["AR", "EN"], key=_lang_widget_key,
+    required=True, label_visibility="visible",
 )
 if _lang_selected.lower() != st.session_state["ui_lang"]:
     st.session_state["ui_lang"] = _lang_selected.lower()
     st.rerun()
 
-with _sb_account.container(horizontal=True, gap="small", wrap=False):
-    if os.environ.get("CIMAFAST_HOME_URL"):
-        _nav_link(f"🏠 {t('الرئيسية')}", os.environ["CIMAFAST_HOME_URL"])
-    # نص قصير بس ("خروج") مش tr("logout") الكامل ("🚪 تسجيل الخروج") - ده
-    # صف ضيق نص عرض الشريط، والنص الطويل كان بيتقطع. من غير إيموجي عمدًا:
-    # إيموجي الألوان بتتجاهل لون النص اللي الـ CSS بيحطه، فلو خلفية غامقة
-    # وإيموجي غامق (زي البني/البرتقالي بتاع الباب) بيبقى شبه مختفي.
-    if st.button(t("خروج"), key="logout_btn", help=tr("logout")):
-        _logout()
-        st.rerun()
+# زرار خروج بعرض الشريط كامل - النص الكامل ("🚪 تسجيل الخروج") بقى ملائم
+# دلوقتي إن الصف بقى لوحده (مش متقاسم مع "الرئيسية" اللي اتنقلت لفوق).
+if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):
+    _logout()
+    st.rerun()
 
 # جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات — كل التفاصيل
 # التنفيذية دي بقت في تبويب "⚙️ إعدادات المشروع" (views/project_settings.py)

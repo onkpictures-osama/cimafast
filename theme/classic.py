@@ -156,160 +156,13 @@ MAIN_CSS = r'''
         z-index: 2;
         background: var(--cf-glass-opaque);
     }
-    /* الشريط الجانبي هو "الحقل الأصفر" بتاع البراند - نفس اتجاه الواجهة،
-       وبيقلب مكانه (يمين للعربي، شمال للإنجليزي).
-
-       كان تدرّج (E8B923 → C99A2E) عشان يهدّي حدة دهبي مش مضبوط. مع لون
-       البراند الرسمي (CF Yellow #FECA05) رجع لون واحد مصمت زي ما الدليل
-       بيقول بالنص: "الحقل الأصفر هو البراند، مش سطح - نفس القيمة في
-       الوضعين". والتباين بقى أحسن كمان: Ink على الأصفر 9.67:1 (AAA) في كل
-       نقطة، بدل 6.27:1 في قاع التدرّج القديم. */
-    section[data-testid="stSidebar"] {
-        direction: __DIR__;
-        background: var(--cf-yellow);
-    }
-    section[data-testid="stSidebar"] * {
-        color: var(--cf-on-brand) !important;
-    }
-    /* Streamlit بيحط ‎opacity: .6‎ على النص التوضيحي (caption). على أرضية
-       غامقة ده مقبول، بس على الحقل الأصفر الكحلي بينزل من 9.67:1 لـ 3.64:1
-       — تحت الحد الأدنى. قاعدة الدليل إن النص فوق الأصفر Ink كامل مش باهت،
-       فبنرجّع الشفافية لواحد هنا بس (جوه الشريط الجانبي). */
-    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-        opacity: 1 !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
-    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label {
-        color: var(--cf-on-brand) !important;
-    }
-    /* لو الشريط الجانبي بيتقفل/بيتفتح (أنيميشن العرض بيتغير من صفر للكامل)،
-       لازم النص ميلفش رأسي حرف تحت حرف - يفضل مقصوص بالعرض بس (…) */
-    section[data-testid="stSidebar"] .cf-sidebar-header {
-        overflow: hidden;
-    }
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-title {
-        font-size: 22px;
-        font-weight: 800;
-        line-height: 1.3;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-subtitle {
-        font-size: 13px;
-        opacity: 0.85;
-        margin-top: 2px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    section[data-testid="stSidebar"] {
-        overflow-x: hidden !important;
-    }
-    /* إعادة تصميم الشريط الجانبي 2026-09-23: الإيقاع الرأسي بين عناصر
-       st.sidebar بقى متحكَّم فيه من بايثون (st.container(gap=...)) بدل
-       ما يتكرر فراغ ~16px افتراضي فوق كل عنصر من غير قصد - وده كان أكبر
-       سبب في الفراغات الفاضية اللي طلعت في الصورة. القاعدة هنا بس للفاصل
-       المخصص الرفيع اللي بيفصل قسم "مشاريعي" عن "شريط الحساب" - مفيش
-       فاصل تاني تحته لأنه آخر حاجة في الشريط الجانبي أصلًا. */
-    section[data-testid="stSidebar"] hr.cf-sb-sep {
-        margin: 10px 0;
-        border: none;
-        border-top: 1px solid rgba(27, 37, 75, 0.22);
-    }
-    /* صندوق صغير حوالين وصف البرنامج - بيوضح إنه مجرد تنويه، مش اختيار قابل للضغط */
-    section[data-testid="stSidebar"] .cf-sidebar-header .cf-desc-box {
-        font-size: 11px;
-        line-height: 1.5;
-        opacity: 0.9;
-        margin-top: 10px;
-        padding: 8px 10px;
-        border: 1px solid rgba(27, 37, 75, 0.35);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.18);
-    }
-    /* صندوق صغير لعرض بيانات المستخدم الحالي (الاسم والوظيفة) فوق الإعدادات -
-       أبيض صريح، عشان يبقى مميز عن باقي عناصر الشريط الجانبي الأصفر */
-    section[data-testid="stSidebar"] .cf-owner-box {
-        font-size: 13px;
-        font-weight: 600;
-        line-height: 1.5;
-        margin: 4px 0 10px 0;
-        padding: 10px 12px;
-        border: 1px solid rgba(27, 37, 75, 0.25);
-        border-radius: 8px;
-        background: var(--cf-white);
-        color: var(--cf-on-brand);
-    }
-    /* نصوص جوه صناديق الإدخال والأزرار (خلفيتها غامقة من الثيم) لازم تفضل
-       فاتحة عشان تتقرا فوق الخلفية الغامقة بتاعتها هي (مش الأصفر اللي حواليها) */
-    section[data-testid="stSidebar"] input,
-    section[data-testid="stSidebar"] textarea,
-    section[data-testid="stSidebar"] [data-baseweb="select"] *,
-    section[data-testid="stSidebar"] .stButton button,
-    section[data-testid="stSidebar"] .stButton button p,
-    section[data-testid="stSidebar"] .stButton button span,
-    section[data-testid="stSidebar"] .stDownloadButton button {
-        color: var(--cf-text) !important;
-    }
-    /* خلفية غامقة صريحة لكل الأزرار في الشريط الجانبي، عشان النص الفاتح
-       يفضل واضح فوقها مهما كان لون الثيم الافتراضي للزرار */
-    section[data-testid="stSidebar"] .stButton button,
-    section[data-testid="stSidebar"] .stDownloadButton button {
-        background-color: var(--cf-on-brand) !important;
-        border: 1px solid var(--cf-on-brand) !important;
-    }
-    section[data-testid="stSidebar"] .stButton button:hover,
-    section[data-testid="stSidebar"] .stDownloadButton button:hover {
-        background-color: var(--cf-navy-raised) !important;
-        border-color: var(--cf-accent) !important;
-        color: var(--cf-text) !important;
-    }
-    section[data-testid="stSidebar"] .stButton button:disabled,
-    section[data-testid="stSidebar"] .stButton button:disabled p {
-        color: var(--cf-mist-dark) !important;
-        background-color: var(--cf-glass-opaque) !important;
-        opacity: 0.7;
-    }
-    /* زرار الـ popover (ℹ️ بجانب اسم البرنامج) - نفس مشكلة الـ expander
-       والـ segmented_control بالظبط: Streamlit بيديله خلفية غامقة
-       افتراضية (مش .stButton فمابيلحقهاش القاعدة فوق)، والنص فوقها كحلي
-       من القاعدة العامة - كحلي على غامق يختفي. */
-    section[data-testid="stSidebar"] [data-testid="stPopoverButton"] {
-        background-color: rgba(27, 37, 75, 0.1) !important;
-        border: 1px solid rgba(27, 37, 75, 0.3) !important;
-    }
-    /* زرار الإعدادات - مربع وأزرق ومختلف شكلًا ولونًا عن باقي أزرار
-       الشريط الجانبي (زي ما طلب المستخدم)، بترس أبيض في النص.
-       الأزرق بقى CF Royal من بالتة البراند بدل الأزرق التقريبي: 6.24:1 على
-       الحقل الأصفر (AA) والأبيض فوقه 8.6:1، ولسه مميز تمامًا عن الكحلي
-       بتاع باقي الأزرار. */
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
-        background-color: var(--cf-royal) !important;
-        border: 1px solid var(--cf-royal) !important;
-        color: var(--cf-white) !important;
-        width: 44px !important;
-        height: 44px !important;
-        min-width: 44px !important;
-        padding: 0 !important;
-        font-size: 20px !important;
-        border-radius: var(--cf-radius-md) !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"]:hover {
-        background-color: var(--cf-navy) !important;
-        border-color: var(--cf-white) !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] p {
-        color: var(--cf-white) !important;
-        font-size: 20px !important;
-    }
-    .cf-settings-label {
-        font-weight: 700;
-        padding-top: 10px;
-    }
+    /* ستايل خلفية الشريط الجانبي وعناصره (اللوجو، الروابط، زرار إنشاء
+       مشروع، صف الأفتار، حقل الدور...) بقى في theme/sidebar.py — سطح غامق
+       دلوقتي (استثناء موثّق ومؤرّخ 2026-09-23 من قاعدة "الحقل الأصفر"،
+       التفاصيل في theme/brand.py)، مش الحقل الأصفر القديم. القواعد اللي
+       كانت هنا (تلوين كل حاجة يدوي عشان الحقل الأصفر) بقت غير لازمة: نفس
+       ثيم Streamlit الغامق الافتراضي اللي باقي البرنامج شغال بيه بقى شغال
+       هنا كمان من غير عكس. */
     /* علامة ميكروفون خفيفة على كل خانة كتابة - مجرد تنويه إننا فاكرين
        ميزة الكتابة بالصوت وهنضيفها لاحقًا، مش شغالة فعليًا دلوقتي.
        بنستخدم أيقونة Material Symbols (نفس خط الأيقونات اللي Streamlit
@@ -360,52 +213,8 @@ MAIN_CSS = r'''
         right: auto !important;
         left: 4px !important;
     }
-    /* عنوان أي قسم قابل للطي (expander) في الشريط الجانبي - خلفية وحدود
-       واضحة بشكل ثابت، عشان النص والسهم يفضلوا باينين في أي حالة (مقفول،
-       مفتوح، عليه الماوس) من غير ما يعتمدوا على خلفية شفافة ممكن تختفي فيها */
-    section[data-testid="stSidebar"] [data-testid="stExpander"] {
-        background-color: rgba(27, 37, 75, 0.07);
-        border: 1px solid rgba(27, 37, 75, 0.3);
-        border-radius: 10px;
-        margin-bottom: 6px;
-    }
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
-        color: var(--cf-on-brand) !important;
-    }
-    /* عنوان الـ expander ثابت (sticky) جوه الشريط الجانبي لازم خلفيته صلبة
-       بلون الشريط نفسه (ذهبي) مش لون المحتوى الرئيسي الغامق - وإلا نص كحلي
-       على خلفية كحلية بيختفي */
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
-        background: var(--cf-accent) !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover,
-    section[data-testid="stSidebar"] [data-testid="stExpander"] details[open] summary {
-        background-color: rgba(27, 37, 75, 0.14) !important;
-        border-radius: 8px;
-    }
-    /* segmented_control (زرار اللغة AR/EN) - نفس مشكلة الـ expander بالظبط:
-       Streamlit بيحط خلفية غامقة افتراضية على القطعة الغير مختارة، والقاعدة
-       العامة فوق بتحط نص كحلي على أي حاجة في الشريط - نص كحلي على خلفية
-       غامقة بيختفي.
-
-       القطعة المختارة كانت تينت دهبي فوق الشريط. ده كان بالكاد باين على
-       التدرّج القديم، وبقى مختفي تمامًا فوق الأصفر المصمت (أصفر على أصفر).
-       فالمختارة بقت العكس: تعبئة Ink وحروف بيضا (14.86:1)، وهو نفس أسلوب
-       "chip مختار = تعبئة اللكنة" في الدليل - واللكنة فوق حقل أصفر هي Ink. */
-    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"] {
-        background-color: rgba(27, 37, 75, 0.08) !important;
-        border: 1px solid rgba(27, 37, 75, 0.25) !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] {
-        background-color: var(--cf-on-brand) !important;
-        border-color: var(--cf-on-brand) !important;
-    }
-    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"],
-    section[data-testid="stSidebar"] [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] * {
-        color: var(--cf-white) !important;
-    }
+    /* ستايل الـ expander (زرار إنشاء مشروع) والـ segmented_control (اللغة)
+       جوه الشريط الجانبي بقى في theme/sidebar.py مع باقي إعادة التصميم. */
     /* علامة "تم الحفظ" - نص رفيع بسيط على أرضية التصميم، مش شكل زرار،
        بتفضل ظاهرة بعد الحفظ لحد ما المستخدم يحفظ سجل تاني */
     .cf-saved-badge {
@@ -479,18 +288,8 @@ MAIN_CSS = r'''
         border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04);
     }
     a.cf-navlink:hover, a.cf-navlink:focus-visible { border-color: var(--cf-accent); color: var(--cf-text); }
-    /* نفس الرابط جوه الشريط الجانبي بيقف فوق الحقل الأصفر مش فوق الأرضية
-       الغامقة، فالحد والخلفية البيضا الشفافة بيختفوا خالص. نسخة الحقل
-       الأصفر: حد Ink وتعبئة Ink خفيفة - نفس لغة باقي عناصر الشريط. */
-    section[data-testid="stSidebar"] a.cf-navlink {
-        border: 1px solid rgba(27, 37, 75, 0.30);
-        background: rgba(27, 37, 75, 0.06);
-    }
-    section[data-testid="stSidebar"] a.cf-navlink:hover,
-    section[data-testid="stSidebar"] a.cf-navlink:focus-visible {
-        border-color: var(--cf-on-brand);
-        background: rgba(27, 37, 75, 0.14);
-    }
+    /* نسخة الرابط جوه الشريط الجانبي (سطح غامق دلوقتي، مش الحقل الأصفر)
+       في theme/sidebar.py مع باقي ستايل الشريط الجانبي المُعاد تصميمه. */
     .cf-progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
     .cf-progress-seg {
         flex: 1; height: 4px; border-radius: 2px;

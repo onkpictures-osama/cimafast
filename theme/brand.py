@@ -9,6 +9,20 @@
   سطح غامق (Midnight / Navy Surface / صورة)  →  الشخصية صفرا  →  mark-dark
   سطح فاتح أو الحقل الأصفر                    →  الشخصية كحلي  →  mark-light
 
+استثناء موثّق (2026-09-23): الشريط الجانبي (‎st.sidebar‎ في app.py، ستايله
+في ‎theme/sidebar.py‎) بقى سطح غامق (Midnight) مش الحقل الأصفر — موافقة
+صريحة من صاحب المنتج على موك أب مرجعي شاركه (خلفية كحلي غامقة، مش الحقل
+الأصفر التقليدي). ده استثناء **للشريط الجانبي بس**، مش تراجع عن القاعدة
+فوق ولا سبب يتغيّر بيه أي سطح تاني في البرنامج — أي محاولة "تصليح" الشريط
+الجانبي يرجع أصفر تاني في مرة جاية غلط، القرار ده مقصود. الشريط الجانبي
+بيستخدم ‎lockup(surface="dark")‎ (النسخة المركّبة تحت، مش ‎lockup_master()‎
+الماستر الجامد) عشان يطلع "CimaFast STUDIO" زي كل سطح تاني في التطبيق، مش
+"MEDIA" بتاعة الماستر. ‎surface="dark"‎ بيسحب ‎MARK_DARK‎
+(‎cimafast-mark-dark-transparent.svg‎ — أصل موجود أصلًا، الشخصية صفرا)، نفس
+لغة العلامة اللي الشريط الثابت (sticky bar) شغال بيها من ماستر مكافئ
+(‎cimafast-lockup-dark-transparent.png‎) — مفيش أصل جديد اتعمل في الحالتين.
+القرار مسجّل كمان في ‎PRODUCT-PLAN.md‎ (بند "قرارات المالك").
+
 ليه ‎data:‎ URI مش ‎<img src="app/static/…">‎: البريفيو شغال تحت
 ‎/v1/‎ بـ ‎baseUrlPath‎، والرابط النسبي بيتكسر لو المستخدم فتح ‎/v1‎ من غير
 الشرطة الأخيرة. الملف 1 كيلوبايت، فالتضمين أرخص من طلب شبكة أصلًا.
@@ -113,6 +127,18 @@ def lockup(surface="dark", px=44, arabic=False, tm=True):
 
 
 _MASTER_W, _MASTER_H = 2400, 1000  # أبعاد ماستر الـ lockup الأصلي
+MASTER_ASPECT = _MASTER_W / _MASTER_H  # النسبة مقفولة — ممنوع مط أو سحق
+_LOCKUP_MASTER = "cimafast-lockup-%s-transparent.png"
+
+
+def lockup_master_path(surface="light"):
+    """مسار ماستر الـ lockup على الديسك.
+
+    للمستهلكين اللي بياخدوا ملف مباشرةً بدل ‎data:‎ URI — التصدير
+    (‎export.py‎) بيدّي المسار لـ openpyxl و python-docx و reportlab زي ما
+    هو، فمحتاجش التضمين اللي المتصفح محتاجه.
+    """
+    return asset_path(_LOCKUP_MASTER % surface)
 
 
 def lockup_master(surface="light", height=44, arabic=False):
@@ -125,8 +151,8 @@ def lockup_master(surface="light", height=44, arabic=False):
     (Inter) — الـ SVG جوه ‎<img>‎ معزول عن CSS بتاع الصفحة. الـ PNG بكسلات
     جاهزة فمفيش اعتماد على خط خالص.
     """
-    src = data_uri("cimafast-lockup-%s-transparent.png" % surface)
-    width = round(height * _MASTER_W / _MASTER_H)
+    src = data_uri(_LOCKUP_MASTER % surface)
+    width = round(height * MASTER_ASPECT)
     img = (
         '<img class="cf-logo-master" src="%s" alt="CimaFast" '
         'style="height:%dpx;width:%dpx;display:block;object-fit:contain">'

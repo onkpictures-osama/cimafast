@@ -194,6 +194,39 @@ def test_gold_sidebar_floor_is_72_percent():
     print(f"\n  gold sidebar: 60% -> {at_60:.2f} (fail)  ·  72% -> {at_72:.2f} (pass)")
 
 
+@test
+def test_sidebar_dark_surface_contrast():
+    """الشريط الجانبي بقى سطح غامق (Midnight) بدل الحقل الأصفر (استثناء
+    موثّق 2026-09-23 في ‎theme/brand.py‎ و‎theme/sidebar.py‎) - كل زوج
+    نص/أرضية جديد فيه لازم يتقاس زي أي زوج تاني في التصميم، مش يتفرض إنه
+    وارث تباين الوضع الغامق العام تلقائيًا من غير ما حد يتأكد بالأرقام.
+
+    الأرضية المستخدمة (Midnight solid، Navy Surface للكروت اللي جواه زي
+    حقل "الدور" وزرار إنشاء المشروع بعد ما يتفتح) - مفيش ميش/تدرّج تحت
+    الشريط الجانبي، فده الحساب الفعلي مش تقريب أسوأ حالة.
+    """
+    ground = tokens.DARK["ground_base"]           # Midnight - خلفية الشريط
+    surface = tokens.BRAND["navy_surface"]         # كروت جوه الشريط (حقل الدور)
+    p = tokens.DARK
+    rows = [
+        ("sidebar-body/midnight", p["text"], ground, C.BODY_FLOOR),
+        ("sidebar-dim/midnight", p["text_dim"], ground, C.BODY_FLOOR),
+        ("sidebar-accent/midnight", p["accent_ink"], ground, C.BODY_FLOOR),
+        ("sidebar-field-value/navy-surface", p["text"], surface, C.BODY_FLOOR),
+        ("sidebar-field-label/navy-surface", C.over(p["text_dim"], surface), surface, C.LARGE_FLOOR),
+        # كابشن Streamlit الافتراضي شفافيته 0.6 - بنتأكد إنها لسه فوق الحد
+        # حتى من غير ما نجبرها opacity:1 زي الحقل الأصفر القديم
+        ("sidebar-caption-60pct/midnight", C.over("rgba(255,255,255,0.6)", ground), ground, C.BODY_FLOOR),
+        # زرار "إنشاء مشروع جديد" (تعبئة صفرا) وصف الأفتار (دايرة صفرا) -
+        # نفس زوج on-accent/accent-fill المُتحقق منه فوق، بس بنسجّله هنا
+        # كمان صراحةً عشان يبقى واضح إنه زوج الشريط الجانبي مش بس زوج عام
+        ("sidebar-cta-ink/yellow-fill", p["on_accent"], p["accent"], C.BODY_FLOOR),
+    ]
+    results, failures = C.audit(rows)
+    print("\n--- sidebar (dark surface) ---\n" + C.fmt(results))
+    assert failures == 0, f"{failures} زوج تحت الحد الأدنى في الشريط الجانبي الغامق"
+
+
 # --------------------------------------------------------------------------
 # 3) الفلاج والمادة
 # --------------------------------------------------------------------------
@@ -385,10 +418,14 @@ def test_mobile_breakpoint_is_below_the_tablet_viewport():
 
 @test
 def test_mobile_touch_target_matches_the_existing_standard():
-    from theme import classic  # noqa: PLC0415
+    from theme import sidebar  # noqa: PLC0415
 
     assert mobile.TOUCH == 44
-    assert "44px" in classic.MAIN_CSS, "الرقم المرجعي اتغير في classic.py"
+    # الرقم المرجعي كان زرار الإعدادات القديم في classic.py (اتشال مع
+    # إعادة تصميم الشريط الجانبي 2026-09-23 - مكانش مستخدم أصلًا). المرجع
+    # دلوقتي زرار "إنشاء مشروع جديد" في theme/sidebar.py - مش ‎.stButton
+    # button‎ فمبيتغطاش بـ TOUCH_CSS العامة، فمحتاج قيمته الصريحة هنا.
+    assert "44px" in sidebar.SIDEBAR_CSS, "الرقم المرجعي اتغير في theme/sidebar.py"
     assert mobile.mobile_css().count("44px") >= 2
 
 
