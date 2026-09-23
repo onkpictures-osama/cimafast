@@ -346,6 +346,14 @@ TRANSLATIONS = {
     "محتاجة مراجعة": "Needs review",
     # أجزاء نصوص ديناميكية (بتتلحق بأرقام أو قوائم وقت التشغيل)
     "حصل خطأ أثناء تحليل الملف:": "Error while analyzing the file:",
+    # رسايل الفشل: المستخدم بيشوف كلام مفهوم، والخطأ الأصلي بيروح للوج
+    "مشكلة في السيرفر مش في ملفك": "A server problem, not a problem with your file",
+    "الملف وصل تمام بس مقدرناش نكمّل. جرّب تاني بعد شوية، ولو المشكلة فضلت ابعت الكود ده للدعم":
+        "Your file arrived fine, but we could not finish. Try again shortly; "
+        "if it keeps happening, send this code to support",
+    "مقدرناش نكمّل التحليل. ملفك زي ما هو، تقدر تجرّب تاني.":
+        "We could not finish the analysis. Your file is untouched — you can try again.",
+    "تفاصيل تقنية": "Technical details",
     "تم التعرف على": "Detected",
     "مشهد في الملف. راجعهم وعدّل أي حاجة غلط قبل التأكيد:": "scene(s) in the file. Review them and fix anything wrong before confirming:",
     "هيتستبعد": "Will exclude",

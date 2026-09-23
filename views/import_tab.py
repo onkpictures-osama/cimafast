@@ -2,6 +2,8 @@
 
 import ai_jobs
 import json
+import logging
+import uuid
 import streamlit as st
 import streamlit.components.v1 as st_components
 from ai_prompt import AI_JSON_PROMPT
@@ -13,6 +15,33 @@ from script_parser import apply_character_merges, apply_location_merges, extract
 from ui import fmt_day_night, fmt_int_ext, ltr, multiselect
 import audit
 import repo
+
+
+_log = logging.getLogger("cimafast.import")
+
+# الأخطاء اللي بنرمي لها رسالة بالعربي احنا بنفسنا (زي "فيه تحليل شغال
+# بالفعل") تعدّي للمستخدم زي ما هي. أي حاجة تانية — خصوصًا أخطاء نظام
+# التشغيل — لأ.
+_SAFE_TO_SHOW = (RuntimeError, ValueError, KeyError, TypeError)
+
+_ERR_TITLE = "مشكلة في السيرفر مش في ملفك"
+_ERR_BODY = "الملف وصل تمام بس مقدرناش نكمّل. جرّب تاني بعد شوية، ولو المشكلة فضلت ابعت الكود ده للدعم"
+
+
+def _user_error(exc, where):
+    """رسالة يفهمها مخرج بيرفع سيناريو، والخطأ الحقيقي يروح للوج.
+
+    كان `st.error(str(e))` بيطلّع نص نظام التشغيل الخام على الشاشة، مثلًا
+    "Read-only file system: '/var/lib/cimafast/ai-jobs/inbox/…tmp' [Errno 30]".
+    ده مبيقولش للمستخدم أي حاجة يعملها، وكمان بيكشف مسارات السيرفر.
+    بنسجّل التفاصيل كاملة في لوج الخدمة (journalctl) ونرجّع للمستخدم
+    رسالة واضحة + كود مرجعي يقوله للدعم.
+    """
+    ref = uuid.uuid4().hex[:8]
+    _log.exception("[%s] %s failed: %s: %s", ref, where, type(exc).__name__, exc)
+    if isinstance(exc, _SAFE_TO_SHOW) and str(exc).strip():
+        return str(exc)
+    return f"⚠️ {t(_ERR_TITLE)}\n\n{t(_ERR_BODY)}: `{ref}`"
 
 
 _ANALYSIS_RTL_CSS = """
@@ -273,7 +302,7 @@ def render(project_id):
             st.session_state["parsed_script"] = parse_script(
                 uploaded_file.name, uploaded_file.getvalue(), known_characters=_known)
         except Exception as e:
-            st.error(f"{t('حصل خطأ أثناء تحليل الملف:')} {e}")
+            st.error(f"{t('حصل خطأ أثناء تحليل الملف:')} {_user_error(e, 'fast parse')}")
 
     # --- تحليل الذكاء الاصطناعي: تقدير -> تأكيد -> طابور ------------------
     if _run_ai:
@@ -285,7 +314,7 @@ def render(project_id):
                 "md": _md, "stats": _stats, "filename": uploaded_file.name,
                 "confidence": _conf, "evidence": _ev}
         except Exception as e:
-            st.error(f"{t('حصل خطأ أثناء قراءة الملف:')} {e}")
+            st.error(f"{t('حصل خطأ أثناء قراءة الملف:')} {_user_error(e, 'ai read')}")
 
     _pending = st.session_state.get("_ai_pending")
     if _pending and not _ai_active:
@@ -329,7 +358,7 @@ def render(project_id):
                     st.session_state.pop("_ai_pending", None)
                     st.rerun()
                 except Exception as e:
-                    st.error(str(e))
+                    st.error(_user_error(e, "ai start"))
         with _no:
             if st.button(t("إلغاء"), use_container_width=True, key="_ai_no"):
                 st.session_state.pop("_ai_pending", None)
@@ -370,7 +399,14 @@ def render(project_id):
                     st.session_state["_ai_load_attempted"] = True
                     st.rerun(scope="app")
             elif state == "failed":
-                st.error(f"[ ❌ ] {t('التحليل فشل')} — {detail}{extra}")
+                # detail جاي من الـ worker وممكن يكون نص استثناء بايثون خام.
+                # بنعرض سطر مفهوم، والتفاصيل التقنية تحت في expander لمين
+                # يحتاجها، مش كعنوان الرسالة.
+                st.error(f"[ ❌ ] {t('التحليل فشل')}{extra} — "
+                         f"{t('مقدرناش نكمّل التحليل. ملفك زي ما هو، تقدر تجرّب تاني.')}")
+                if detail:
+                    with st.expander(t("تفاصيل تقنية")):
+                        st.code(detail, language="text")
                 if st.session_state.get("_ai_last_seen_state") != "failed":
                     st.session_state["_ai_last_seen_state"] = "failed"
                     st.rerun(scope="app")
@@ -394,7 +430,8 @@ def render(project_id):
                     st.session_state["ai_parsed_script"] = _parsed_ai
                     st.rerun()
                 except Exception as e:
-                    st.error(f"{t('نتيجة الذكاء الاصطناعي مش مقروءة:')} {e}")
+                    st.error(f"{t('نتيجة الذكاء الاصطناعي مش مقروءة:')} "
+                             f"{_user_error(e, 'ai result parse')}")
             else:
                 st.error(t("التحليل خلص بس ملف النتيجة مش موجود. جرّب تاني."))
         if _state in ai_jobs.TERMINAL:
