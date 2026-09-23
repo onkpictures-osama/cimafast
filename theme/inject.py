@@ -191,19 +191,26 @@ def _sticky_bar_js(st):
     جوه string جافاسكريبت مش HTML حقيقي — اتأكدت منها بتجربة معزولة قبل
     الحل ده. ونفس السبب ماخدتش ‎src‎ اللوجو من بايثون: بنقراه وقت التشغيل
     من اللوجو الموجود أصلًا جوه الشريط الجانبي (‎.cf-logo-master‎) بدل ما
-    نكرر الـ ‎data:‎ URI هنا."""
+    نكرر الـ ‎data:‎ URI هنا.
+
+    ‎ensureBar()‎ بتتفحص وجود الشريط وترجع فورًا لو موجود (idempotent)، لكن
+    وجود الشريط مش معناه إن اللوجو اتحط: أول مرة ‎ensureBar()‎ بتتنفذ (على
+    طول لما السكريبت يحمّل) ممكن ‎.cf-logo-master‎ لسه ماتحطتش في الـ DOM —
+    الشريط الجانبي بتاع Streamlit بياخد وقت أطول يترسم في صفحة فيها مشروع
+    (قايمة مشاريع + popover) عن صفحة الدخول. لو حطينا ‎src‎ مرة واحدة بس
+    وقت البناء، بيفضل فاضي (أيقونة صورة مكسورة) لبقية الجلسة. عشان كده
+    ‎ensureLogo()‎ منفصلة عن ‎ensureBar()‎ وبتتعاد كل ‎tick‎ من الـ
+    ‎setInterval‎ لغاية ما ‎src‎ يتحط فعلًا — مش مرة واحدة وخلاص."""
     js = """
     (function(){
         function ensureBar(){
             var bar = document.getElementById('cf-sticky-bar');
             if (bar) return bar;
-            var sidebarLogo = document.querySelector('.cf-logo-master');
             bar = document.createElement('div');
             bar.id = 'cf-sticky-bar';
             var img = document.createElement('img');
             img.className = 'cf-sticky-bar__logo';
             img.alt = 'CimaFast';
-            img.src = sidebarLogo ? sidebarLogo.src : '';
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'cf-sticky-bar__burger';
@@ -218,6 +225,19 @@ def _sticky_bar_js(st):
             document.body.appendChild(bar);
             return bar;
         }
+        function ensureLogo(){
+            var bar = document.getElementById('cf-sticky-bar');
+            if (!bar) return false;
+            var img = bar.querySelector('.cf-sticky-bar__logo');
+            if (!img) return false;
+            if (img.getAttribute('src')) return true;
+            var sidebarLogo = document.querySelector('.cf-logo-master');
+            if (sidebarLogo && sidebarLogo.src) {
+                img.src = sidebarLogo.src;
+                return true;
+            }
+            return false;
+        }
         function bindScroll(){
             var container = document.querySelector('[data-testid="stMain"]');
             if (!container || container.dataset.cfScrollBound) return;
@@ -228,13 +248,15 @@ def _sticky_bar_js(st):
             }, {passive: true});
         }
         ensureBar();
+        ensureLogo();
         bindScroll();
         var tries = 0;
         var iv = setInterval(function(){
             tries++;
             bindScroll();
+            var logoReady = ensureLogo();
             var c = document.querySelector('[data-testid="stMain"]');
-            if ((c && c.dataset.cfScrollBound) || tries > 20) clearInterval(iv);
+            if ((c && c.dataset.cfScrollBound && logoReady) || tries > 20) clearInterval(iv);
         }, 250);
     })();
     """
