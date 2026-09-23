@@ -1024,6 +1024,40 @@ def set_actor_photo(actor_id, photo_path, updated_at=None):
                      (photo_path, updated_at or now, now, actor_id))
 
 
+def share_actor_publicly(actor_id, company_id, role):
+    """بيفتح (أو بيجدد) لينك البروفايل العام. أي توكن قديم بيموت مع التجديد.
+    بيرجّع التوكن الجديد، أو None لو المستخدم مش من حقه يعدّل البروفايل ده.
+
+    الفحص مرتين زي update_actor: can_edit_actor هنا، وشرط الشركة جوه الجملة."""
+    import public_profile
+    if not can_edit_actor(actor_by_id(actor_id), company_id, role):
+        return None
+    token = public_profile.new_token()
+    run_query("UPDATE actors SET public_share_token=?, public_share_at=? WHERE id=? "
+              "AND (?=1 OR owner_company_id=?)",
+              (token, _now_iso(), actor_id, 1 if role == "operator" else 0, company_id))
+    return token
+
+
+def stop_sharing_actor(actor_id, company_id, role):
+    """بيقفل البروفايل العام: اللينك بيرجع "مش متاح" من أول زيارة جاية."""
+    if not can_edit_actor(actor_by_id(actor_id), company_id, role):
+        return False
+    run_query("UPDATE actors SET public_share_token=NULL, public_share_at=NULL WHERE id=? "
+              "AND (?=1 OR owner_company_id=?)",
+              (actor_id, 1 if role == "operator" else 0, company_id))
+    return True
+
+
+def actor_by_public_token(token):
+    """الصف بالتوكن، أو None — من غير دخول، فالتوكن لازم يعدّي فحص الشكل الأول."""
+    import public_profile
+    if not public_profile.valid_token(token):
+        return None
+    rows = fetch_all("SELECT * FROM actors WHERE public_share_token=?", (token,))
+    return rows[0] if rows else None
+
+
 def actor_unlocked_for_company(actor_id, company_id):
     """True لو الشركة دي رشّحت أو تعاقدت مع الممثل/ة ده في أي مشروع من
     مشاريعها، أو هي اللي أضافت البروفايل - وقتها بس الحقول الحساسة بتتعرض

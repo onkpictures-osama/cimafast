@@ -573,6 +573,35 @@ TRANSLATIONS = {
     "تم حفظ التعديل": "Changes saved",
     "مرشّحين للدور ده": "shortlisted for this role",
     "الممثل/ة المرشّح/ة": "Shortlisted actor",
+    # البروفايل العام (مشاركة على السوشيال ميديا)
+    "البروفايل العام": "Public profile",
+    "البروفايل مش منشور. لو نشرته، أي حد معاه اللينك يقدر يشوف الاسم والصورة والبيو والأعمال — من غير أي بيانات تواصل.":
+        "This profile isn't shared. Once shared, anyone with the link can see the name, photo, bio and credits — never any contact details.",
+    "انشر البروفايل العام": "Share public profile",
+    "البروفايل منشور — أي حد معاه اللينك ده يقدر يشوفه من غير تسجيل دخول.":
+        "The profile is public — anyone with this link can see it without signing in.",
+    "لينك جديد": "New link",
+    "اللينك الجديد بيلغي القديم فورًا.": "A new link cancels the old one at once.",
+    "إيقاف المشاركة": "Stop sharing",
+    "تم نشر البروفايل العام": "Public profile shared",
+    "تم إيقاف المشاركة — اللينك القديم مابقاش شغال": "Sharing stopped — the old link no longer works",
+    "مشاركة على": "Share on",
+    "اللي بيظهر: الاسم المعروف، الصورة، البيو، الأعمال، التصنيف، الشوريل وإنستجرام — والطول/الشعر/العين/المهارات لو اخترتها في «بيانات تظهر للكل». عمره ما بيظهر: التليفون، الإيميل، الوكيل، مقاسات الجسم، الهوايات، التدخين، الروابط التانية، ولا أي ترشيحات.":
+        "Shown: stage name, photo, bio, credits, category, showreel and Instagram — plus height/hair/eyes/skills if chosen under “Details shown to everyone”. Never shown: phone, email, agent, body measurements, hobbies, smoking, other links, or any shortlists.",
+    "افتح الصفحة العامة": "Open the public page",
+    "نبذة": "About", "مواصفات ومهارات": "Details & skills",
+    "نسخ اللينك": "Copy link", "اتنسخ ✓": "Copied ✓",
+    "بروفايل عام على CimaFast Studio — بيانات التواصل مش بتظهر هنا.":
+        "Public profile on CimaFast Studio — contact details are never shown here.",
+    "البروفايل ده مش متاح.": "This profile isn't available.",
+    "بروفايل ممثل/ة على CimaFast Studio": "Actor profile on CimaFast Studio",
+    # فيديوهات الأعمال السابقة
+    "مثال: فيلم كذا (2023) - دور كذا https://youtu.be/...": "e.g. Film Name (2023) - role name https://youtu.be/...",
+    "حط لينك فيديو (يوتيوب، فيميو، ديلي موشن، فيسبوك، أو ملف ‎.mp4‎) في نفس سطر العمل — الفيديو هيتعرض في البروفايل تحت العمل ده.":
+        "Put a video link (YouTube, Vimeo, Dailymotion, Facebook, or an .mp4 file) on the same line as the credit — the video plays on the profile under that credit.",
+    "اللينكات دي اتحفظت كنص بس ومش هتتعرض كفيديو (ولا هتظهر في البروفايل العام) — استخدم لينك يوتيوب أو فيميو أو ديلي موشن أو فيسبوك أو ملف ‎.mp4‎ مباشر:":
+        "These links were saved as text only and won't play as videos (or appear on the public profile) — use a YouTube, Vimeo, Dailymotion or Facebook link, or a direct .mp4 file:",
+    "لينك مش متعرف عليه كفيديو": "Not recognised as a video link",
 
     # P2 - توليد صور بمرجع (شخصيات + الأماكن)، مسموح 2026-09-23
     "البرومبت اتجمّع تلقائيًا من البيانات المحفوظة — عدّله زي ما تحب.":

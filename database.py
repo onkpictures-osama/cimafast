@@ -820,6 +820,10 @@ _MIGRATIONS = {
     "actors": [
         ("owner_company_id", "INTEGER"),
         ("created_by", "TEXT"),
+        # بروفايل عام بلينك سري (public_profile.py). NULL = مش منشور (الافتراضي).
+        # إلغاء المشاركة بيرجّعه NULL، فاللينك القديم بيموت فورًا.
+        ("public_share_token", "TEXT"),
+        ("public_share_at", "TEXT"),
     ],
     "companies": [
         # B5: نوع الاشتراك (creator / studio / enterprise). مبدئي — لحد ما
@@ -923,6 +927,8 @@ _INDEXES = [
     # قايمة خزانة المواهب بتفلتر بـ discoverable، وصف الكاستينج بيتقري
     # بالممثل/بالمشروع/بالشخصية - نفس منطق شركة المشاريع فوق.
     ("idx_actors_discoverable", "actors (discoverable)"),
+    # الصفحة العامة بتدوّر بالتوكن في كل زيارة (من غير دخول)
+    ("idx_actors_public_share", "actors (public_share_token)"),
     ("idx_casting_actor", "character_actor_casting (actor_id)"),
     ("idx_casting_project", "character_actor_casting (project_id)"),
     ("idx_casting_character", "character_actor_casting (character_id)"),

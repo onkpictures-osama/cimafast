@@ -26,7 +26,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, RedirectResponse
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
@@ -42,6 +42,7 @@ import home  # noqa: E402
 import links  # noqa: E402
 import permissions  # noqa: E402
 import repo  # noqa: E402
+import videos  # noqa: E402
 
 SECRETS_PATH = Path(os.environ.get("CIMAFAST_SECRETS", "/etc/cimafast/secrets.toml"))
 HERE = Path(__file__).resolve().parent
@@ -536,6 +537,56 @@ async def api_usage(request: Request):
                              target_labels=audit.TARGET_LABELS))
 
 
+# --- البروفايل العام للممثل/ة (P9، من غير دخول) ----------------------------------
+# هنا مش في Streamlit عشان صفحة HTML حقيقية بتقدر تحط Open Graph: واتساب وفيسبوك
+# بيعرضوا الاسم والصورة في معاينة اللينك. الحقول المسموحة كلها في public_profile.py.
+# PUBLIC_BOARD_URL: المسار اللي Caddy بيوصّل بيه للتطبيق ده من برّه (بيشيله قبل
+# ما الطلب يوصل)، محتاجينه عشان og:image لازم يبقى رابط مطلق.
+PUBLIC_BOARD_URL = os.environ.get("CIMAFAST_BOARD_URL", "/v1/board/")
+# CSP: مفيش سكريبت من برّه، والـ iframe بس من خدمات الفيديو المعروفة (videos.EMBED_HOSTS).
+# Referrer: الأصل بس (من غير التوكن) — يوتيوب بيرفض التضمين لو مفيش origin خالص.
+_PUBLIC_HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex",
+                   "X-Content-Type-Options": "nosniff",
+                   "Referrer-Policy": "strict-origin-when-cross-origin",
+                   "Content-Security-Policy": (
+                       "default-src 'none'; img-src 'self' data:; font-src 'self'; "
+                       "style-src 'unsafe-inline'; script-src 'unsafe-inline'; media-src https:; "
+                       "frame-src " + " ".join(videos.EMBED_HOSTS) + "; "
+                       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")}
+
+
+def _public_url(request, token):
+    host = request.headers.get("host", "")
+    return f"{request.url.scheme}://{host}{PUBLIC_BOARD_URL.rstrip('/')}/p/{token}"
+
+
+async def public_actor_page(request: Request):
+    import public_profile
+    token = request.path_params["token"]
+    lang = "en" if request.query_params.get("lang") == "en" else "ar"
+    actor = repo.actor_by_public_token(token)
+    if not actor:
+        # نفس الرد لتوكن غلط أو اتلغى أو ممثل/ة اتمسح — مفيش فرق يكشف حاجة
+        return HTMLResponse(public_profile.render_not_found(lang, asset_base="../"),
+                            status_code=404, headers=_PUBLIC_HEADERS)
+    url = _public_url(request, token)
+    view = public_profile.public_view(actor)
+    page = public_profile.render_page(
+        view, lang, photo_url=f"{url}/photo", share_url=url,
+        lang_switch_url="?lang=ar" if lang == "en" else "?lang=en", asset_base="../")
+    return HTMLResponse(page, headers=_PUBLIC_HEADERS)
+
+
+async def public_actor_photo(request: Request):
+    """صورة الممثل/ة صاحب التوكن ده بس. مفيش أي جزء من المسار جاي من الطلب."""
+    import public_profile
+    actor = repo.actor_by_public_token(request.path_params["token"])
+    path = public_profile.photo_file(actor) if actor else None
+    if not path:
+        return HTMLResponse("", status_code=404, headers=_PUBLIC_HEADERS)
+    return FileResponse(path, media_type=public_profile.photo_media_type(path), headers=_PUBLIC_HEADERS)
+
+
 async def healthz(request: Request):
     """بيلمس قاعدة البيانات فعلًا — 200 من غير ما يوصل للبيانات مايثبتش حاجة."""
     try:
@@ -555,6 +606,8 @@ app = Starlette(
     routes=[
         Route("/", page),
         Route("/healthz", healthz),
+        Route("/p/{token:str}", public_actor_page, methods=["GET"]),
+        Route("/p/{token:str}/photo", public_actor_photo, methods=["GET"]),
         Route("/api/board", api_board, methods=["GET"]),
         Route("/api/board", api_save, methods=["PUT"]),
         Route("/api/days", api_add_day, methods=["POST"]),

@@ -12,12 +12,16 @@
 عادات شخصية لشخص حقيقي عمرها ما بتتخترع - بتفضل فاضية وتتعرض "غير متوفر".
 """
 
+import base64
 import datetime as dt
+import os
 
 import streamlit as st
 
 import permissions
+import public_profile
 import repo
+import videos
 from database import (ACTOR_CASTING_STATUS_LABELS, ACTOR_CATEGORY_OPTIONS,
                       ACTOR_SENSITIVE_FIELDS, FIELD_HELP, GENDER_OPTIONS)
 from i18n import t, tr
@@ -32,6 +36,7 @@ _EN_ALPHABET = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 _STALE_DAYS = 90  # تقريبًا 3 شهور - مهلة تحديث الصورة اللي المالك طلبها
 
 _SELECTED_KEY = "_cf_selected_actor_id"
+_VIDEO_WARN_KEY = "_cf_actor_video_warn"   # لينكات فيديو مش متعرف عليها من آخر حفظ
 
 # أسماء الحقول الحساسة للعرض (البروفايل، واختيار "ظاهر للكل")
 _SENSITIVE_LABELS = {
@@ -126,7 +131,9 @@ def _actor_fields(prefix, a=None):
                               index=GENDER_OPTIONS.index(a["gender"]) if a.get("gender") in GENDER_OPTIONS else 0,
                               key=f"{prefix}_gender")
         credits = st.text_area(t("أعمال سابقة (سطر لكل عمل)"), value=a.get("credits_text") or "",
-                               placeholder=t("مثال: فيلم كذا (2023) - دور كذا"), key=f"{prefix}_credits")
+                               placeholder=t("مثال: فيلم كذا (2023) - دور كذا https://youtu.be/..."),
+                               help=t("حط لينك فيديو (يوتيوب، فيميو، ديلي موشن، فيسبوك، أو ملف ‎.mp4‎) في نفس سطر العمل — الفيديو هيتعرض في البروفايل تحت العمل ده."),
+                               key=f"{prefix}_credits")
 
     st.markdown(f"**{t('المقاسات (لإدارة الأزياء)')}**")
     m1, m2, m3 = st.columns(3)
@@ -208,6 +215,7 @@ def _render_add_actor_form(company_id):
                                     created_by=st.session_state.get("_auth_user"))
             if photo is not None:
                 repo.set_actor_photo(new_id, save_uploaded_image(photo, f"actors/{new_id}"))
+            _flag_unrecognised(values["credits_text"])
             st.session_state[_SELECTED_KEY] = new_id
             st.toast(t("تم إضافة الممثل/ة"), icon="✅")
             st.rerun()
@@ -335,10 +343,11 @@ def _render_profile(actor_id, project_id, company_id):
             st.write(actor["bio"])
 
     st.markdown(f"**{t('أعمال سابقة')}**")
+    flagged = st.session_state.pop(_VIDEO_WARN_KEY, None)
+    if flagged:
+        _warn_unrecognised(flagged)
     if actor.get("credits_text"):
-        for line in str(actor["credits_text"]).splitlines():
-            if line.strip():
-                st.markdown(f"- {line.strip()}")
+        render_credits(videos.credits(actor["credits_text"]), show_unrecognised=True)
     else:
         st.caption(t("غير متوفر"))
 
@@ -357,6 +366,7 @@ def _render_profile(actor_id, project_id, company_id):
     _render_sensitive_section(actor, company_id)
     st.divider()
     _render_casting_section(actor, project_id)
+    _render_public_share_section(actor, company_id)
     _render_edit_section(actor, company_id)
 
 
@@ -467,7 +477,117 @@ def _render_edit_section(actor, company_id):
                 st.warning(t("اسم الممثل/ة مينفعش يبقى فاضي"))
                 return
             repo.update_actor(actor["id"], values, company_id, role)
+            _flag_unrecognised(values["credits_text"])
             if photo is not None:
                 repo.set_actor_photo(actor["id"], save_uploaded_image(photo, f"actors/{actor['id']}"))
             st.toast(t("تم حفظ التعديل"), icon="💾")
             st.rerun()
+
+
+# ---------- البروفايل العام (مشاركة على السوشيال ميديا) ----------
+
+def _public_share_url(token):
+    """اللينك المطلق اللي بيتشير. صفحة Starlette (‎/p/<token>‎ تحت
+    CIMAFAST_BOARD_URL) لو موجودة — دي اللي فيها Open Graph فالمعاينة بتطلع
+    بالاسم والصورة. من غيرها (تشغيلة من غير الواجهة الجديدة) ‎?profile=‎ هنا."""
+    headers = st.context.headers
+    host = headers.get("host", "")
+    proto = headers.get("x-forwarded-proto") or ("http" if host.startswith(("127.", "localhost")) else "https")
+    board = os.environ.get("CIMAFAST_BOARD_URL")
+    if board:
+        return f"{proto}://{host}{board.rstrip('/')}/p/{token}"
+    base = (st.get_option("server.baseUrlPath") or "").strip("/")
+    return f"{proto}://{host}/{base + '/' if base else ''}?profile={token}"
+
+
+def _render_public_share_section(actor, company_id):
+    """النشر/الإيقاف لمين يقدر يعدّل البروفايل بس. الافتراضي: مش منشور."""
+    role = permissions.current_role()
+    if not repo.can_edit_actor(actor, company_id, role):
+        return
+    st.divider()
+    st.markdown(f"**🔗 {t('البروفايل العام')}**")
+    token = actor.get("public_share_token")
+    if not token:
+        st.caption(t("البروفايل مش منشور. لو نشرته، أي حد معاه اللينك يقدر يشوف الاسم والصورة والبيو والأعمال — من غير أي بيانات تواصل."))
+        if st.button(f"🌐 {t('انشر البروفايل العام')}", key=f"actor_share_on_{actor['id']}"):
+            repo.share_actor_publicly(actor["id"], company_id, role)
+            st.toast(t("تم نشر البروفايل العام"), icon="🌐")
+            st.rerun()
+        st.caption(t("اللي بيظهر: الاسم المعروف، الصورة، البيو، الأعمال، التصنيف، الشوريل وإنستجرام — والطول/الشعر/العين/المهارات لو اخترتها في «بيانات تظهر للكل». عمره ما بيظهر: التليفون، الإيميل، الوكيل، مقاسات الجسم، الهوايات، التدخين، الروابط التانية، ولا أي ترشيحات."))
+        return
+
+    url = _public_share_url(token)
+    st.success(t("البروفايل منشور — أي حد معاه اللينك ده يقدر يشوفه من غير تسجيل دخول."))
+    st.code(url, language=None)          # فيه زرار نسخ جاهز
+    st.caption(t("مشاركة على"))
+    name = _display_name(actor)
+    cols = st.columns(6)
+    cols[0].link_button(t("افتح الصفحة العامة"), url, use_container_width=True)
+    for col, (label, href) in zip(cols[1:], public_profile.share_links(url, name)):
+        col.link_button(label, href, use_container_width=True)
+    b1, b2 = st.columns(2)
+    if b1.button(f"🔄 {t('لينك جديد')}", key=f"actor_share_new_{actor['id']}",
+                 help=t("اللينك الجديد بيلغي القديم فورًا."), use_container_width=True):
+        repo.share_actor_publicly(actor["id"], company_id, role)
+        st.rerun()
+    if b2.button(f"⛔ {t('إيقاف المشاركة')}", key=f"actor_share_off_{actor['id']}", use_container_width=True):
+        repo.stop_sharing_actor(actor["id"], company_id, role)
+        st.toast(t("تم إيقاف المشاركة — اللينك القديم مابقاش شغال"), icon="⛔")
+        st.rerun()
+    st.caption(t("اللي بيظهر: الاسم المعروف، الصورة، البيو، الأعمال، التصنيف، الشوريل وإنستجرام — والطول/الشعر/العين/المهارات لو اخترتها في «بيانات تظهر للكل». عمره ما بيظهر: التليفون، الإيميل، الوكيل، مقاسات الجسم، الهوايات، التدخين، الروابط التانية، ولا أي ترشيحات."))
+
+
+def render_public_profile(token):
+    """‎?profile=<token>‎ من غير دخول (app.py بيناديها قبل بوابة الدخول).
+    بيرسم نفس HTML الصفحة العامة (public_profile.render_body) — مفيش أي قراءة
+    تانية من صف الممثل/ة هنا غير الصورة، ودي بتتقري من public_profile.photo_file."""
+    lang = "en" if st.query_params.get("lang") == "en" else st.session_state.get("ui_lang", "ar")
+    actor = repo.actor_by_public_token(token)
+    if not actor:
+        st.html(f"<style>{public_profile.CSS}</style>"
+                f'<div class="cf-pp"><div class="cf-pp__card"><h1>'
+                f'{public_profile._e(public_profile._tr("البروفايل ده مش متاح.", lang))}</h1></div></div>')
+        return
+    view = public_profile.public_view(actor)
+    photo_url = None
+    path = public_profile.photo_file(actor)
+    if path:
+        with open(path, "rb") as fh:
+            photo_url = (f"data:{public_profile.photo_media_type(path)};base64,"
+                         + base64.b64encode(fh.read()).decode())
+    switch = f"?profile={token}&lang={'ar' if lang == 'en' else 'en'}"
+    st.html(f"<style>{public_profile.CSS}</style>"
+            + public_profile.render_body(view, lang, photo_url=photo_url, share_url=_public_share_url(token),
+                                         lang_switch_url=switch, copy_button=False, embed_videos=False))
+    # st.html بيشيل iframe — الفيديوهات هنا (نفس روابط التضمين المبنية في videos.py)
+    if any(c["videos"] for c in view["credits"]):
+        render_credits([c for c in view["credits"] if c["videos"]])
+
+
+# ---------- فيديوهات الأعمال السابقة ----------
+
+def _flag_unrecognised(credits_text):
+    bad = videos.unrecognised(credits_text)
+    if bad:
+        st.session_state[_VIDEO_WARN_KEY] = bad
+
+
+def _warn_unrecognised(urls):
+    st.warning(t("اللينكات دي اتحفظت كنص بس ومش هتتعرض كفيديو (ولا هتظهر في البروفايل العام) — استخدم لينك يوتيوب أو فيميو أو ديلي موشن أو فيسبوك أو ملف ‎.mp4‎ مباشر:")
+               + "\n\n" + "\n".join(f"- {ltr(u)}" for u in urls))
+
+
+def render_credits(items, show_unrecognised=False):
+    """سطور الأعمال وتحت كل سطر فيديوهاته. المشغّل iframe لرابط اتبنى من رقم
+    الفيديو بس (videos.parse) — مفيش HTML ولا لينك من اليوزر بيدخل الصفحة."""
+    import streamlit.components.v1 as components
+    for c in items:
+        st.markdown(f"- {c['text'] or '🎬'}")
+        for v in c["videos"]:
+            if v["kind"] == "video":
+                st.video(v["embed_url"])
+            else:
+                components.iframe(v["embed_url"], height=340)
+        if show_unrecognised and c.get("unrecognised"):
+            st.caption("⚠️ " + t("لينك مش متعرف عليه كفيديو") + ": " + " · ".join(ltr(u) for u in c["unrecognised"]))
