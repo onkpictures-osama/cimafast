@@ -43,12 +43,33 @@ department working on the same data.
 3. **Evidence over opinion.** Every item says what in the data or code justifies it.
 4. **Everything ships to /v1 first.** Production only on the owner's approval.
 5. **Show what we already know.** Surfacing stored data beats building new AI.
+6. **Three stages, always.** Every film or series moves through three sequential
+   stages — **pre-production → production → post-production** — whether the
+   track is Classic (physical shoot) or AI-generated. They can overlap at the
+   edges in practice, but the product's roadmap and navigation must still read
+   as three distinct, ordered stages, so a user always knows exactly which one
+   their project is in. No feature is scoped without saying which stage it
+   serves. *(Owner, 2026-09-23.)*
+
+## The three stages, mapped
+
+- **Pre-production** — script → breakdown → shots → schedule → call sheets,
+  before a single frame is shot or generated. This is where CimaFast has lived
+  since day one and is still finishing: Phase 2 and Phase 3 below.
+- **Production** — the shoot itself (Classic) or the generation run itself
+  (AI-generated): what was actually captured or generated, day by day, against
+  what was planned. Exists today only as two under-built items inside Phase 4
+  (B2, B4) — undersized relative to being its own stage.
+- **Post-production** — everything after the last shot or generation until
+  delivery: editing, color, score, sound design, mix, VFX/CGI, graphics and
+  mastering. **Does not exist in the product at all today** — no table, no
+  screen, no report covers any of it. See the new item under Phase 4.
 
 ## Roadmap
 
 Each item: *problem → what we build → done when*. Owner agent in brackets.
 
-### Phase 0 — ERP foundations (before a second company can use CimaFast)
+### Phase 0 — ERP foundations (before a second company can use CimaFast) — cross-stage
 
 - **F1 Companies, users and project access** [chief-engineer, infrastructure]
   Accounts live in a config file and every user sees every project. → Users,
@@ -99,7 +120,7 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   and restore-drilled. Documented in that repo's README and
   `/opt/cimafast-backup/README.md`.
 
-### Phase 1 — A home for every user
+### Phase 1 — A home for every user — cross-stage
 
 - **H1 User home (concierge)** [production, chief-engineer]
   After login, users land in whatever project was open last; tools are scattered.
@@ -114,14 +135,61 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   notification and agent post opens the exact screen (supported by `st.tabs(default=)`). ✅ **On /v1 2026-09-21**, with lazy tabs.
 - **H3 Onboarding** [production] — a sample project and a guided first import,
   so a new company sees the full pipeline before loading its own script.
+- **H4 Targeted change notifications** [production, infrastructure] —
+  🗒️ **Specified 2026-09-23** [production]. `F3`'s audit trail records who
+  changed what but nothing pushes it to the people it affects — a department
+  head only finds out a location or shoot day changed by opening the app and
+  looking. Builds on `audit_log`: attach the department/role a change concerns
+  (not just the user who made it), surface it as a notification (bell icon on
+  home + sidebar) that deep-links straight to the changed item via the
+  existing `H2` mechanism. *Done when* a change to a scene's location or a
+  shoot day's schedule is visible, same session, to the department it
+  concerns, without a manual refresh.
+- **H5 Item-level comments** [production, chief-engineer] —
+  🗒️ **Specified 2026-09-23** [production]. No communication path exists
+  inside the product at all — not a team chat, not a comment. The workflow
+  need is narrower than a chat: a note thread on a specific item (a scene, a
+  location, a shoot day), the way a production actually leaves feedback on one
+  thing, not an open channel. A bridge to an outside channel (email/WhatsApp)
+  is a distinct, bigger decision and is not part of this item. *Done when* a
+  user can leave and read a comment on a scene/location/shoot day, and the
+  people it notifies (via H4) can jump straight to the thread.
 
-### Phase 2 — Complete the core pipeline (where users stall today)
+### Phase 2 — Complete the core pipeline (where users stall today) — pre-production
 
 - **P1 Starter shots from the AI analysis** [universal-creative, chief-engineer]
   141 scenes carry suggested shots nobody sees; 0 shots exist. → Show the
   suggestion on each scene and create editable starter shots per scene or in bulk.
-- **P2 Reference images at scale** [universal-creative] — character image
-  generation (today a stub) at parity with locations; bulk "generate missing".
+- **P2 Reference images at scale** [universal-creative, chief-engineer] —
+  character image generation (today a stub) at parity with locations; bulk
+  "generate missing". 🗒️ **Scoped 2026-09-23, from owner feedback:** the
+  location generator (`image_gen.py`, `ui.render_image_picker`) only ever sends
+  a text prompt — no reference image in or out, and the "extra details" box the
+  user sees is blank; the full prompt it builds from the location's own
+  description is assembled server-side and never shown. Character generation
+  isn't a lesser version of this — it's `st.info("🔒 ميزة توليد صور الشخصيات
+  الذكية قيد التطوير")` (`views/characters.py:116`), a dead radio option. →
+  1) **Reference-image input**, not just text: let the user attach the actor's
+  own photo and/or a background/location photo alongside the prompt, so the
+  generated image is conditioned on them, not description alone — needs
+  `image_gen.generate_image` to send image content, not just a text message,
+  and confirmation the OpenRouter model accepts multi-image input (fall back to
+  a model that does if `google/gemini-3.1-flash-image` doesn't).
+  2) **A few quick picks, not free text** — shot size reusing the existing
+  `SHOT_SIZE_OPTIONS` vocabulary (already used for shots, never offered here)
+  plus one or two more (e.g. indoor/outdoor light). Minimal copy — one line of
+  instruction, no paragraphs.
+  3) **The prompt box arrives pre-filled**, composed from what script analysis
+  already stored for that character/look (`personality_notes`, and for the
+  look: `apparent_age`, `makeup_state`, `hair_state`, `wardrobe_description`,
+  `description`) or that location — editable before generating, not a blank
+  box the user fills from memory of their own script.
+  *Done when:* a character with a filled-in look but no reference image can
+  generate one — the prompt box already reads a real paragraph built from that
+  look's stored fields, the user can attach the cast actor's photo and a
+  location/background photo, pick a shot size, and get an image conditioned on
+  both — with parity on the location side (prompt visible and editable there
+  too, not just characters).
 - **P3 Location model** [universal-creative, production] — sites and rooms
   (parent/child), city and address, a merge tool for duplicates. Scheduling,
   scouting and call sheets all depend on it.
@@ -182,8 +250,14 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   relationship to the existing importer, honest scope) in
   **`SCRIPT-EDITOR-PLAN.md`**.
 - ⭐ **P9 "Talent Vault" (خزانة المواهب) — an Actor role and a cross-company
-  casting directory** [universal-creative, production] — 🗒️ **Proposed
-  2026-09-22, not scoped, not to be deployed until decided.** A new Actor
+  casting directory** [chief-engineer, universal-creative, production] —
+  🗒️ **Proposed 2026-09-22; owner requested it be built 2026-09-23, with a
+  data-safety boundary the orchestrator set: real named actors get only
+  legitimate public bio/filmography data, never invented phone
+  numbers/measurements/habits — see `ACTOR-CASTING-PLAN.md`'s 2026-09-23
+  section for the full reasoning and the safe seed-data approach (fictional
+  demo actors carry the rich data, real actors stay honest and sparse until
+  they self-register).** A new Actor
   role (their own scenes/shots/wardrobe/props/direction notes), plus a
   searchable directory any director/producer can cast from — actors
   self-register with photos (refreshed every 3 months), measurements, looks,
@@ -196,21 +270,39 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   visibility, formal role vs. separate account type, who sees sensitive
   fields, honest scope) in **`ACTOR-CASTING-PLAN.md`**.
 
-### Phase 3 — Scheduling and shoot days (the heart of a production ERP)
+### Phase 3 — Scheduling and shoot days (the heart of a production ERP) — pre-production, ending at the handoff into production
 
 - **S1 Stripboard** — built on /v1 (`/v1/board/`): drag-and-drop, suggested
   schedule, company-move and day/night warnings, cast DOOD.
+  🗒️ **Gap found 2026-09-23** [production]: `board/app.py` and `board.html`
+  schedule scenes onto a day; shots (`اللقطات`) live in a separate, unrelated
+  tab and never attach to a shoot day. A schedule a camera department can
+  actually shoot from needs the shot list under each scene, not just the scene.
+  *Done when* a shoot day in the board shows each scene's shots (type, setup,
+  who owns it), not scenes alone.
 - **S2 Calendar** — a start date and working days turn the stripboard into dates.
 - **S3 Call sheets** — generated per shoot day from the schedule, cast and locations.
+  🗒️ **Specified 2026-09-23** [production]: not built yet — no reference to a
+  call sheet anywhere in `export.py` or the board. Needed as a printable/
+  shareable per-day report (Arabic RTL, matches the brand guide per the
+  exported-reports item above): every scene scheduled that day with its time,
+  every cast member called with call time, the day's locations and addresses,
+  weather/notes field. Pulls only from data already in the schedule (S1+S4) —
+  no separate data entry. *Done when* a production manager picks a shoot day on
+  the board and exports a call sheet PDF with cast call times and locations
+  filled in from existing data, no manual re-entry.
 - **S4 Cast and crew directory** — contacts, availability, and the DOOD per person.
 
 ### Phase 4 — ERP breadth
 
+Split by stage, per Principle 6 — this phase is where the **production** and
+**post-production** stages actually live in the plan, alongside cross-stage
+business items. Today only the cross-stage items and two thin production items
+exist; post-production is entirely new.
+
+**Cross-stage**
 - **B1 Budget and costs** — budget lines per department, actuals, reports.
-- **B2 Daily production reports** — what was shot vs planned, per day.
 - **B3 Vendors, equipment and rentals.**
-- **B4 AI-generated production module** — versioned prompts, generation settings,
-  digital-asset tracking, linked to scenes and shots.
 - ⭐ **B5 "Subscription Gates" (بوابات الاشتراك) — subscription tiers &
   pricing** [orchestrator] — 🗒️ **Proposed
   2026-09-22, not scoped, explicitly not to be deployed until the owner and
@@ -220,6 +312,50 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   production companies and agencies running many parallel productions.
   Numbers, analysis and open naming/architecture questions in
   **`SUBSCRIPTIONS-PLAN.md`**.
+
+**Production stage** (the shoot itself, or the generation run itself)
+- **B2 Daily production reports** — what was shot vs planned, per day.
+- **B4 AI-generated production module** — versioned prompts, generation settings,
+  digital-asset tracking, linked to scenes and shots.
+
+**Post-production stage** (everything after the last shot/generation until delivery)
+- ⭐ **PP1 "لوحة حالة البوست بروداكشن" (Post-Production Status Board)**
+  [production, chief-engineer] — 🗒️ **Proposed 2026-09-23, owner approved
+  adding it to the plan the same day ("يلا حطه"); not yet scoped for a build
+  order — that is the orchestrator's call.**
+  *Evidence:* the product has zero tables, screens or reports for any of the
+  seven post-production departments — editing, color grading, score, sound
+  design, ADR & final mix, VFX/CGI, and titles/graphics & mastering/QC. A
+  production manager or post-producer today tracks this outside CimaFast
+  entirely (WhatsApp, a shared spreadsheet, a Drive folder), and there is no
+  single place a director or producer can check the state of all seven
+  departments at once. Checked the well-known purpose-built tools in this
+  space (ftrack/Backlight, Autodesk ShotGrid, Frame.io, Wipster, PIX System,
+  Kollaborate, Signiant Media Shuttle) — they are shot-tracking or
+  review-and-approve tools built for VFX pipelines or big-studio dailies, not
+  a lightweight cross-department status report a producer can hand a director
+  who never opens the app; that gap is exactly what small and mid-size
+  productions fall back to spreadsheets for, and it's what this item closes.
+  *What we build:* a per-project board with one card per department showing
+  status (لم يبدأ / جارٍ / في المراجعة / معتمد / محتاج تعديل), the assigned
+  studio or freelancer with contact info and location, one or two external
+  preview links (Google Drive or whatever the vendor already uses — a URL
+  field, never file hosting inside CimaFast), and a lightweight comment
+  thread per department. New tables (`post_departments`, `post_status`,
+  `post_links`, `post_comments`), each project-scoped and going through the
+  existing `audit_log`/permissions layers untouched. A one-click exported
+  report (PDF/Word, `export.py` pattern) listing all seven departments' status,
+  last update and vendor contact, so a director or producer gets the full
+  picture without logging in; any department untouched for 7+ days is flagged
+  stale on that report. The department list differs slightly by project track
+  (Classic vs. AI-generated) but shares the same tables, screen and report —
+  distinct labels, one data model, per how the two tracks are meant to stay
+  coherent.
+  *Done when:* a post-producer on a real project can update every department's
+  status, attach a preview link and a vendor contact, leave a comment, and
+  export one report that shows a director/producer the full seven-department
+  picture without opening the app — in under two minutes, with stale
+  departments visibly flagged.
 
 ### Continuous
 
@@ -285,3 +421,31 @@ never a decision for the owner.
    background reference mockup and approved it ("Yes") over the yellow-field
    look the brand guide currently documents for the sidebar. Treated as an
    intentional, scoped exception to that rule, not a reversal of it elsewhere.
+6. **Three-stage framing** — decided 2026-09-23: the product and this plan
+   always organize around three sequential stages — pre-production →
+   production → post-production — for both Classic and AI-generated tracks,
+   so a user always knows which stage their project is in. Recorded as
+   Principle 6 and in "The three stages, mapped" above.
+7. **Post-production status board approved onto the plan** — decided
+   2026-09-23 ("يلا حطه"): the post-production stage does not exist in the
+   product yet; owner approved adding **PP1** (Phase 4) to this plan.
+   Build order/priority is still the orchestrator's call, not decided here.
+8. **Sequencing the 2026-09-23 Phase 1/3 additions (H4, H5, S1's shots gap,
+   S3)** — decided 2026-09-23, orchestrator, no owner call needed (this is
+   priority ordering inside the approved plan, not a scope change):
+   **H4 before S3.** H4 is the cheaper build — it only attaches a
+   department/role to existing `audit_log` rows and surfaces them through the
+   `H2` deep-link mechanism already on /v1 — and `H5` cannot start without it
+   (its own done-when clause needs H4 to exist). S3 cannot start immediately
+   either way: it depends on `S2` (Calendar — no start date/working days yet)
+   and `S4` (Cast and crew directory — no call times stored yet), neither
+   built, so H4 has room to land first without costing S3 any time. Landing
+   it first also means that by the time call sheets ship, an in-app answer
+   already exists to the exact gap flagged — a call sheet going stale the
+   moment the schedule changes. Order: **H4 → S1's shots-on-board gap (can run
+   in parallel with H4; board/ vs app.py, different surface) → S2 + S4 (S3's
+   own unbuilt data prerequisites) → S3 → H5** (blocked on H4 by its own
+   spec). Ahead of all of it: **P9 (Talent Vault) and P2 (reference images)
+   are already mid-build in this checkout** (uncommitted `views/actors.py`,
+   `image_gen.py`, `views/characters.py`, etc.) and hold chief-engineer's
+   capacity until that work lands — this ordering applies to what comes after.
