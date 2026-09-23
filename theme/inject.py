@@ -256,7 +256,15 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
     فالقوالب ‎__DIR__‎ / ‎__ALIGN__‎ / ‎__ROWDIR__‎ بتتبدل في النسختين
     بنفس الطريقة.
     """
-    parts = [classic.MAIN_CSS, sidebar.SIDEBAR_CSS, _header_logo_css(), _sticky_bar_css()]
+    # ‎collapse_slide_css‎ بترجع فاضي في الإنجليزي: اتجاه انزلاق الشريط
+    # الجانبي وهو بيتفتح/بيتقفل بيتصلّح في العربي بس (الشرح في ‎sidebar.py‎).
+    parts = [
+        classic.MAIN_CSS,
+        sidebar.SIDEBAR_CSS,
+        sidebar.collapse_slide_css(dir_),
+        _header_logo_css(),
+        _sticky_bar_css(),
+    ]
     if variant == GLASS:
         parts.append(glass.main_css(dir_))
     # موبايل: طبقة CSS ثابتة جوه @media، بتتطبق لوحدها لما عرض الشاشة يضيق —

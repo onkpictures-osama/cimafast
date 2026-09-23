@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from theme import contrast as C  # noqa: E402
-from theme import brand, flag, glass, mobile, tokens  # noqa: E402
+from theme import brand, flag, glass, mobile, sidebar, tokens  # noqa: E402
 
 _results = []
 
@@ -525,6 +525,26 @@ def test_arabic_name_sits_beside_the_lockup_in_cairo():
     word_block = with_ar[with_ar.index("cf-logo__word"):with_ar.index("cf-logo__ar")]
     assert brand.ARABIC_NAME not in word_block
     assert 'font-family: "Cairo"' in brand.LOGO_CSS
+
+
+@test
+def test_sidebar_slides_out_to_the_right_in_arabic_only():
+    """الشريط الجانبي في العربي واقف على اليمين (‎direction: rtl‎)، بس إزاحة
+    Streamlit وهو بيتقفل ‎translateX(-عرض)‎ فيزيائية ناحية الشمال — فكان
+    بيتقلّص ناحية نص الشاشة بدل ما يخرج من حرف اليمين. القاعدة اللي
+    بتعكس الإشارة لازم تتحقن في العربي **بس**، والإنجليزي يفضل زي ما هو."""
+    rtl = sidebar.collapse_slide_css("rtl")
+    assert sidebar.collapse_slide_css("ltr") == ""
+    blocks = _css_blocks(rtl)
+    assert len(blocks) == 1
+    sel, body = blocks[0]
+    # لازم تتسكوب على الحالة المقفولة بس - المفتوحة بتاخد ‎none‎ من Streamlit
+    assert '[aria-expanded="false"]' in sel
+    assert 'section[data-testid="stSidebar"]' in sel
+    # إشارة موجبة = ناحية اليمين. أي ‎translateX(-‎ هنا يبقى رجوع للباج.
+    assert "translateX(" in body and "translateX(-" not in body
+    # من غير ‎!important‎ عن قصد: أسبقية السيليكتور لوحدها بتغلب كلاس emotion
+    assert "!important" not in body
 
 
 def _strip_comments(css):
