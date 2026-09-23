@@ -1,7 +1,7 @@
 """شاشة مكتبة التحليلات (‎?page=library‎) — على مستوى الحساب، بره أي مشروع.
 
 المنطق كله في analysis_library.py؛ هنا العرض بس: بحث، وكارت لكل تحليل عليه
-تلات حاجات — استورد في مشروع، نزّل الملف، احذف (بتأكيد).
+أربع حاجات — استورد في مشروع، تقرير البناء الدرامي، نزّل الملف، احذف (بتأكيد).
 """
 
 import html
@@ -15,6 +15,7 @@ import links
 import permissions
 from i18n import t
 from ui import ltr
+from views import dramaturgy_panel
 
 _log = logging.getLogger("cimafast.library")
 
@@ -151,13 +152,27 @@ def _entry_card(current_user, row, can_import):
             f'{ltr(row["location_count"])} {html.escape(t("مكان"))}</div>',
             unsafe_allow_html=True)
 
-        c_imp, c_dl, c_del = st.columns(3)
+        # زرار التقرير بس على النسخة اللي ليها worker للتقرير (/v1 دلوقتي)
+        if dramaturgy_panel.jobs.available():
+            c_imp, c_drama, c_dl, c_del = st.columns(4)
+        else:
+            (c_imp, c_dl, c_del), c_drama = st.columns(3), None
         with c_imp:
             if st.button(t("📥 استورد في مشروع"), key=f"lib_imp_{eid}", use_container_width=True,
                          disabled=not can_import,
                          help=None if can_import else t("حسابك مشاهدة فقط — مينفعش تستورد في مشروع.")):
                 st.session_state["_lib_open"] = None if st.session_state.get("_lib_open") == eid else eid
                 st.session_state.pop("_lib_confirm_delete", None)
+                st.session_state.pop("_lib_drama", None)
+        if c_drama is not None:
+            with c_drama:
+                # مفيش علامة "فيه تقرير" في الكارت نفسه: ده محتاج نفك JSON كل صف في
+                # اللستة، واللستة معمولة من الأعمدة الخفيفة بس (_LIST_COLS). التقرير
+                # بيتقري لما اللوحة تتفتح.
+                if st.button(t("🎭 البناء الدرامي"), key=f"lib_drama_{eid}", use_container_width=True):
+                    st.session_state["_lib_drama"] = None if st.session_state.get("_lib_drama") == eid else eid
+                    st.session_state.pop("_lib_open", None)
+                    st.session_state.pop("_lib_confirm_delete", None)
         with c_dl:
             st.download_button(
                 t("⬇️ نزّل ملف"), data=lambda: lib.to_file(lib.get(current_user, eid),
@@ -169,6 +184,7 @@ def _entry_card(current_user, row, can_import):
                          disabled=not lib.can_delete(current_user, row)):
                 st.session_state["_lib_confirm_delete"] = eid
                 st.session_state.pop("_lib_open", None)
+                st.session_state.pop("_lib_drama", None)
 
         if st.session_state.get("_lib_confirm_delete") == eid:
             st.warning(t("متأكد إنك عايز تحذف التحليل ده من المكتبة؟ المشاريع اللي اتستورد فيها "
@@ -191,6 +207,8 @@ def _entry_card(current_user, row, can_import):
 
         if st.session_state.get("_lib_open") == eid:
             _import_panel(current_user, row)
+        if c_drama is not None and st.session_state.get("_lib_drama") == eid:
+            dramaturgy_panel.render(current_user, eid, key=f"lib_{eid}")
 
 
 def render(current_user, company_id, role, is_ar=True):

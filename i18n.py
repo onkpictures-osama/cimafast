@@ -749,6 +749,41 @@ TRANSLATIONS = {
         "This character is already cast with another actor. Remove that casting first to change it.",
     "الرقم ده متحط لشخصية تانية في المشروع. اختار رقم تاني أو فضّي رقمها الأول.":
         "That number belongs to another character in this project. Pick another or clear theirs first.",
+    # --- تقرير البناء الدرامي (dramaturgy.py) ---
+    "🎭 اعمل تقرير البناء الدرامي": "🎭 Generate Dramatic-Structure Report",
+    "تحليل تاني فوق نتيجة السيناريو: نقط القوة والضعف في البناء الدرامي حسب هرم فرايتاج، وكل حكم فيه بيترجع لأرقام مشاهد حقيقية.":
+        "A second pass on top of the analysis: strengths and weaknesses in the dramatic structure per Freytag's pyramid, every claim tied to real scene numbers.",
+    "بيحلل البناء الدرامي...": "Analysing dramatic structure…",
+    "تقرير البناء الدرامي جاهز": "Dramatic-structure report ready",
+    "مقدرناش نطلّع تقرير البناء الدرامي. جرّب تاني.": "Couldn't generate the dramatic-structure report. Try again.",
+    "⬇️ تصدير تقرير البناء الدرامي": "⬇️ Export dramatic-structure report",
+    "لسه مفيش تقرير بناء درامي لهذا التحليل": "No dramatic-structure report yet for this analysis",
+    "🎭 عمل تقرير تاني": "🎭 Regenerate report",
+    "🎭 تقرير البناء الدرامي": "🎭 Dramatic-Structure Report",
+    "🎭 البناء الدرامي": "🎭 Dramatic structure",
+    "تكلفة تقديرية": "Estimated cost",
+    "بحد أقصى": "capped at",
+    "في الطابور": "Queued",
+    "مفيش مشاهد في التحليل ده، فمش هيتعمل تقرير بناء درامي.":
+        "This analysis has no scenes, so no dramatic-structure report can be made.",
+    "مقدرناش نعمل التقرير المرة دي. التحليل نفسه زي ما هو، جرّب تاني بعد شوية.":
+        "We couldn't make the report this time. The analysis itself is untouched; try again shortly.",
+    "رد الذكاء الاصطناعي مش JSON سليم — التقرير ده مايتحفظش، جرّب تاني.":
+        "The AI reply wasn't valid JSON, so this report wasn't saved. Try again.",
+    "رد الذكاء الاصطناعي جاله شكل غير متوقع ومش قادرين نقرا التقرير منه.":
+        "The AI reply came back in an unexpected shape and the report couldn't be read.",
+    "مراحل هرم فرايتاج في التقرير فيها فجوة أو تداخل بين المشاهد.":
+        "The report's Freytag stages leave a gap or overlap between scenes.",
+    "مراحل هرم فرايتاج في التقرير ماغطتش كل مشاهد السكريبت.":
+        "The report's Freytag stages don't cover every scene in the script.",
+    "التقرير مفيهوش المراحل الخمسة لهرم فرايتاج بالظبط.":
+        "The report doesn't have exactly the five Freytag stages.",
+    "التقرير من غير حكم عام (verdict) على البناء الدرامي.":
+        "The report has no overall verdict on the dramatic structure.",
+    "منحنى التوتر فيه قيمة برّه المدى المسموح (0-100).":
+        "The tension curve has a value outside the allowed range (0-100).",
+    "تقرير البناء الدرامي مش متاح على النسخة دي.":
+        "The dramatic-structure report isn't available on this version.",
 }
 
 

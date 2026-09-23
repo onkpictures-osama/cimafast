@@ -927,3 +927,237 @@ def build_shot_list_pdf(project, project_id, fetch_all):
 
     c.save()
     return buf.getvalue()
+
+
+# ---------- تقرير البناء الدرامي (dramaturgy.py) ----------
+# المحتوى كله جاي جاهز ومترجم من dramaturgy.to_sections() — هنا الشكل بس.
+# reportlab و python-docx مابيرسموش SVG، فمنحنى التوتر بيترسم تاني كصورة PNG
+# (PIL) بنفس منطق dramaturgy.render_svg، ونفس الصورة بتدخل الوورد والـ PDF.
+
+_DRAMA_CURVE_W, _DRAMA_CURVE_H = 1800, 560
+
+
+def dramaturgy_curve_png(report, lang="ar"):
+    """منحنى التوتر كـ PNG: في العربي بداية القصة (العرض) على اليمين. بنرسم بـ
+    BASIC layout ونشكّل العربي بـ _ar() بنفسنا — لو سبنا raqm يشكّله كمان
+    النص هيتقلب مرتين."""
+    from PIL import Image, ImageDraw, ImageFont
+    import dramaturgy
+
+    width, height = _DRAMA_CURVE_W, _DRAMA_CURVE_H
+    curve = report.get("tension_curve") or []
+    n = len(curve)
+    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+    rtl = lang == "ar"
+    pad_l, pad_r, pad_t, pad_b = 30, 30, 30, 70
+    plot_w, plot_h = width - pad_l - pad_r, height - pad_t - pad_b
+
+    def x_of(i):
+        frac = i / (n - 1) if n > 1 else 0.5
+        return pad_l + ((1 - frac) if rtl else frac) * plot_w
+
+    def y_of(v):
+        return pad_t + (1 - float(v) / 100) * plot_h
+
+    try:
+        font = ImageFont.truetype(_ARABIC_BOLD_FONT_PATH if os.path.exists(_ARABIC_BOLD_FONT_PATH)
+                                  else _ARABIC_FONT_PATH, 26, layout_engine=ImageFont.Layout.BASIC)
+    except OSError:
+        font = ImageFont.load_default()
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    labels = []
+    stage_colors = getattr(dramaturgy, "_STAGE_COLORS", {})
+    for st_ in (report.get("stages") or []) if n else []:
+        # حدود الشريط في نص المسافة بين المشهدين، عشان المراحل تلزق في بعض
+        # من غير فراغات، ومرحلة المشهد الواحد تبقى شريط باين مش خط
+        half = (plot_w / (n - 1) / 2) if n > 1 else plot_w / 2
+        x1, x2 = x_of(st_["from_index"] - 1), x_of(st_["to_index"] - 1)
+        left = max(pad_l, min(x1, x2) - half)
+        right = min(pad_l + plot_w, max(x1, x2) + half)
+        hexc = stage_colors.get(st_["stage"], "#888888").lstrip("#")
+        rgb = tuple(int(hexc[i:i + 2], 16) for i in (0, 2, 4))
+        od.rectangle([left, pad_t, right, pad_t + plot_h], fill=rgb + (38,))
+        labels.append(((left + right) / 2, rgb, st_.get("label_ar") if rtl else st_.get("label_en")))
+    img = Image.alpha_composite(img, overlay)
+    d = ImageDraw.Draw(img)
+    mist = tuple(int(MIST[i:i + 2], 16) for i in (0, 2, 4))
+    for v in (0, 50, 100):
+        d.line([(pad_l, y_of(v)), (pad_l + plot_w, y_of(v))], fill=mist, width=1)
+    pts = [(x_of(i), y_of(pt["value"])) for i, pt in enumerate(curve)]
+    if len(pts) > 1:
+        d.line(pts, fill=(192, 70, 60), width=5, joint="curve")
+    for x, y in pts:
+        d.ellipse([x - 4, y - 4, x + 4, y + 4], fill=(192, 70, 60))
+    for cx, rgb, label in labels:
+        text = _ar(label) if rtl else str(label or "")
+        tw = d.textlength(text, font=font)
+        x = min(max(cx - tw / 2, 4), width - tw - 4)      # الاسم مايتقصّش على الحافة
+        d.text((x, height - pad_b + 18), text, font=font, fill=rgb)
+    buf = BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def _drama_title(lang):
+    return "تقرير البناء الدرامي" if lang == "ar" else "Dramatic-Structure Report"
+
+
+def _drama_script_title(script_name):
+    """اسم السيناريو من غير امتداد الملف: ‎"الحلقة الاولى.pdf"‎ في سطر عربي
+    بيتعرض ‎"pdf.الحلقة الاولى"‎ وده بيلخبط القارئ."""
+    name = str(script_name or "").strip()
+    stem, dot, ext = name.rpartition(".")
+    if dot and stem and ext.lower() in ("pdf", "docx", "doc", "txt", "json", "fdx", "md"):
+        name = stem
+    return name or "—"
+
+
+def _drama_blocks(report, lang):
+    """(عنوان، [فقرات]) — نقطة الضعف بتتكتب في سطور (المشكلة / ليه مهم /
+    إزاي نقويه) بدل سطر واحد طويل متقسّم بـ "|"، أسهل في القراية على الورق."""
+    import dramaturgy
+    out = []
+    for sec in dramaturgy.to_sections(report, lang=lang):
+        paras = [p.replace(" | ", "\n") for p in sec["paragraphs"]]
+        out.append((sec["heading"], paras))
+    return out
+
+
+def build_dramatic_structure_pdf(report, script_name, lang="ar"):
+    font_name, bold_font_name = _register_arabic_font()
+    rtl = lang == "ar"
+    page_w, page_h = A4
+    margin = 40
+    usable_w = page_w - 2 * margin
+    body_size, head_size, line_h = 10.5, 13, 15
+    wrap_chars = 88 if rtl else 95
+
+    buf = BytesIO()
+    c = pdfcanvas.Canvas(buf, pagesize=(page_w, page_h))
+    y = page_h - margin
+
+    def text_at(txt, font, size, color=INK):
+        c.setFont(font, size)
+        c.setFillColor(colors.HexColor(f"#{color}"))
+        if rtl:
+            c.drawRightString(page_w - margin, y, txt)
+        else:
+            c.drawString(margin, y, txt)
+
+    def need(h):
+        nonlocal y
+        if y - h < margin:
+            c.showPage()
+            y = page_h - margin
+
+    # بلوك العنوان: اللوجو ناحية بداية القراءة، والعنوان واسم السيناريو في النص
+    path = _logo_file("light")
+    if path:
+        w = 28 * MASTER_ASPECT
+        c.drawImage(path, (page_w - margin - w) if rtl else margin, y - 28,
+                    width=w, height=28, mask="auto")
+    c.setFillColor(colors.HexColor(f"#{INK}"))
+    c.setFont(bold_font_name, 16)
+    c.drawCentredString(page_w / 2, y - 16, _ar(_drama_title(lang)))
+    c.setFont(bold_font_name, 11)
+    c.drawCentredString(page_w / 2, y - 32, _ar(_drama_script_title(script_name)))
+    c.setFillColor(colors.HexColor(f"#{NAVY}"))
+    c.setFont(font_name, 8)
+    c.drawCentredString(page_w / 2, y - 45, _ar(_drama_meta_line(report, lang)))
+    y -= 62
+
+    # منحنى التوتر بعرض الصفحة
+    from reportlab.lib.utils import ImageReader
+    img_h = usable_w * _DRAMA_CURVE_H / _DRAMA_CURVE_W
+    c.drawImage(ImageReader(BytesIO(dramaturgy_curve_png(report, lang))), margin, y - img_h,
+                width=usable_w, height=img_h)
+    y -= img_h + 18
+
+    for heading, paras in _drama_blocks(report, lang):
+        need(head_size + line_h * 2)
+        c.setFillColor(colors.HexColor(f"#{YELLOW}"))
+        c.rect(margin, y - 5, usable_w, head_size + 8, stroke=0, fill=1)
+        text_at(_ar(heading), bold_font_name, head_size)
+        y -= head_size + 12
+        for para in paras:
+            lines = []
+            for part in para.split("\n"):
+                lines.extend(_wrap_lines(part, wrap_chars, max_lines=40))
+            for j, ln in enumerate(lines):
+                need(line_h)
+                # النص بعد _ar مترتب بصريًا: آخر حرف في السترنج هو أقصى
+                # اليمين، فالبولت في العربي بيتحط في الآخر مش الأول
+                if j == 0:
+                    ln = f"{ln} •" if rtl else f"• {ln}"
+                text_at(ln, font_name, body_size)
+                y -= line_h
+            y -= 4
+        y -= 6
+        c.setStrokeColor(colors.HexColor(f"#{MIST}"))
+        c.line(margin, y + 4, page_w - margin, y + 4)
+
+    c.save()
+    return buf.getvalue()
+
+
+def _drama_meta_line(report, lang):
+    meta = report.get("meta") or {}
+    when = (meta.get("generated_at") or "")[:10] or date.today().isoformat()
+    n = report.get("scene_count") or 0
+    if lang == "ar":
+        return f"{n} مشهد · اتعمل {when} · CimaFast STUDIO"
+    return f"{n} scenes · generated {when} · CimaFast STUDIO"
+
+
+def build_dramatic_structure_word(report, script_name, lang="ar"):
+    rtl = lang == "ar"
+    document = docx.Document()
+    section = document.sections[0]
+    for side in ("left_margin", "right_margin", "top_margin", "bottom_margin"):
+        setattr(section, side, Cm(1.8))
+
+    def align(p, center=False):
+        if rtl:
+            (_set_rtl_center if center else _set_rtl)(p)
+        elif center:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    _add_word_logo(document)
+    for text, size, bold, color in ((_drama_title(lang), 20, True, _WORD_INK),
+                                    (_drama_script_title(script_name), 13, True, _WORD_INK),
+                                    (_drama_meta_line(report, lang), 8, False, _WORD_NAVY)):
+        p = document.add_paragraph()
+        align(p, center=True)
+        r = p.add_run(text)
+        r.bold, r.font.size, r.font.color.rgb = bold, Pt(size), color
+
+    pic = document.add_paragraph()
+    pic.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    pic.add_run().add_picture(BytesIO(dramaturgy_curve_png(report, lang)), width=Cm(17))
+
+    for heading, paras in _drama_blocks(report, lang):
+        # العنوان على شريط أصفر بحروف Ink — نفس قاعدة الدليل في الـ PDF
+        table = document.add_table(rows=1, cols=1)
+        table.style = "Table Grid"
+        _brand_table_borders(table, YELLOW)
+        cell = table.rows[0].cells[0]
+        cell.text = heading
+        _shade_cell(cell, YELLOW)
+        for p in cell.paragraphs:
+            align(p)
+            for r in p.runs:
+                r.bold, r.font.size, r.font.color.rgb = True, Pt(13), _WORD_INK
+        for para in paras:
+            for i, part in enumerate(para.split("\n")):
+                p = document.add_paragraph()
+                align(p)
+                r = p.add_run(("• " if i == 0 else "") + part)
+                r.font.size, r.font.color.rgb = Pt(10.5), _WORD_INK
+                if i == 0 and len(para.split("\n")) > 1:
+                    r.bold = True
+        document.add_paragraph()
+
+    buf = BytesIO()
+    document.save(buf)
+    return buf.getvalue()

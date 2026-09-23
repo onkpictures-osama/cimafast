@@ -16,6 +16,7 @@ from script_parser import apply_character_merges, apply_location_merges, extract
 from ui import fmt_day_night, fmt_int_ext, ltr, multiselect
 import audit
 import repo
+from views import dramaturgy_panel
 
 
 _log = logging.getLogger("cimafast.import")
@@ -467,6 +468,14 @@ def render(project_id):
         _analysis_rtl_css()
         with st.container(key="cf_analysis"):
             _render_analysis_dashboard(st.session_state["last_analysis"])
+    if not parsed:
+        # بعد الاستيراد (أو في زيارة تانية) التقرير يفضل متاح على آخر تحليل
+        # اتعمل من المشروع ده في المكتبة، مش بس وقت ما النتيجة على الشاشة
+        _drama_entry = (dramaturgy_panel.jobs.entry_for_project(st.session_state.get("_auth_user"), project_id)
+                        if dramaturgy_panel.jobs.available() else None)
+        if _drama_entry:
+            with st.container(border=True, key="cf_drama_import"):
+                dramaturgy_panel.render(st.session_state.get("_auth_user"), _drama_entry, key="import")
     if parsed:
         scenes = parsed["scenes"]
         for w in parsed["warnings"]:
@@ -477,6 +486,10 @@ def render(project_id):
                 f'<div class="cf-lib-saved">📚 {t("التحليل ده اتحفظ في مكتبة التحليلات بتاعتك — لو ده مش المشروع الصح، استورده من هناك في أي مشروع تاني.")} '
                 f'<a href="?page=library" target="_self">{t("افتح المكتبة")}</a></div>',
                 unsafe_allow_html=True)
+            # تقرير البناء الدرامي: بدوسة بس (بيكلّف)، وبيتحفظ على نفس التحليل في المكتبة
+            with st.container(border=True, key="cf_drama_import"):
+                dramaturgy_panel.render(st.session_state.get("_auth_user"),
+                                        parsed["library_id"], key="import")
 
         st.success(f"{t('تم التعرف على')} {len(scenes)} {t('مشهد في الملف. راجعهم وعدّل أي حاجة غلط قبل التأكيد:')}")
         excluded_scene_indices = set()

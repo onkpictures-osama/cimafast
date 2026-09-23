@@ -217,6 +217,23 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   back-filled with the right owner. Tests: `tests/test_analysis_library.py`.
   Still to come: analyses imported before the spool existed can't be recovered
   (only their edited scenes survive in the project).
+- **P4b Dramatic-structure report (تقرير البناء الدرامي، هرم فرايتاج)**
+  [universal-creative (prompt, schema, wording), chief-engineer (integration)] —
+  owner request 2026-09-23: after an analysis, a report of strengths, weak
+  dramatic zones and weak structure, each tied to real scene numbers, with how to
+  strengthen it, built on Freytag's pyramid. → On demand only, from
+  «اعمل تقرير البناء الدرامي» with the estimated cost on the button, on the
+  script-analysis screen and on each Analysis Library entry. Shows a tension
+  curve plus the sections; exports to PDF and Word (curve included); stored on
+  the library entry (`reports.dramatic_structure`). Viewers can't run it (F2);
+  each run is a usage event and each save an audit row (F3).
+  ✅ **On /v1 2026-09-23.** Runs on its own /v1-only queue and worker
+  (`dramaturgy_jobs.py`, `dramaturgy_worker.py`, `cimafast-dramaturgy-v1.service`);
+  production's AI worker is untouched, and the button is hidden wherever that
+  queue isn't configured. Tests: `tests/test_dramaturgy.py`,
+  `tests/test_dramaturgy_jobs.py`. **Open:** the first real run (12 scenes) hit
+  its spending ceiling at $0.38 against a $0.14 estimate and produced no report —
+  the estimate and ceiling need calibrating before this goes to production.
 - **P5 Looks and continuity** [universal-creative] — scenes that note a look
   change create or link a look; continuity-sensitive props tracked across scenes.
   🔎 **Scoped 2026-09-23**, after an owner report that "adding a state to a
@@ -480,6 +497,7 @@ one at a time as they are rebuilt.
 - Reports that show what is missing; exports always built from current data.
 - `app.py` split into views; SQLite in WAL mode; all queries in a data layer (`repo.py`).
 - The shooting-schedule board (S1) at `/v1/board/`.
+- Dramatic-structure report (P4b) — needs its own production worker and a calibrated cost ceiling first.
 
 ## How the agents use this plan
 
