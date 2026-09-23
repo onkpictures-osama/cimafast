@@ -425,10 +425,12 @@ with st.sidebar.container(gap=2):
             '<div class="cf-title">%s</div>' % theme.brand.lockup("dark", px=36),
             unsafe_allow_html=True,
         )
-        # "؟" مش إيموجي ("ℹ️") ولا حرف دائرة نادر ("ⓘ") - الاتنين ما رسمهمش
-        # صحيح. علامة استفهام عادية أكيد موجودة في نفس الخط اللي بيرسم باقي
-        # نص الواجهة كله صح.
-        with st.popover("؟"):
+        # أيقونة "معلومات" مش "؟" - طلب محمد الزيات (2026-09-23): علامة
+        # الاستفهام بتتقري "مساعدة"، والزرار ده بيعرض نبذة عن البرنامج.
+        # ‎:material/info:‎ من خط Material Symbols اللي Streamlit شايله جواه،
+        # فمش معتمد على خطوط الجهاز (ده اللي خلّى "ⓘ" تفشل قبل كده)، وبياخد
+        # لون النص زي باقي الشريط بدل مربع إيموجي أزرق ثابت ("ℹ️").
+        with st.popover("", icon=":material/info:"):
             st.markdown(f"**{tr('studio_tagline')}**")
             st.caption(t(_APP_DESCRIPTION))
     # تاجلاين تحت اللوجو - نفس نص "؟" (studio_tagline)، مش ترجمة حرفية
