@@ -44,7 +44,12 @@ def inject_base(st, variant=CLASSIC, lang="ar"):
     # التوكنز أول حاجة: من بعد ما ألوان البراند الرسمية بقت في ‎tokens.py‎،
     # الشكل الكلاسيكي بقى بيستهلك ‎var(--cf-*)‎ زي شكل الزجاج بالظبط. فلازم
     # بلوك الـ ‎:root‎ يتحقن في المسارين، مش في مسار الزجاج بس زي الأول.
-    parts = [tokens.css_vars("dark"), brand.LOGO_CSS, classic.BASE_CSS, classic.LOGIN_CSS]
+    # ستايل الشريط الثابت هنا مش في ‎inject_main‎ بس: الشريط مبني بجافاسكريبت
+    # جوه ‎body‎ بره React، فبيفضل موجود بعد تسجيل الخروج. من غير ستايله كانت
+    # صورة اللوجو بتترسم بمقاسها الأصلي (2400×1000) وتغطي شاشة الدخول كلها
+    # (بلاغ المالك 2026-09-23). وعلى شاشة الدخول نفسها مالوش لازمة خالص.
+    parts = [tokens.css_vars("dark"), brand.LOGO_CSS, classic.BASE_CSS, classic.LOGIN_CSS,
+             _sticky_bar_css(), "body:has(.cf-login) #cf-sticky-bar { display: none !important; }"]
     if variant == GLASS:
         parts.append(glass.base_css())
         parts.append(glass.login_css())
@@ -212,6 +217,9 @@ def _sticky_bar_js(st, logo_src):
             img.className = 'cf-sticky-bar__logo';
             img.alt = 'CimaFast';
             img.src = '%(logo_src)s';
+            // المقاس inline كمان: لو الستايل اتأخر أو اتشال، الصورة متتفردش بمقاسها الأصلي
+            img.style.height = '28px';
+            img.style.width = 'auto';
             var btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'cf-sticky-bar__burger';
@@ -263,7 +271,6 @@ def inject_main(st, variant=CLASSIC, dir_="rtl", align="right", rowdir="row-reve
         sidebar.SIDEBAR_CSS,
         sidebar.collapse_slide_css(dir_),
         _header_logo_css(),
-        _sticky_bar_css(),
     ]
     if variant == GLASS:
         parts.append(glass.main_css(dir_))

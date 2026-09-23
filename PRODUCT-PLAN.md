@@ -441,8 +441,10 @@ one at a time as they are rebuilt.
   is updated to record the sidebar as an intentional exception (not left to
   read as a bug), avatar is a placeholder (initials) rather than real photo
   upload unless the owner asks for upload as its own feature, and the
-  MEDIA/STUDIO wordmark inconsistency (flagged 2026-09-23, still open) is
-  resolved as part of the same pass since the logo is being touched anyway.
+  MEDIA/STUDIO wordmark inconsistency is ✅ **resolved 2026-09-23**: the owner
+  ruled the product is "CimaFast Studio, not Media" — the lockup masters (SVG +
+  re-rendered PNG) now read STUDIO everywhere, and the oversized login-screen
+  logo (a leftover sticky-bar image after logout) is gone.
 
 - **Bring exported reports onto the brand guide** [chief-engineer] —
   🗒️ **Found 2026-09-23** (owner: "use branding guidelines for reports").

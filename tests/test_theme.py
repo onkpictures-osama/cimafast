@@ -484,6 +484,35 @@ def test_wordmark_is_never_restyled():
 
 
 @test
+def test_no_media_anywhere_in_the_logo():
+    """قرار المالك 2026-09-23: البرنامج اسمه سيما فاست ستوديو، مش ميديا.
+    الماسترات (SVG) هي مصدر الـ PNG اللي الدخول والهيدر والتقارير بيستخدموه."""
+    for surface in ("dark", "light"):
+        svg = open(os.path.join(brand.ASSET_DIR, "cimafast-lockup-%s-transparent.svg" % surface),
+                   encoding="utf-8").read()
+        assert "MEDIA" not in svg and ">STUDIO<" in svg, surface
+        assert "MEDIA" not in brand.lockup(surface) and "MEDIA" not in brand.lockup_master(surface)
+
+
+@test
+def test_sticky_bar_never_shows_on_login():
+    """الشريط الثابت بيفضل في الصفحة بعد الخروج (مبني بره React). ستايله لازم
+    يبقى في الستايل الأساسي اللي شاشة الدخول بتاخده، وإلا صورة اللوجو بتترسم
+    بمقاسها الأصلي 2400×1000 على الشاشة كلها (بلاغ 2026-09-23)."""
+    import theme.inject as inject
+    captured = []
+    class _St:
+        def markdown(self, body, **_):
+            captured.append(body)
+        def html(self, body, **_):
+            captured.append(body)
+    inject.inject_base(_St())
+    css = "\n".join(captured)
+    assert "#cf-sticky-bar" in css
+    assert "body:has(.cf-login) #cf-sticky-bar { display: none !important; }" in css
+
+
+@test
 def test_logo_assets_exist_and_are_the_right_variant():
     """نسخة اللوجو الصح للسطح الصح: صفرا على الغامق، كحلي على الأصفر/الفاتح
     (الدليل ص 03 · Colour rule). وبنتأكد إن مثلث التشغيل أحمر في الاتنين —

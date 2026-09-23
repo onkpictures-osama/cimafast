@@ -82,8 +82,9 @@ def _render_login_screen():
     بعض. الاتجاه RTL عشان العربي هو الأساس، بس خانات الإدخال نفسها LTR لأن
     اسم المستخدم وكلمة السر بالإنجليزي."""
     theme.inject_login(st, _theme_variant)
-    # اللوجو الرسمي بدل الإيموجي + النص: الـ lockup الأفقي بنسخة الاستوديو
-    # (STUDIO مكان MEDIA، الدليل ص 04) على سطح غامق ⇒ النسخة الصفرا.
+    # اللوجو الرسمي بدل الإيموجي + النص: الـ lockup الأفقي "CimaFast STUDIO"
+    # (الدليل ص 04) على سطح غامق ⇒ النسخة الصفرا. ده اللوجو الوحيد على شاشة
+    # الدخول — مفيش لوجو كبير في الخلفية (طلب المالك 2026-09-23).
     # الاسم العربي جنبه بخط Cairo، زي ما الدليل بيطلب بالظبط — مش جوه
     # الـ lockup ولا ترجمة حرفية جوه الووردمارك.
     st.markdown(
@@ -477,7 +478,7 @@ with st.sidebar.container(gap=2):
                        vertical_alignment="center", wrap=False):
         # سطح غامق دلوقتي ⇒ نسخة العلامة الصفرا (mark-dark). و‎lockup()‎
         # المركّبة مش ‎lockup_master()‎ الماستر عشان يطلع "CimaFast STUDIO"
-        # زي كل سطح تاني في التطبيق، مش "MEDIA" بتاعة الماستر الجامد.
+        # زي كل سطح تاني في التطبيق.
         st.markdown(
             '<div class="cf-title">%s</div>' % theme.brand.lockup("dark", px=36),
             unsafe_allow_html=True,
