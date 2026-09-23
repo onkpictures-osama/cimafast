@@ -57,6 +57,11 @@ TOUCH_CSS = f"""
         min-height: {TOUCH}px !important;
         min-width: {TOUCH}px !important;
     }}
+    /* H4: جرس التنبيهات في الشريط الجانبي — زرار popover، 40px من غير ده. */
+    .st-key-cf_notif_pop [data-testid="stPopoverButton"] {{
+        min-height: {TOUCH}px !important;
+        min-width: {TOUCH}px !important;
+    }}
 """
 
 # ---------------------------------------------------------------------------

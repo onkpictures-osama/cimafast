@@ -43,8 +43,20 @@ def parse(params):
     return project_id, tab
 
 
-def screen(base, project_id=None, tab=None):
-    """الرابط لشاشة: base هو عنوان التطبيق (مثلًا ‎/v1/ أو ‎../../)."""
+def item(params):
+    """H4: رقم العنصر اللي الرابط بيشاور عليه (‎&item=88‎)، أو None."""
+    raw = _first(params.get("item"))
+    try:
+        value = int(raw) if raw not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+    return value if value and value > 0 else None
+
+
+def screen(base, project_id=None, tab=None, item=None):
+    """الرابط لشاشة: base هو عنوان التطبيق (مثلًا ‎/v1/ أو ‎../../).
+
+    ‎item‎ (H4): عنصر واحد جوه التبويب — التبويب بيفتحه لوحده بدل ما اليوزر يدوّر."""
     query = {}
     if project_id is not None:
         query["project"] = int(project_id)
@@ -52,4 +64,6 @@ def screen(base, project_id=None, tab=None):
         if tab not in TABS:
             raise ValueError(f"unknown tab: {tab}")
         query["tab"] = tab
+    if item is not None and tab is not None:
+        query["item"] = int(item)
     return f"{base}?{urlencode(query)}" if query else base

@@ -37,7 +37,8 @@ import sys
 
 # جداول مش بتتسجّل: السجل نفسه (عشان مايسجّلش نفسه للأبد)، وذاكرة "آخر شاشة"
 # بتاعت الصفحة الرئيسية (بتتكتب مع كل ضغطة تبويب — دي حدث استخدام مش تغيير بيانات).
-SKIP_TABLES = {"audit_log", "usage_events", "user_profile"}
+# notification_seen (H4) نفس فكرة user_profile: "اتشاف لحد فين" حالة شاشة، مش تغيير بيانات.
+SKIP_TABLES = {"audit_log", "usage_events", "user_profile", "notification_seen"}
 
 # أعمدة قيمتها ماتتكتبش في السجل أبدًا. hash كلمة السر لو اتخزن في اللوج يبقى
 # اللوج بقى نسخة تانية من ملف كلمات السر.
@@ -474,7 +475,17 @@ def _summary(token, entity_id):
 # --- الكتابة في الجدولين ----------------------------------------------------------------
 
 _AUDIT_SQL = ("INSERT INTO audit_log (at, username, company_id, project_id, entity, entity_id, "
-              "action, summary, changes, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+              "action, summary, changes, source, departments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+
+
+def _departments(entity, action, changes):
+    """H4: الأقسام اللي الصف ده يخصّها. غلطة هنا بتسيب الصف من غير وسم، مش بتوقّعه."""
+    try:
+        import notify
+        return notify.tag(entity, action, changes)
+    except Exception as exc:  # noqa: BLE001
+        _warn("departments", exc)
+        return None
 _USAGE_SQL = ("INSERT INTO usage_events (at, username, company_id, project_id, event, target, "
               "detail, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
 
@@ -483,7 +494,8 @@ def _insert_audit(cur, row):
     from database import _adapt_query
     cur.execute(_adapt_query(_AUDIT_SQL), (
         row["at"], row["username"], row["company_id"], row["project_id"], row["entity"],
-        row["entity_id"], row["action"], row["summary"], row["changes"], row["source"]))
+        row["entity_id"], row["action"], row["summary"], row["changes"], row["source"],
+        _departments(row["entity"], row["action"], row["changes"])))
 
 
 def _own_write(sql, values):
@@ -509,9 +521,9 @@ def log(action, entity, entity_id=None, summary=None, changes=None,
         if username:
             ctx = dict(ctx, username=username)
         user, company, project, src = _resolved(ctx, project_id, company_id)
+        changes_text = json.dumps(changes, ensure_ascii=False) if isinstance(changes, dict) else changes
         row = (_now(), user, company, project, entity, entity_id, action, summary,
-               json.dumps(changes, ensure_ascii=False) if isinstance(changes, dict) else changes,
-               source or src)
+               changes_text, source or src, _departments(entity, action, changes_text))
         if cur is not None:
             from database import _adapt_query
             cur.execute(_adapt_query(_AUDIT_SQL), row)

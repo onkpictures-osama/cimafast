@@ -115,6 +115,19 @@ def render(project, project_id, _is_ar):
             # ضغطة في أي مكان، فكانوا بيتبنوا مع كل حركة في البرنامج.
             _scenes_shown = []
             st.caption(t("اختار مشهد أو أكتر من الجدول (المربع جنب الصف) عشان تعدّلهم أو تمسحهم."))
+    # H4: جاي من تنبيه (‎&item=‎) — المشهد اللي اتغيّر بس، وفورمته مفتوحة.
+    # لو المشهد مش في المشروع ده (اتمسح، أو رابط مشروع تاني) بنتجاهل الرابط.
+    _focus_id = st.session_state.get("_focus_scene")
+    _focused = [sc for sc in scenes if sc["id"] == _focus_id] if (_focus_id and scenes) else []
+    if _focus_id and not _focused:
+        st.session_state.pop("_focus_scene", None)
+    if _focused:
+        _scenes_shown = _focused
+        _fc1, _fc2 = st.columns([0.7, 0.3], vertical_alignment="center")
+        _fc1.info(f"🔔 {t('بتعرض المشهد اللي اتغيّر بس.')}")
+        if _fc2.button(t("اعرض كل المشاهد"), key="clear_scene_focus", use_container_width=True):
+            st.session_state.pop("_focus_scene", None)
+            st.rerun()
     int_ext_edit_options = ["غير محدد"] + INT_EXT_OPTIONS
     day_night_edit_options = ["غير محدد"] + DAY_NIGHT_OPTIONS
     loc_edit_options = ["بدون تحديد"] + list(loc_variant_map.keys())
@@ -135,7 +148,8 @@ def render(project, project_id, _is_ar):
         # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
         # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
         # 16 ثانية لكل rerun على الإنتاج).
-        _lazy_exp = exp_col.expander(title, key=f"exp_scene_{sc['id']}", on_change="rerun")
+        _lazy_exp = exp_col.expander(title, key=f"exp_scene_{sc['id']}", on_change="rerun",
+                                     expanded=bool(_focused))
         with _lazy_exp:
             if _lazy_exp.open:
                 with st.form(f"edit_scene_{sc['id']}"):

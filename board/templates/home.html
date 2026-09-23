@@ -16,6 +16,19 @@
     <div class="bar__title">
       <h1><img class="cf-logo-master" src="{{ brand }}cimafast-lockup-dark-transparent.png?v={{ asset_version }}" alt="CimaFast"></h1>
       <span class="who">
+        {# H4: جرس التغييرات اللي تخص قسمك — home.js بيملاه وبيحدّثه كل ٣٠ ثانية #}
+        <span class="notif">
+          <button type="button" class="notif__btn" id="notif-btn" aria-haspopup="true"
+                  aria-expanded="false" aria-controls="notif-panel" aria-label="التنبيهات"
+                  title="التغييرات اللي تخص قسمك">
+            <span aria-hidden="true">🔔</span>
+            <span class="notif__count" id="notif-count" aria-hidden="true" hidden></span>
+          </button>
+          <div class="notif__panel" id="notif-panel" role="region" aria-label="التغييرات اللي تخص قسمك" hidden>
+            <strong class="notif__title">التغييرات اللي تخص قسمك</strong>
+            <ul class="notif__list" id="notif-list"></ul>
+          </div>
+        </span>
         <span class="chip">{{ role_label }}</span>
         <span class="who__avatar" aria-hidden="true">{{ initials }}</span>
         <span class="who__id">

@@ -40,6 +40,7 @@ import auth  # noqa: E402
 import database  # noqa: E402
 import home  # noqa: E402
 import links  # noqa: E402
+import notify  # noqa: E402
 import permissions  # noqa: E402
 import repo  # noqa: E402
 import videos  # noqa: E402
@@ -433,6 +434,33 @@ async def home_page(request: Request):
         "brand": HOME_BRAND})
 
 
+# --- التنبيهات (H4) -----------------------------------------------------------------
+# الروابط جوه كل تنبيه محسوبة من مكان الصفحة الرئيسية (‎/v1/home/‎)، زي كروت
+# المشاريع بالظبط — الجرس في الرئيسية بس.
+
+async def api_notifications(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    feed = notify.feed(user, HOME_APP, HOME_BOARD)
+    for item in feed["items"]:
+        item["ago"] = notify.ago(item["at"])
+    return JSONResponse(feed)
+
+
+async def api_notifications_seen(request: Request):
+    user, err = _need_user(request)
+    if err:
+        return err
+    body = await request.json()
+    try:
+        up_to = int(body.get("up_to"))
+    except (TypeError, ValueError, AttributeError):
+        return JSONResponse({"error": "up_to required"}, status_code=400)
+    notify.mark_seen(user, up_to)
+    return JSONResponse({"ok": True, "unread": notify.unread_count(user)})
+
+
 async def api_search(request: Request):
     user, err = _need_user(request)
     if err:
@@ -618,6 +646,8 @@ app = Starlette(
         Route("/home", lambda request: RedirectResponse("home/", status_code=308)),
         Route("/home/", home_page),
         Route("/api/search", api_search, methods=["GET"]),
+        Route("/api/notifications", api_notifications, methods=["GET"]),
+        Route("/api/notifications/seen", api_notifications_seen, methods=["POST"]),
         Route("/api/projects", api_create_project, methods=["POST"]),
         # Location نسبي: Caddy شايل /v1/board، فـ "/team/" المطلق كان هيودّي على الإنتاج
         Route("/team", lambda request: RedirectResponse("team/", status_code=308)),

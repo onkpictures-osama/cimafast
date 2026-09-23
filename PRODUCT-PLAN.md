@@ -145,6 +145,11 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
   existing `H2` mechanism. *Done when* a change to a scene's location or a
   shoot day's schedule is visible, same session, to the department it
   concerns, without a manual refresh.
+  ✅ **On /v1 2026-09-23.** Every audit row is tagged with the departments it
+  concerns (department read from the user's job title; an unclear title sees
+  everything). Bell in the sidebar and on `/v1/home/`, polling every 30s; a
+  scene notification opens that scene's edit form (`&item=`), a shoot-day one
+  opens the schedule board.
 - **H5 Item-level comments** [production, chief-engineer] —
   🗒️ **Specified 2026-09-23** [production]. No communication path exists
   inside the product at all — not a team chat, not a comment. The workflow

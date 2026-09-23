@@ -20,6 +20,7 @@ import repo
 import accounts
 import audit
 import links
+import notify
 import permissions
 
 # أيقونة البرنامج = العلامة لوحدها على مربع كحلي (الدليل ص 04، lockup رقم 5:
@@ -385,6 +386,56 @@ theme.inject_main(
 
 
 
+# ---------------- جرس التنبيهات (H4) ----------------
+# التغييرات اللي تخص قسم المستخدم (notify.py). ‎run_every=30‎ عشان التغيير
+# يوصل في نفس الجلسة من غير ما حد يعمل refresh — الـ fragment بس اللي بيعيد،
+# مش الصفحة كلها، فمفيش فورم مفتوحة بتتأثر. فتح الجرس = "شفتهم".
+
+def _mark_notifications_seen():
+    # بيتنادي مع الفتح والقفل الاتنين؛ mark_seen مابيرجعش لورا، فالقفل مالوش أثر.
+    _latest = st.session_state.get("_notif_latest") or 0
+    st.session_state["_notif_seen_before"] = notify.last_seen(_current_user)
+    notify.mark_seen(_current_user, _latest)
+
+
+@st.fragment(run_every=30)
+def _notification_bell():
+    _lang = st.session_state.get("ui_lang", "ar")
+    _feed = notify.feed(_current_user, "", os.environ.get("CIMAFAST_BOARD_URL"), lang=_lang)
+    st.session_state["_notif_latest"] = _feed["latest_id"]
+    _unread = _feed["unread"]
+    # العدد في شارة لوحده جنب الجرس، مش في اسم الزرار: Streamlit بيعتبر
+    # الـ popover عنصر جديد لما اسمه يتغيّر، فكان بيقفل نفسه أول ما يتفتح
+    # (الفتح بيصفّر العدد ← الاسم بيتغيّر ← يتقفل).
+    _bell_row = st.container(horizontal=True, gap=None, vertical_alignment="center", wrap=False)
+    if _unread:
+        _bell_row.markdown(
+            '<span class="cf-notif-badge" role="status" aria-label="%s">%s</span>'
+            % (html.escape(f"{_unread} {t('تنبيه جديد')}", quote=True), html.escape(ltr(min(_unread, 99)))),
+            unsafe_allow_html=True)
+    with _bell_row.popover("", icon=":material/notifications:", key="cf_notif_pop",
+                           help=t("التغييرات اللي تخص قسمك"), on_change=_mark_notifications_seen):
+        st.markdown(f"**{t('التغييرات اللي تخص قسمك')}**")
+        if not _feed["items"]:
+            st.caption(t("مفيش تغييرات جديدة في مشاريعك آخر أسبوعين."))
+            return
+        _before = st.session_state.get("_notif_seen_before")
+        _rows = []
+        for _it in _feed["items"][:15]:
+            _new = _it["unread"] or (_before is not None and _it["id"] > _before)
+            _rows.append(
+                '<a class="cf-notif%s" href="%s" target="_self">'
+                '<span class="cf-notif__text">%s</span>'
+                '<span class="cf-notif__meta">%s · %s · %s</span></a>'
+                % (" cf-notif--new" if _new else "", html.escape(_it["href"], quote=True),
+                   html.escape(_it["text"]), html.escape(_it["who"]), html.escape(_it["project"]),
+                   html.escape(notify.ago(_it["at"], lang=_lang))))
+        # الـ popover بيترسم بره ‎.stApp‎ فمابيورثش اتجاهها — من غير ‎dir‎ صريح
+        # «الأقواس» في الملخصات العربي كانت بتقلب ناحيتها.
+        st.markdown('<div class="cf-notif-list" dir="%s">%s</div>'
+                    % ("ltr" if _lang == "en" else "rtl", "".join(_rows)), unsafe_allow_html=True)
+
+
 # ---------------- الشريط الجانبي ----------------
 # إعادة تصميم 2026-09-23 (رابعة، سطح غامق): موافقة صاحب المنتج ("Yes") على
 # موك أب مرجعي شاركه — خلفية كحلي غامقة بدل الحقل الأصفر، بدل ما تبقى
@@ -481,6 +532,13 @@ if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_sta
             st.toast(t("الرابط ده لمشروع مش متاح لحسابك."), icon="🔒")
     if _link_tab:
         st.session_state["main_tabs"] = tr(links.TABS[_link_tab])
+# H4: ‎&item=‎ من تنبيه — المشهد اللي اتغيّر بيتفتح لوحده في تبويب المشاهد.
+# بيتشال من الرابط بعد ما يتقري، عشان rerun بعد كده مايرجّعش التركيز عليه.
+_link_item = links.item(st.query_params)
+if _link_item is not None:
+    if _link_tab == "scenes":
+        st.session_state["_focus_scene"] = _link_item
+    del st.query_params["item"]
 
 if len(_my_companies) > 1:
     _company_names = {c["name"]: c for c in _my_companies}
@@ -573,6 +631,7 @@ with _sb_nav_row:
     if os.environ.get("CIMAFAST_HOME_URL"):
         _nav_link("🏠", os.environ["CIMAFAST_HOME_URL"],
                   title=t("الرئيسية"), icon_only=True)
+    _notification_bell()
     st.markdown('<div class="cf-sb-globe" aria-hidden="true">🌐</div>',
                 unsafe_allow_html=True)
     # الشكل (حبتين مستقلتين مدوّرتين تمامًا، المختارة تعبئة صفرا) متفروض في

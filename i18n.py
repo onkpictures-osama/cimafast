@@ -619,6 +619,12 @@ TRANSLATIONS = {
     "صورة الممثل/ة الحقيقي (اختياري)": "Photo of the real actor (optional)",
     "صورة خلفية/مكان (اختياري)": "Background/location photo (optional)",
     "🖼️ صورة مرجعية للمظهر": "🖼️ Reference photo for this look",
+    # H4: التنبيهات
+    "التغييرات اللي تخص قسمك": "Changes that concern your department",
+    "مفيش تغييرات جديدة في مشاريعك آخر أسبوعين.": "No new changes in your projects in the last two weeks.",
+    "بتعرض المشهد اللي اتغيّر بس.": "Showing only the scene that changed.",
+    "اعرض كل المشاهد": "Show all scenes",
+    "تنبيه جديد": "new notifications",
 }
 
 

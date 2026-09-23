@@ -288,6 +288,24 @@ MAIN_CSS = r'''
         border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.04);
     }
     a.cf-navlink:hover, a.cf-navlink:focus-visible { border-color: var(--cf-accent); color: var(--cf-text); }
+    /* H4: قايمة التنبيهات جوه الجرس. الجديد بعلامة صفرا على ناحية بداية
+       السطر (‎border-inline-start‎ بيقلب لوحده بين العربي والإنجليزي). كل صف
+       رابط كامل ≥44px عشان يتمسك بالصباع على التليفون. */
+    .cf-notif-list { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+    a.cf-notif {
+        display: flex; flex-direction: column; gap: 2px; min-height: 44px; justify-content: center;
+        padding: 6px 10px; border-radius: 8px; text-decoration: none; color: var(--cf-text);
+        border-inline-start: 3px solid transparent; background: rgba(255, 255, 255, 0.03);
+    }
+    a.cf-notif:hover, a.cf-notif:focus-visible { background: rgba(255, 255, 255, 0.08); color: var(--cf-text); }
+    a.cf-notif--new { border-inline-start-color: var(--cf-accent); }
+    .cf-notif__text { font-weight: 600; font-size: 0.92rem; }
+    .cf-notif__meta { font-size: 0.78rem; opacity: 0.75; }
+    .cf-notif-badge {
+        display: inline-block; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+        background: var(--cf-accent); color: var(--cf-on-accent); font-size: 12px; font-weight: 700;
+        line-height: 20px; text-align: center;
+    }
     /* نسخة الرابط جوه الشريط الجانبي (سطح غامق دلوقتي، مش الحقل الأصفر)
        في theme/sidebar.py مع باقي ستايل الشريط الجانبي المُعاد تصميمه. */
     .cf-progress-bar { display: flex; gap: 4px; margin-bottom: 6px; }
