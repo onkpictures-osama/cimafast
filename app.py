@@ -473,36 +473,35 @@ def _notification_bell():
 # (مفيش ميزة صور حسابات لسه - PRODUCT-PLAN)، وحقل "الدور" للقراءة بس
 # (الدور نفسه كان معروف من قبل، بس مش ظاهر في الشريط).
 
-with st.sidebar.container(gap=2):
-    with st.container(horizontal=True, gap="small",
-                       vertical_alignment="center", wrap=False):
-        # سطح غامق دلوقتي ⇒ نسخة العلامة الصفرا (mark-dark). و‎lockup()‎
-        # المركّبة مش ‎lockup_master()‎ الماستر عشان يطلع "CimaFast STUDIO"
-        # زي كل سطح تاني في التطبيق.
-        st.markdown(
-            '<div class="cf-title">%s</div>' % theme.brand.lockup("dark", px=36),
-            unsafe_allow_html=True,
-        )
-        # أيقونة "معلومات" مش "؟" - طلب محمد الزيات (2026-09-23): علامة
-        # الاستفهام بتتقري "مساعدة"، والزرار ده بيعرض نبذة عن البرنامج.
-        # ‎:material/info:‎ من خط Material Symbols اللي Streamlit شايله جواه،
-        # فمش معتمد على خطوط الجهاز (ده اللي خلّى "ⓘ" تفشل قبل كده)، وبياخد
-        # لون النص زي باقي الشريط بدل مربع إيموجي أزرق ثابت ("ℹ️").
-        with st.popover("", icon=":material/info:"):
-            st.markdown(f"**{tr('studio_tagline')}**")
-            st.caption(t(_APP_DESCRIPTION))
-    # تاجلاين تحت اللوجو - نفس نص "؟" (studio_tagline)، مش ترجمة حرفية
-    # لتاجلاين إنجليزي جديد ("IDEAS TO SCREEN") مالوش وجود في نظام الهوية.
-    # مفيش تاجلاين تانية في آخر الشريط (كان فيها "GOOD STORIES GO FURTHER"
-    # في الموك أب) - نفس الجملة مكررة مرتين في شريط بالطول ده زحمة مش زينة.
+# تخطيط الشريط (طلب المالك 2026-09-23، بموك أب مرجعي): تلات مجموعات، كل
+# واحدة في مكانها الثابت وكل حاجة جواها في النص -
+#   1) فوق: اللوجو، التاجلاين، وأيقونة المعلومات تحتهم.
+#   2) فوق النص بشوية: المشاريع (إنشاء، اختيار، الدور) - أكتر تفاصيل.
+#   3) تحت خالص: الحساب، الأيقونات (الرئيسية، التنبيهات، اللغة)، الخروج.
+# الفراغ بين المجموعات مقصود: مساحة تتمدد فيها أي معلومة أو إمكانية جديدة
+# من غير ما باقي الشريط يتزق. التوزيع الرأسي نفسه في theme/sidebar.py
+# (‎.st-key-cf_sb_*‎)، والمفاتيح دي لازم تفضل زي ما هي.
+with st.sidebar.container(gap=2, key="cf_sb_brand", horizontal_alignment="center"):
+    # سطح غامق ⇒ نسخة العلامة الصفرا (mark-dark)، و‎lockup()‎ المركّبة
+    # عشان يطلع "CimaFast STUDIO" زي كل سطح تاني في التطبيق.
+    st.markdown(
+        '<div class="cf-title">%s</div>' % theme.brand.lockup("dark", px=36),
+        unsafe_allow_html=True,
+    )
+    # تاجلاين تحت اللوجو - نفس نص نبذة البرنامج (studio_tagline).
     st.markdown(
         '<div class="cf-sb-tagline">%s</div>' % html.escape(tr("studio_tagline")),
         unsafe_allow_html=True,
     )
-    # مفيش مفتاح لغة هنا فوق خالص بعد تعديل محمد (2026-09-23) - نزل تحت في
-    # صف واحد جنب أيقونة الرئيسية، شوف قسم الحساب في آخر الشريط.
+    # أيقونة "معلومات" مش "؟" - طلب محمد الزيات (2026-09-23): علامة
+    # الاستفهام بتتقري "مساعدة"، والزرار ده بيعرض نبذة عن البرنامج.
+    # ‎:material/info:‎ من خط Material Symbols اللي Streamlit شايله جواه،
+    # فمش معتمد على خطوط الجهاز. بقت تحت التاجلاين في النص زي الموك أب.
+    with st.popover("", icon=":material/info:"):
+        st.markdown(f"**{tr('studio_tagline')}**")
+        st.caption(t(_APP_DESCRIPTION))
 
-_sb_projects = st.sidebar.container(gap=6)
+_sb_projects = st.sidebar.container(gap=6, key="cf_sb_projects")
 _sb_projects.markdown(
     '<div class="cf-sb-section-label">📁 %s</div>' % html.escape(tr("sidebar_projects")),
     unsafe_allow_html=True,
@@ -594,8 +593,9 @@ if permissions.can(_role, "create_project"):
 # (تعبئة صفرا + حروف كحلي) بدل ما تخترع بالتة جديدة. الاسم تحته نوع
 # الاشتراك (Creator/Studio/Enterprise) - نفس اللي كان في الكابشن القديم،
 # مش وظيفة، غلاف بصري بس اتغيّر.
-st.sidebar.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
-_sb_account = st.sidebar.container(gap=6)
+_sb_account = st.sidebar.container(gap=6, key="cf_sb_account", horizontal_alignment="center")
+# الفاصل جوه مجموعة الحساب نفسها (مش قبلها) عشان ينزل معاها تحت
+_sb_account.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
 _display_name = ((_me_row["display_name"] if _me_row else None) or _current_user or "?").strip()
 _initials = "".join(w[0] for w in _display_name.split()[:2]).upper() or "?"
 _sb_account.markdown(
@@ -627,7 +627,8 @@ _sb_account.markdown(
 # لو ‎CIMAFAST_HOME_URL‎ مش متظبط (تشغيلة من غير رئيسية) الأيقونة مش
 # بتتكوّن خالص ومفتاح اللغة بياخد الصف لوحده - زي ما كان بالظبط.
 _sb_nav_row = _sb_account.container(
-    horizontal=True, gap="small", vertical_alignment="center", wrap=False)
+    horizontal=True, gap="small", vertical_alignment="center", wrap=False,
+    horizontal_alignment="center")
 with _sb_nav_row:
     if os.environ.get("CIMAFAST_HOME_URL"):
         _nav_link("🏠", os.environ["CIMAFAST_HOME_URL"],

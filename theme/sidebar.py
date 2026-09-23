@@ -29,6 +29,107 @@ SIDEBAR_CSS = r'''
         background: var(--cf-midnight);
         overflow-x: hidden !important;
     }
+    /* ---- التوزيع الرأسي: تلات مجموعات (طلب المالك 2026-09-23) ----
+       فوق: البراند. فوق النص بشوية: المشاريع. تحت خالص: الحساب.
+       السلسلة من ‎stSidebarContent‎ لحد العمود الجذر لازم تبقى flex
+       بطول الشريط كله، عشان ‎margin-top:auto‎ على مجموعة الحساب يزقها
+       لتحت. الفراغ بين المجموعات هو المساحة اللي أي إضافة جديدة بتاكل
+       منها. على شاشة قصيرة الفراغات بتقفل لحد الحد الأدنى والشريط بيتمرر
+       عادي - مفيش حاجة بتتقص. */
+    section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+        display: flex;
+        flex-direction: column;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+        flex: 1 0 auto;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 20px;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div,
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] {
+        flex: 1 0 auto;
+        display: flex;
+        flex-direction: column;
+    }
+    /* المشاريع: فوق النص بشوية - المسافة بتكبر مع طول الشاشة وليها حد */
+    section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-cf_sb_projects) {
+        margin-top: clamp(20px, 12vh, 140px);
+    }
+    /* الحساب: آخر الشريط */
+    section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-cf_sb_account) {
+        margin-top: auto;
+        padding-top: 24px;
+    }
+    /* كل حاجة في النص جوه المجموعات */
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand,
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects,
+    section[data-testid="stSidebar"] .st-key-cf_sb_account {
+        text-align: center;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand .cf-title {
+        display: flex;
+        justify-content: center;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_account hr.cf-sb-sep {
+        width: 100%;
+        margin-top: 0;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_account .cf-sb-avatar-row {
+        justify-content: center;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_account .cf-sb-avatar-row > div:last-child {
+        text-align: start;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects .cf-sb-section-label {
+        text-align: center;
+        margin-bottom: 6px;
+    }
+    /* تسميات الخانات (الحساب، المشروع الحالي) في النص فوق خانتها */
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects [data-testid="stWidgetLabel"] {
+        justify-content: center;
+        width: 100%;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects [data-testid="stWidgetLabel"] p {
+        text-align: center;
+        width: 100%;
+    }
+    /* اللوجو: الحاوية كانت بتتقاس 23px واللوجو أطول، فكان بيركب على
+       التاجلاين تحته */
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand .cf-title {
+        min-height: 44px;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+    /* أيقونة المعلومات لوحدها زي الموك أب: من غير كارت ولا سهم ⌄ -
+       السهم في ‎div[aria-hidden]‎ التاني جوه الزرار. هدف اللمس فاضل ٤٤. */
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand [data-testid="stPopover"] button {
+        border: none !important;
+        background: transparent !important;
+        min-width: 44px;
+        min-height: 44px;
+        opacity: 0.8;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand [data-testid="stPopover"] button:hover {
+        opacity: 1;
+        color: var(--cf-yellow);
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_brand [data-testid="stPopover"] button div[aria-hidden="true"] {
+        display: none;
+    }
+    /* صف الأيقونات تحت: كل عنصر بمقاسه الطبيعي عشان الصف كله يتوسّط -
+       غلاف جرس التنبيهات كان بياخد ‎flex-grow‎ ويزق الباقي للحرف */
+    section[data-testid="stSidebar"] .st-key-cf_sb_account [data-testid="stHorizontalBlock"] > * {
+        flex: 0 0 auto !important;
+        width: auto !important;
+    }
+
+    /* زرار الخروج بعرض المجموعة كامل حتى جوه حاوية متوسّطة */
+    section[data-testid="stSidebar"] .st-key-cf_sb_account .stButton,
+    section[data-testid="stSidebar"] .st-key-cf_sb_account [data-testid="stElementContainer"]:has(.stButton) {
+        width: 100%;
+    }
+
     /* الصفوف الأفقية في الشريط (اللوجو + ⓘ فوق، و🏠 🌐 AR/EN تحت) - كان
        فيهم شريط تمرير رأسي صغير بأسهم فوق/تحت، محمد صوّره (2026-09-23).
        السبب: Streamlit بيدي الحاوية الأفقية ‎overflow:auto‎، وأي
