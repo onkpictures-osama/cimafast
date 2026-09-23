@@ -56,6 +56,87 @@ def tr(key):
 
 
 TRANSLATIONS = {
+    # --- مكتبة التحليلات (analysis_library.py / views/library.py) ---
+    "مكتبة التحليلات": "Analysis Library",
+    "📚 مكتبة التحليلات": "📚 Analysis Library",
+    "كل سيناريو بيتحلل بالذكاء الاصطناعي بيتحفظ هنا لوحده، على حسابك وبره أي مشروع. لو استوردته في المشروع الغلط، استورده من هنا في المشروع الصح — أو ادمجه مع مشروع فيه بيانات، والشخصيات والأماكن المتشابهة بتتربط بالموجود بدل ما تتكرر.":
+        "Every screenplay analysed with AI is saved here automatically, on your account and outside any project. If you imported it into the wrong project, import it from here into the right one — or merge it into a project that already has data, and similar characters and locations link to the existing ones instead of being duplicated.",
+    "حصلت مشكلة عندنا مش في ملفك. جرّب تاني، ولو فضلت ابعت الكود ده للدعم":
+        "Something went wrong on our side, not in your file. Try again, and if it persists send this code to support",
+    "⬆️ ارفع ملف تحليل من CimaFast": "⬆️ Upload a CimaFast analysis file",
+    "حسابك مشاهدة فقط — تقدر تتصفح وتنزّل التحليلات، بس مش تضيف.":
+        "Your account is view-only — you can browse and download analyses, but not add them.",
+    "ملف اتنزّل من مكتبة CimaFast (من حسابك أو من حساب تاني) — بيتضاف لمكتبتك في الشركة دي.":
+        "A file downloaded from a CimaFast library (yours or another account's) — it is added to your library in this company.",
+    "اختار الملف": "Choose the file",
+    "➕ ضيفه للمكتبة": "➕ Add to the library",
+    "اتضاف للمكتبة.": "Added to the library.",
+    "التحليل ده موجود في المكتبة بالفعل.": "This analysis is already in the library.",
+    "مفيش مشروع تقدر تستورد فيه. محتاج دور تعديل في مشروع (مش مشاهدة فقط).":
+        "There is no project you can import into. You need an editing role on a project (not view-only).",
+    "المشروع اللي هيتستورد فيه": "Project to import into",
+    "المشروع فيه بيانات بالفعل. تحب:": "The project already has data. Do you want to:",
+    "🔗 دمج مع الموجود (الشخصيات والأماكن المتشابهة تتربط بالموجود)":
+        "🔗 Merge with what's there (similar characters and locations link to the existing ones)",
+    "🆕 بيانات جديدة (من غير مطابقة مع الموجود)": "🆕 New data (no matching against what's there)",
+    "المشروع فاضي — التحليل هيتضاف زي ما هو.": "The project is empty — the analysis will be added as it is.",
+    "مشاهد جديدة": "New scenes",
+    "مشاهد أرقامها موجودة في المشروع وهتتخطى": "Scenes whose numbers already exist and will be skipped",
+    "شخصيات جديدة": "New characters",
+    "أماكن جديدة": "New locations",
+    "موجودين بنفس الاسم وهيتربطوا بيهم": "Already there under the same name, will be linked",
+    "هيتدمجوا مع الموجود — شيل علامة أي واحد مش هو هو:":
+        "These will be merged with what's there — untick any that are not the same:",
+    "هو نفسه": "is the same as",
+    "حالة تانية من": "is another state of",
+    "📥 استورد في المشروع ده": "📥 Import into this project",
+    "اتدمج مع الموجود": "Merged with existing",
+    "كل مشاهد التحليل ده موجودة في المشروع بالفعل — مفيش حاجة جديدة تتستورد.":
+        "Every scene in this analysis is already in the project — nothing new to import.",
+    "ملف مرفوع": "Uploaded file",
+    "ذكاء اصطناعي": "AI",
+    "اتحلل": "Analysed",
+    "بواسطة": "by",
+    "من مشروع": "from project",
+    "📥 استورد في مشروع": "📥 Import into a project",
+    "حسابك مشاهدة فقط — مينفعش تستورد في مشروع.": "Your account is view-only — you can't import into a project.",
+    "⬇️ نزّل ملف": "⬇️ Download file",
+    "🗑️ احذف": "🗑️ Delete",
+    "متأكد إنك عايز تحذف التحليل ده من المكتبة؟ المشاريع اللي اتستورد فيها مش هتتأثر، بس الملف نفسه هيروح. نزّله الأول لو ممكن تحتاجه.":
+        "Delete this analysis from the library? Projects it was imported into are not affected, but the analysis itself will be gone. Download it first if you might need it.",
+    "أيوه، احذفه": "Yes, delete it",
+    "اتحذف من المكتبة.": "Deleted from the library.",
+    "لأ، سيبه": "No, keep it",
+    "افتح المشروع": "Open the project",
+    "🔍 دوّر باسم السيناريو أو المشروع أو اللي حلّله": "🔍 Search by screenplay, project or who analysed it",
+    "مثال: الحلقة الاولى": "e.g. Episode one",
+    "المكتبة فاضية لسه. أول ما تحلل سيناريو بالذكاء الاصطناعي في أي مشروع، التحليل هيتحفظ هنا لوحده.":
+        "The library is empty so far. As soon as you analyse a screenplay with AI in any project, the analysis is saved here automatically.",
+    "تحليل": "analyses",
+    "مفيش تحليل بالاسم ده.": "No analysis matches that.",
+    "التحليل ده اتحفظ في مكتبة التحليلات بتاعتك — لو ده مش المشروع الصح، استورده من هناك في أي مشروع تاني.":
+        "This analysis is saved in your Analysis Library — if this is not the right project, import it from there into any other project.",
+    "افتح المكتبة": "Open the library",
+    # رسايل analysis_library.LibraryError الثابتة (اللي فيها أرقام بتتعرض بالعربي)
+    "التحليل ده مش موجود أو مش متاح لحسابك.": "This analysis doesn't exist or isn't available to your account.",
+    "بيانات التحليل ده بايظة ومش مقروءة.": "This analysis's data is damaged and can't be read.",
+    "حذف التحليل لصاحبه أو لمدير الشركة بس.": "Only the analysis's owner or the company admin can delete it.",
+    "الملف فاضي.": "The file is empty.",
+    "الملف أكبر من المسموح (25 ميجا) — ده مش شكل ملف تحليل.": "The file is over the 25 MB limit — that is not an analysis file.",
+    "الملف مش بترميز UTF-8 — ده مش ملف تحليل من CimaFast.": "The file isn't UTF-8 — it is not a CimaFast analysis file.",
+    "الملف مش JSON سليم — ممكن يكون اتقطع أو اتعدّل بإيد.": "The file isn't valid JSON — it may be truncated or edited by hand.",
+    "ده مش ملف تحليل من CimaFast (لازم يكون ‎.cimafast-analysis.json‎). لو ده JSON من AI تاني، ارفعه من تبويب «إضافة سيناريو» جوه المشروع.":
+        "This is not a CimaFast analysis file (it must be .cimafast-analysis.json). If it is JSON from another AI, upload it from the Add Screenplay tab inside the project.",
+    "رقم نسخة الملف مش مفهوم — الملف ممكن يكون اتعدّل.": "The file's version number isn't readable — the file may have been edited.",
+    "بيانات السيناريو ناقصة في الملف (اسم السيناريو).": "The file is missing the screenplay details (its name).",
+    "الملف مفيهوش تحليل (قايمة المشاهد ناقصة).": "The file has no analysis (the scene list is missing).",
+    "الملف مفيهوش ولا مشهد.": "The file has no scenes.",
+    "التحذيرات في الملف لازم تكون قايمة.": "The warnings in the file must be a list.",
+    "بيانات التشغيل (meta) في الملف مش مكتوبة صح.": "The run details (meta) in the file are malformed.",
+    "مقدرناش نقرا ولا مشهد من الملف.": "We couldn't read any scene from the file.",
+    "التقارير في الملف مش مكتوبة صح.": "The reports in the file are malformed.",
+    "حسابك مش عضو في الشركة دي.": "Your account isn't a member of this company.",
+    "المشروع ده مش متاح لحسابك.": "This project isn't available to your account.",
     "الشركة": "Company",
     "الحساب": "Account",
     "خروج": "Log out",

@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import accounts  # noqa: E402
+import analysis_library  # noqa: E402
 import audit  # noqa: E402
 import auth  # noqa: E402
 import database  # noqa: E402
@@ -421,6 +422,12 @@ async def home_page(request: Request):
         tools.append((group, row))
     audit.event("screen", target="home", company_id=next((c["id"] for c in companies), None))
     creatable = [c for c in companies if permissions.can(c["role"], "create_project")]
+    # مكتبة التحليلات: عدد التحليلات المحفوظة على الحساب. غلطة هنا ماتوقّعش الرئيسية.
+    try:
+        library_count = analysis_library.count_for(user)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[home] library count: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        library_count = 0
     # دايرة الأفتار: مفيش صور حسابات في البرنامج لسه (زي قرار الشريط
     # الجانبي بالظبط) — أحرف أولى من الاسم بدل صورة، مش هاش عشوائي.
     _display_name = (me.get("display_name") or user or "?").strip()
@@ -429,7 +436,7 @@ async def home_page(request: Request):
         "user": user, "me": me, "initials": initials, "role_label": accounts.ROLE_LABELS.get(role, role),
         "companies": companies, "creatable": creatable, "cards": cards, "continue": cont,
         "needs": home.needs_you(role, me.get("job_title"), cards)[:12], "tools": tools,
-        "focus": focus, "can_manage_team": any(permissions.can(c["role"], "manage_team") for c in companies),
+        "focus": focus, "library_count": library_count, "can_manage_team": any(permissions.can(c["role"], "manage_team") for c in companies),
         "static": HOME_STATIC, "app": HOME_APP, "board": HOME_BOARD,
         "brand": HOME_BRAND})
 

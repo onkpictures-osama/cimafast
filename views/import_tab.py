@@ -1,6 +1,7 @@
 """تبويب import."""
 
 import ai_jobs
+import analysis_library
 import json
 import logging
 import uuid
@@ -353,8 +354,10 @@ def render(project_id):
                         _pending["md"], project_id, _pending["filename"],
                         known_characters=_known, max_cost_usd=_ceiling)
                     # F3: تشغيل التحليل بيكلّف فلوس — بيتسجّل كحدث استخدام بسقفه
+                    # job_id: مكتبة التحليلات بتعرف منه مين اللي شغّل التحليل
                     audit.event("ai", target="script_analysis", project_id=project_id,
-                                detail={"file": _pending["filename"], "ceiling_usd": _ceiling})
+                                detail={"file": _pending["filename"], "ceiling_usd": _ceiling,
+                                        "job_id": st.session_state["ai_job_id"]})
                     st.session_state.pop("_ai_pending", None)
                     st.rerun()
                 except Exception as e:
@@ -427,6 +430,12 @@ def render(project_id):
                     _parsed_ai["warnings"] = list(_res.get("warnings", [])) + \
                         list(_parsed_ai.get("warnings", []))
                     _parsed_ai["meta"] = _res.get("meta", {})
+                    # مكتبة التحليلات: التحليل بيتحفظ على الحساب لوحده، بره المشروع،
+                    # عشان لو ده المشروع الغلط يتستورد بعدين في الصح. عمره ما بيوقّع الشاشة.
+                    _saved = analysis_library.save_job(
+                        _job, fallback_owner=st.session_state.get("_auth_user"),
+                        fallback_company=st.session_state.get("_cf_company"))
+                    _parsed_ai["library_id"] = _saved
                     st.session_state["ai_parsed_script"] = _parsed_ai
                     st.rerun()
                 except Exception as e:
@@ -462,6 +471,12 @@ def render(project_id):
         scenes = parsed["scenes"]
         for w in parsed["warnings"]:
             st.warning(w)
+        if parsed.get("library_id"):
+            # التحليل بقى محفوظ على الحساب — لو ده المشروع الغلط، مفيش حاجة ضاعت
+            st.markdown(
+                f'<div class="cf-lib-saved">📚 {t("التحليل ده اتحفظ في مكتبة التحليلات بتاعتك — لو ده مش المشروع الصح، استورده من هناك في أي مشروع تاني.")} '
+                f'<a href="?page=library" target="_self">{t("افتح المكتبة")}</a></div>',
+                unsafe_allow_html=True)
 
         st.success(f"{t('تم التعرف على')} {len(scenes)} {t('مشهد في الملف. راجعهم وعدّل أي حاجة غلط قبل التأكيد:')}")
         excluded_scene_indices = set()

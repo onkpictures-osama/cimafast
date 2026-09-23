@@ -263,6 +263,49 @@ def _run_lang(page, app, lang, out_dir, shots_on):
         _settle(page, 600)
 
 
+def _run_library(page, app, lang, out_dir, shots_on, theme):
+    """مكتبة التحليلات (‎?page=library‎): شاشة بره التبويبات، فبتتقاس لوحدها —
+    الكارت مقفول، وبعدين وهي مفتوح فيها لوحة «استورد في مشروع»."""
+    print(f"\n=== {lang} library @ {PHONE[0]}x{PHONE[1]} ===", flush=True)
+    desktop = VIEWPORTS["desktop"]
+    page.set_viewport_size({"width": desktop[0], "height": desktop[1]})
+    page.goto(app.url + "/?page=library" + ("&theme=glass" if theme == "glass" else ""),
+              wait_until="domcontentloaded")
+    _settle(page, 1400)
+    # فتح صفحة جديدة = جلسة Streamlit جديدة، واللغة بترجع عربي
+    if lang == "en":
+        # الشريط الجانبي فاضل مقفول من فحص التليفون اللي قبله — نفتحه الأول
+        expand = page.locator('[data-testid="stExpandSidebarButton"]')
+        if expand.count() and expand.first.is_visible():
+            expand.first.click()
+            _settle(page, 800)
+        page.get_by_role("radio", name="EN", exact=True).first.click()
+        _settle(page, 1200)
+    page.set_viewport_size({"width": PHONE[0], "height": PHONE[1]})
+    _settle(page, 900)
+    cards = page.locator('[class*="st-key-cf_lib_entry_"]').count()
+    check(f"[{lang}] library: الكارت ظاهر", cards >= 1, f"{cards} كارت")
+    for state in ("closed", "import-open"):
+        if state == "import-open":
+            label = "📥 استورد في مشروع" if lang == "ar" else "📥 Import into a project"
+            page.get_by_role("button", name=label).first.click()
+            _settle(page, 1200)
+            panel = page.get_by_role("button", name=("📥 استورد في المشروع ده" if lang == "ar"
+                                                      else "📥 Import into this project")).count()
+            check(f"[{lang}] library: لوحة الاستيراد اتفتحت", panel >= 1)
+        s = page.evaluate(JS_SCREEN)
+        check(f"[{lang}] library/{state}: عمود واحد", not s["sharedRows"],
+              f"{len(s['sharedRows'])} صف فيه أكتر من عمود"
+              + (f" {s['sharedRows'][:2]}" if s["sharedRows"] else ""))
+        check(f"[{lang}] library/{state}: مفيش زحلقة أفقية للصفحة", s["pageOverflow"] <= 1,
+              f"{s['pageOverflow']}px · {s['wideCount']} {s['wideKinds'][:5]}")
+        check(f"[{lang}] library/{state}: مساحات اللمس ≥{TOUCH}px", not s["smallTouch"],
+              str(s["smallTouch"][:4]))
+        if shots_on:
+            page.screenshot(path=os.path.join(out_dir, f"mobile-{lang}-library-{state}.png"),
+                            full_page=True)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="فحص شاشة الموبايل")
     ap.add_argument("--port", type=int, default=8607)
@@ -301,6 +344,7 @@ def main(argv=None):
                 page.set_viewport_size({"width": PHONE[0], "height": PHONE[1]})
                 _settle(page, 900)
                 _run_lang(page, app, lang, args.out or "", bool(args.out))
+                _run_library(page, app, lang, args.out or "", bool(args.out), args.theme)
                 ctx.close()
             browser.close()
 

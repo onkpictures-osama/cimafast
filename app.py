@@ -14,10 +14,11 @@ import theme
 
 from i18n import t, tr
 from ui import ltr
-import views.import_tab, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
+import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.project_settings
 import repo
 import accounts
+import analysis_library
 import audit
 import links
 import notify
@@ -239,6 +240,13 @@ def _bootstrap_accounts():
     init_db()
     done = accounts.migrate_accounts(resolve_users())
     print(f"[accounts] migration: {done}", file=sys.stderr, flush=True)
+    # مكتبة التحليلات: أي تحليل خلص في الطابور ومش محفوظ (القديم كمان) يتحفظ
+    try:
+        with permissions.system():
+            print(f"[library] saved from spool: {analysis_library.sync_from_spool()}",
+                  file=sys.stderr, flush=True)
+    except Exception as exc:  # noqa: BLE001 — المكتبة عمرها ما توقّع البرنامج
+        print(f"[library] sync failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
     return done
 
 
@@ -289,7 +297,8 @@ if _me_row and _me_row["must_change_password"]:
 _home_url = os.environ.get("CIMAFAST_HOME_URL")
 if _home_url and not st.session_state.get("_landed"):
     st.session_state["_landed"] = True
-    if links.parse(st.query_params) == (None, None):
+    # ‎?page=library‎ شاشة بحد ذاتها — مش "مفيش رابط"
+    if links.parse(st.query_params) == (None, None) and not st.query_params.get("page"):
         # setTimeout: كوكي الدخول (st.html فوق) لازم يتكتب قبل ما نسيب الصفحة
         st.html(f"<script>setTimeout(function(){{window.location.replace({json.dumps(_home_url)})}}, 150)</script>",
                 unsafe_allow_javascript=True)
@@ -616,6 +625,10 @@ _sb_me_row.markdown(
 with _sb_me_row:
     _notification_bell()
 
+# مكتبة التحليلات: على الحساب نفسه، بره أي مشروع — فمكانها في مجموعة الحساب
+with _sb_account:
+    _nav_link(f"📚 {t('مكتبة التحليلات')}", "?page=library")
+
 # صف الأيقونات: الرئيسية 🏠 + اللغة 🌐 AR/EN جنب بعض، في النص - طلب محمد الزيات
 # (2026-09-23): "نزّل بلوك اللغة جنب الرئيسية، واشيل كلمة اللغة وكلمة
 # الرئيسية، الأيقونات لوحدها واضحة".
@@ -661,6 +674,17 @@ if _lang_selected.lower() != st.session_state["ui_lang"]:
 if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):
     _logout()
     st.rerun()
+
+# مكتبة التحليلات (‎?page=library‎): شاشة الحساب، قبل اختيار أي مشروع — بتشتغل
+# حتى لمستخدم لسه مالوش مشاريع (يرفع ملف تحليل وينزّله).
+if st.query_params.get("page") == "library":
+    st.session_state["_cf_project"] = None     # F3: كتابات المكتبة مش تبع مشروع
+    try:
+        views.library.render(current_user=_current_user, company_id=company_id, role=_role,
+                             is_ar=_is_ar)
+    except permissions.Denied as _exc:
+        st.warning(t(str(_exc)))
+    st.stop()
 
 if not projects:
     if permissions.can(_role, "create_project"):

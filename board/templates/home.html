@@ -66,6 +66,16 @@
     </a>
     {% endif %}
 
+    {# مكتبة التحليلات: على الحساب نفسه، بره أي مشروع — كارت ثابت مش مربوط بمشروع #}
+    <a class="continue continue--library" href="{{ app }}?page=library">
+      <span class="continue__icon" aria-hidden="true">📚</span>
+      <span class="continue__body">
+        <span class="continue__label">مكتبة التحليلات · كل سيناريو اتحلل محفوظ على حسابك</span>
+        <strong>{% if library_count %}{{ library_count }} تحليل محفوظ{% else %}لسه مفيش تحليلات{% endif %}</strong>
+      </span>
+      <span class="continue__go">افتح ←</span>
+    </a>
+
     <div class="home__cols">
       <section class="panel" aria-labelledby="h-needs">
         <h2 id="h-needs">محتاجك</h2>

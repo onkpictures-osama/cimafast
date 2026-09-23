@@ -201,6 +201,22 @@ Each item: *problem → what we build → done when*. Owner agent in brackets.
 - **P4 Analysis reliability and cost** [universal-creative, infrastructure] — a
   run that returns 0 scenes is a failure, not "done"; never charge twice for the
   same file; show AI spend per project and company.
+- **P4a Analysis Library (مكتبة التحليلات)** [chief-engineer] — owner request
+  2026-09-23: an analysis run in the wrong project was tied to that project and
+  could only be imported there, so money spent on it was effectively lost. →
+  Every completed AI analysis is saved automatically on the account of whoever
+  ran it (visible to their company, F1), outside any project, and can be
+  imported into any project — as new data, or merged so similar characters and
+  locations link to existing ones instead of duplicating (F2 permissions, F3
+  audit row). Portable as one versioned UTF-8 JSON file
+  (`.cimafast-analysis.json`, `format`/`version` header, optional `reports`
+  section for reports generated after the analysis), which can be uploaded into
+  another account's library.
+  ✅ **On /v1 2026-09-23.** Sidebar (account group) and a card on `/v1/home/`
+  open `/v1/?page=library`; the three analyses already in the /v1 spool were
+  back-filled with the right owner. Tests: `tests/test_analysis_library.py`.
+  Still to come: analyses imported before the spool existed can't be recovered
+  (only their edited scenes survive in the project).
 - **P5 Looks and continuity** [universal-creative] — scenes that note a look
   change create or link a look; continuity-sensitive props tracked across scenes.
   🔎 **Scoped 2026-09-23**, after an owner report that "adding a state to a

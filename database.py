@@ -473,6 +473,31 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_usage_company_at ON usage_events (company_id, at DESC);
         CREATE INDEX IF NOT EXISTS idx_usage_event_at ON usage_events (event, at DESC);
+        -- مكتبة التحليلات (analysis_library.py): كل تحليل سيناريو خلص بيتحفظ هنا
+        -- على مستوى الحساب، بره أي مشروع، عشان يتستورد في أي مشروع تاني بعدين.
+        -- من غير مفاتيح خارجية عن قصد: التحليل لازم يفضل موجود لو المشروع اللي
+        -- جه منه اتمسح — ده بالظبط سيناريو "استوردته في المشروع الغلط".
+        CREATE TABLE IF NOT EXISTS analysis_library (
+            id SERIAL PRIMARY KEY,
+            company_id INTEGER,
+            owner_username TEXT,
+            script_name TEXT NOT NULL,
+            source_project_id INTEGER,
+            source_project_name TEXT,
+            analysed_at TEXT,
+            saved_at TEXT NOT NULL,
+            origin TEXT NOT NULL DEFAULT 'ai',
+            job_id TEXT,
+            content_hash TEXT NOT NULL,
+            scene_count INTEGER NOT NULL DEFAULT 0,
+            character_count INTEGER NOT NULL DEFAULT 0,
+            location_count INTEGER NOT NULL DEFAULT 0,
+            payload TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_library_company ON analysis_library (company_id, saved_at);
+        CREATE INDEX IF NOT EXISTS idx_library_owner ON analysis_library (owner_username);
+        CREATE INDEX IF NOT EXISTS idx_library_hash ON analysis_library (content_hash);
+        CREATE INDEX IF NOT EXISTS idx_library_job ON analysis_library (job_id);
         """)
     else:
         c.executescript("""
@@ -820,6 +845,31 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_usage_company_at ON usage_events (company_id, at DESC);
         CREATE INDEX IF NOT EXISTS idx_usage_event_at ON usage_events (event, at DESC);
+        -- مكتبة التحليلات (analysis_library.py): كل تحليل سيناريو خلص بيتحفظ هنا
+        -- على مستوى الحساب، بره أي مشروع، عشان يتستورد في أي مشروع تاني بعدين.
+        -- من غير مفاتيح خارجية عن قصد: التحليل لازم يفضل موجود لو المشروع اللي
+        -- جه منه اتمسح — ده بالظبط سيناريو "استوردته في المشروع الغلط".
+        CREATE TABLE IF NOT EXISTS analysis_library (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_id INTEGER,
+            owner_username TEXT,
+            script_name TEXT NOT NULL,
+            source_project_id INTEGER,
+            source_project_name TEXT,
+            analysed_at TEXT,
+            saved_at TEXT NOT NULL,
+            origin TEXT NOT NULL DEFAULT 'ai',
+            job_id TEXT,
+            content_hash TEXT NOT NULL,
+            scene_count INTEGER NOT NULL DEFAULT 0,
+            character_count INTEGER NOT NULL DEFAULT 0,
+            location_count INTEGER NOT NULL DEFAULT 0,
+            payload TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_library_company ON analysis_library (company_id, saved_at);
+        CREATE INDEX IF NOT EXISTS idx_library_owner ON analysis_library (owner_username);
+        CREATE INDEX IF NOT EXISTS idx_library_hash ON analysis_library (content_hash);
+        CREATE INDEX IF NOT EXISTS idx_library_job ON analysis_library (job_id);
         """)
     conn.commit()
     _migrate_schema(conn)

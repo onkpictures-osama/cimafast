@@ -142,6 +142,20 @@ def build(db_path):
             (sid, num, size, move, angle, dur, action, confirmed),
         )
 
+    # مكتبة التحليلات: تحليل واحد محفوظ باسم حساب التجربة (shotbot)، عشان شاشة
+    # المكتبة تتقاس وفيها كارت حقيقي مش فاضية. من غير شركة: لسه مفيش شركات
+    # وقت الزرع (بتتعمل أول ما البرنامج يشتغل)، وصاحب التحليل بيشوفه دايمًا.
+    import analysis_library  # noqa: PLC0415
+    analysis_library.save(
+        {"scenes": [
+            {"scene_number": 1, "int_ext": "INT", "day_night": "نهار", "location_name": "شقة نادية - الدقي",
+             "characters": ["نادية", "حسن"], "props": [], "notes": ""},
+            {"scene_number": 2, "int_ext": "EXT", "day_night": "ليل", "location_name": "الكورنيش",
+             "characters": ["حسن"], "props": [], "notes": ""},
+        ], "warnings": [], "meta": {}},
+        script_name="عروسة البحر - المسودة التانية.docx", owner="shotbot", company_id=None,
+        source_project_id=pid, source_project_name="عروسة البحر", origin="ai")
+
     return pid
 
 
