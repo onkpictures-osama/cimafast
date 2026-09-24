@@ -138,7 +138,7 @@ TRANSLATIONS = {
     "بيانات التشغيل (meta) في الملف مش مكتوبة صح.": "The run details (meta) in the file are malformed.",
     "مقدرناش نقرا ولا مشهد من الملف.": "We couldn't read any scene from the file.",
     "التقارير في الملف مش مكتوبة صح.": "The reports in the file are malformed.",
-    "حسابك مش عضو في المشروع ده.": "Your account isn't a member of this project.",
+    "حسابك مش عضو في مساحة العمل دي.": "Your account isn't a member of this workspace.",
     "المشروع ده مش متاح لحسابك.": "This project isn't available to your account.",
     "الشركة": "Company",
     "مساحة العمل": "Workspace",
@@ -788,6 +788,21 @@ TRANSLATIONS = {
     "المسلسل ده لسه مالوش حلقات — حدد العدد فوق عشان تقدر ترفع سكريبت كل حلقة.":
         "This series has no episodes yet — set the count above to upload each episode's script.",
     "الحلقة دي موجودة بالفعل": "That episode already exists",
+
+    # (أ) أعضاء لكل مشروع (2026-09-24)
+    "أعضاء المشروع": "Project members",
+    "المشروع ده مفتوح لكل أعضاء مساحة العمل (اتعمل قبل ميزة أعضاء المشروع). أول ما تحفظ اختيارك هنا، هيبقى للي تختارهم بس.":
+        "This project is open to every workspace member (it predates project members). Once you save a selection here, only the people you pick will see it.",
+    "اللي مش متعلّم عليه مش هيشوف المشروع ده خالص. مدير المشروع بيشوف كل المشاريع دايمًا.":
+        "Anyone unticked won't see this project at all. The project manager always sees every project.",
+    "مفيش أعضاء تانيين في مساحة العمل لسه. ضيفهم من «إدارة الفريق» وبعدين اختارهم هنا.":
+        "No other workspace members yet. Add them from «Manage team», then pick them here.",
+    "بيشوف كل المشاريع": "sees every project",
+    "حفظ أعضاء المشروع": "Save project members",
+    "اتشال": "Removed",
+    "ضيف كل فريق مساحة العمل للمشروع": "Add the whole workspace team to the project",
+    "من غيرها المشروع بيبدأ بيك انت بس، وتضيف الأعضاء من ⚙️ إعدادات المشروع.":
+        "Without it the project starts with just you; add members from ⚙️ Project Settings.",
     "يوم تصوير": "shoot days",
     "يوم انتظار": "hold days",
     "من يوم": "from day",

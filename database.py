@@ -52,6 +52,7 @@ _ON_CONFLICT_TARGETS = {
     "scene_characters": "(scene_id, character_id)",
     "scene_props": "(scene_id, prop_id)",
     "memberships": "(company_id, user_id)",
+    "project_members": "(project_id, user_id)",
 }
 _INSERT_IGNORE_RE = re.compile(r"INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)", re.IGNORECASE)
 
@@ -454,6 +455,19 @@ def init_db():
             active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT,
             UNIQUE(company_id, user_id)
+        );
+
+        -- (أ) أعضاء لكل مشروع (موافقة المالك 2026-09-24): مدير المشروع
+        -- والمشغّل بيشوفوا كل مشاريع مساحة العمل؛ الباقي بيشوف المشاريع اللي
+        -- اتضافوا ليها بس. projects.members_scoped = 0 → مشروع قديم مفتوح لكل
+        -- الأعضاء لحد ما المدير يحدد أعضاءه أول مرة (محدش بيخسر دخول).
+        CREATE TABLE IF NOT EXISTS project_members (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            added_by TEXT,
+            added_at TEXT,
+            UNIQUE(project_id, user_id)
         );
 
         CREATE TABLE IF NOT EXISTS user_profile (
@@ -861,6 +875,18 @@ def init_db():
             UNIQUE(company_id, user_id)
         );
 
+        -- (أ) أعضاء لكل مشروع - نفس الشرح في نسخة Postgres فوق
+        CREATE TABLE IF NOT EXISTS project_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            added_by TEXT,
+            added_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(project_id, user_id)
+        );
+
         -- الصفحة الرئيسية: "كمّل من مكان ما وقفت" (آخر مشروع وتبويب لكل مستخدم)
         CREATE TABLE IF NOT EXISTS user_profile (
             username TEXT PRIMARY KEY,
@@ -977,6 +1003,9 @@ _MIGRATIONS = {
         # تفاصيل خاصة بنوع المشروع (JSON): مدة الحلقة للمسلسل، المنصة للفيديو
         # القصير... - عمود واحد بدل عمود لكل نوع، لأن كل نوع أسئلته غير التاني.
         ("type_details", "TEXT"),
+        # (أ) 1 = المشروع ليه أعضاء محددين (project_members). 0/NULL = مشروع
+        # قديم مفتوح لكل أعضاء مساحة العمل زي ما كان قبل الميزة.
+        ("members_scoped", "INTEGER DEFAULT 0"),
     ],
     "locations": [
         ("parent_location_id", "INTEGER"),
@@ -1082,6 +1111,7 @@ _INDEXES = [
     # كل قراءة مشاريع بتفلتر بالشركة (accounts.projects_for)، فده الفهرس اللي
     # العزل بين الشركات بيقف عليه.
     ("idx_projects_company", "projects (company_id)"),
+    ("idx_project_members_user", "project_members (user_id)"),
     # قايمة خزانة المواهب بتفلتر بـ discoverable، وصف الكاستينج بيتقري
     # بالممثل/بالمشروع/بالشخصية - نفس منطق شركة المشاريع فوق.
     ("idx_actors_discoverable", "actors (discoverable)"),

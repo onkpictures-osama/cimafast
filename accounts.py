@@ -229,30 +229,58 @@ def role_in(username, company_id):
     return None
 
 
+# (أ) أعضاء لكل مشروع: الأدوار دي بتشوف كل مشاريع مساحة العمل. الباقي بيشوف
+# المشاريع اللي هو عضو فيها (project_members)، أو المشاريع القديمة اللي لسه
+# ماتحددلهاش أعضاء (members_scoped = 0) - زي ما كانوا بيشوفوها قبل الميزة.
+SEES_ALL_PROJECTS = ("operator", "admin")
+
+_VISIBLE_TO_MEMBER = ("(COALESCE(p.members_scoped, 0) = 0 OR EXISTS "
+                      "(SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = ?))")
+
+
 def projects_for(username, company_id=None):
-    """المشاريع اللي المستخدم يقدر يشوفها — كلها، أو شركة واحدة منهم."""
-    allowed = [c["id"] for c in companies_for(username)]
+    """المشاريع اللي المستخدم يقدر يشوفها — كلها، أو مساحة عمل واحدة منهم."""
+    companies = companies_for(username)
     if company_id is not None:
-        allowed = [c for c in allowed if c == company_id]
-    if not allowed:
+        companies = [c for c in companies if c["id"] == company_id]
+    if not companies:
         return []
-    marks = ",".join("?" * len(allowed))
-    return fetch_all(f"SELECT * FROM projects WHERE company_id IN ({marks}) ORDER BY id DESC", tuple(allowed))
+    everything = [c["id"] for c in companies if c["role"] in SEES_ALL_PROJECTS]
+    limited = [c["id"] for c in companies if c["role"] not in SEES_ALL_PROJECTS]
+    parts, params = [], []
+    if everything:
+        parts.append(f"p.company_id IN ({','.join('?' * len(everything))})")
+        params += everything
+    if limited:
+        parts.append(f"(p.company_id IN ({','.join('?' * len(limited))}) AND {_VISIBLE_TO_MEMBER})")
+        params += limited + [user(username)["id"]]
+    return fetch_all(f"SELECT p.* FROM projects p WHERE {' OR '.join(parts)} ORDER BY p.id DESC", tuple(params))
 
 
 def project_role(username, project_id):
-    """دور المستخدم في الشركة اللي المشروع تبعها، أو None لو مالوش دخل بيه."""
+    """دور المستخدم في مساحة العمل اللي المشروع تبعها — بس لو يقدر يدخل
+    المشروع ده نفسه؛ وإلا None."""
+    if not can_access_project(username, project_id):
+        return None
     p = _one("SELECT company_id FROM projects WHERE id=?", (project_id,))
-    return role_in(username, p["company_id"]) if p else None
+    return role_in(username, p["company_id"])
 
 
 def can_access_project(username, project_id):
-    p = _one("SELECT company_id FROM projects WHERE id=?", (project_id,))
-    return bool(p) and role_in(username, p["company_id"]) is not None
+    p = _one("SELECT company_id, members_scoped FROM projects WHERE id=?", (project_id,))
+    if not p:
+        return False
+    role = role_in(username, p["company_id"])
+    if role is None:
+        return False
+    if role in SEES_ALL_PROJECTS or not p["members_scoped"]:
+        return True
+    return _one("SELECT 1 AS ok FROM project_members WHERE project_id=? AND user_id=?",
+                (project_id, user(username)["id"])) is not None
 
 
 def create_project(actor, company_id, name, project_type, resolution, orientation, aspect_ratio,
-                   episode_count=None, type_details=None):
+                   episode_count=None, type_details=None, add_all_members=False):
     """مشروع جديد في شركة معيّنة. قبل F1 المشروع كان بيتعمل من غير شركة وكل الناس
     تشوفه؛ دلوقتي بيتسجّل تبع الشركة اللي المستخدم شغال فيها.
 
@@ -269,7 +297,7 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
     import json
     role = role_in(actor, company_id)
     if role is None:
-        raise AccessDenied("مش عضو في المشروع ده")
+        raise AccessDenied("مش عضو في مساحة العمل دي")
     if not permissions.can(role, "create_project"):
         raise permissions.Denied("create_project")
     from database import run_query
@@ -279,15 +307,73 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
         with permissions.system():
             project_id = run_query(
                 "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
-                "default_aspect_ratio, company_id, type_details) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "default_aspect_ratio, company_id, type_details, members_scoped) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
                 (name, project_type, resolution, orientation, aspect_ratio, company_id,
                  json.dumps(type_details, ensure_ascii=False) if type_details else None))
+            # (أ) المشروع الجديد: منشئه عضو فيه على طول (والمديرين بيشوفوا
+            # الكل أصلًا)، و"كل الفريق" لو اتطلب في الفورم
+            uids = {user(actor)["id"]}
+            if add_all_members:
+                uids |= {r["user_id"] for r in fetch_all(
+                    "SELECT user_id FROM memberships WHERE company_id=? AND active=1", (company_id,))}
+            for uid in uids:
+                run_query("INSERT OR IGNORE INTO project_members (project_id, user_id, added_by, added_at) "
+                          "VALUES (?, ?, ?, ?)", (project_id, uid, actor, _now()))
+            act.extra["كل الفريق"] = bool(add_all_members)
             if project_type == "مسلسل":
                 import repo
                 repo.ensure_episodes(project_id, episode_count)
                 act.extra["حلقات"] = episode_count
         act.entity_id = act.project_id = project_id
     return project_id
+
+
+def project_team(actor, project_id):
+    """أعضاء مساحة العمل بالنسبة للمشروع ده: كل عضو نشط، ودوره، وهل بيشوف
+    المشروع (مدير = بيشوف الكل دايمًا). للمدير أو المشغّل بس."""
+    p = _one("SELECT company_id, members_scoped FROM projects WHERE id=?", (project_id,))
+    if not p:
+        raise AccessDenied("المشروع ده مش موجود")
+    role = role_in(actor, p["company_id"])
+    if role is None or not permissions.can(role, "manage_team"):
+        raise AccessDenied("تحديد أعضاء المشروع لمدير المشروع بس")
+    rows = fetch_all("""
+        SELECT u.id AS user_id, u.username, u.display_name, u.job_title, m.role,
+               EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id=? AND pm.user_id=u.id) AS listed
+        FROM memberships m JOIN users u ON u.id = m.user_id
+        WHERE m.company_id=? AND m.active=1 AND u.active=1
+        ORDER BY u.display_name, u.username""", (project_id, p["company_id"]))
+    scoped = bool(p["members_scoped"])
+    return {"scoped": scoped, "members": [dict(
+        r, sees_all=r["role"] in SEES_ALL_PROJECTS,
+        in_project=r["role"] in SEES_ALL_PROJECTS or not scoped or bool(r["listed"])) for r in rows]}
+
+
+def set_project_team(actor, project_id, usernames):
+    """أعضاء المشروع = usernames دول (من أعضاء مساحة العمل النشطين). أول مرة
+    بتتعمل لمشروع قديم بتقفله على اللي اتختاروا (members_scoped=1). المديرين
+    بيفضلوا شايفين كل حاجة مهما كانت القايمة. بيرجّع (اتضافوا، اتشالوا)."""
+    team = project_team(actor, project_id)          # فحص الصلاحية جوه
+    wanted = {auth.normalize_username(u) for u in usernames}
+    by_name = {m["username"]: m for m in team["members"] if not m["sees_all"]}
+    current = {n for n, m in by_name.items() if m["in_project"]}
+    target = {n for n in wanted if n in by_name}
+    added, removed = sorted(target - current), sorted(current - target)
+    if not team["scoped"]:
+        # المشروع كان مفتوح للكل: القايمة المحفوظة بتبدأ من اللي اتختاروا بالظبط
+        added = sorted(target)
+    with audit.action("project_members", "project_members", project_id=project_id, username=actor,
+                      summary=f"تحديد أعضاء المشروع ({len(target)} عضو)") as act:
+        act.extra = {"اتضافوا": added, "اتشالوا": removed}
+        with _tx() as ex:
+            ex("UPDATE projects SET members_scoped=1 WHERE id=?", (project_id,))
+            for n in removed:
+                ex("DELETE FROM project_members WHERE project_id=? AND user_id=?",
+                   (project_id, by_name[n]["user_id"]))
+            for n in added:
+                ex("INSERT OR IGNORE INTO project_members (project_id, user_id, added_by, added_at) "
+                   "VALUES (?, ?, ?, ?)", (project_id, by_name[n]["user_id"], actor, _now()))
+    return added, removed
 
 
 def delete_project(actor, project_id):
@@ -324,7 +410,7 @@ def _require_manageable(actor, company_id, username):
     target = user(username)
     if not target or not _one("SELECT 1 AS ok FROM memberships WHERE company_id=? AND user_id=?",
                               (company_id, target["id"])):
-        raise AccessDenied("المستخدم ده مش عضو في المشروع ده")
+        raise AccessDenied("المستخدم ده مش عضو في مساحة العمل دي")
     if target["is_operator"] and not user(actor)["is_operator"]:
         raise AccessDenied("حساب مشغّل المنصة مايتعدّلش من هنا")
     return target
@@ -362,7 +448,7 @@ def set_subscription_tier(actor, company_id, tier):
 
 def members(actor, company_id):
     if role_in(actor, company_id) is None:
-        raise AccessDenied("مش عضو في المشروع ده")
+        raise AccessDenied("مش عضو في مساحة العمل دي")
     return fetch_all("""
         SELECT u.username, u.display_name, u.email, u.job_title, u.active AS user_active,
                u.last_login_at, m.role, m.active FROM memberships m JOIN users u ON u.id = m.user_id

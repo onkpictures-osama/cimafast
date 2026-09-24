@@ -45,7 +45,7 @@ def test(fn):
 
 
 def _project(name="P"):
-    return accounts.create_project("boss", CO, name, "فيلم", "1080p", "أفقي", "16:9")
+    return accounts.create_project("boss", CO, name, "فيلم", "1080p", "أفقي", "16:9", add_all_members=True)  # (أ): السيناريو هنا = كل الفريق في المشروع
 
 
 def _raises(exc, fn, *a, **kw):

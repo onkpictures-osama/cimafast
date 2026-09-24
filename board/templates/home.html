@@ -112,6 +112,7 @@
           <label class="field"><span>مساحة العمل</span>
             <select name="company_id">{% for c in creatable %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
           {% else %}<input type="hidden" name="company_id" value="{{ creatable[0].id }}">{% endif %}
+          <label class="check"><input type="checkbox" name="add_all_members" value="1"> ضيف كل فريق مساحة العمل للمشروع</label>
           <button class="btn btn--primary">إنشاء وابدأ بالسيناريو</button>
           <p id="new-status" class="status" role="status"></p>
         </form>

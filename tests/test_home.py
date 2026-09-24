@@ -30,10 +30,10 @@ B, _ = accounts.create_company("melzayat", "شركة ب", "boss_b")
 accounts.add_member("boss_a", A, "costume", role="department", job_title="مصممة أزياء")
 accounts.add_member("boss_a", A, "ad", role="department", job_title="مساعد مخرج أول")
 accounts.add_member("boss_a", A, "watcher", role="viewer")
-EMPTY = accounts.create_project("boss_a", A, "مشروع فاضي", "فيلم", "1080p", "أفقي", "16:9")
+EMPTY = accounts.create_project("boss_a", A, "مشروع فاضي", "فيلم", "1080p", "أفقي", "16:9", add_all_members=True)  # (أ): السيناريو هنا = كل الفريق في المشروع
 FULL = accounts.create_project("boss_a", A, "عروسة البحر", "مسلسل", "1080p", "أفقي", "16:9",
-                              episode_count=10)
-OTHER = accounts.create_project("boss_b", B, "سر الشركة ب", "فيلم", "1080p", "أفقي", "16:9")
+                              episode_count=10, add_all_members=True)  # (أ): السيناريو هنا = كل الفريق في المشروع
+OTHER = accounts.create_project("boss_b", B, "سر الشركة ب", "فيلم", "1080p", "أفقي", "16:9", add_all_members=True)  # (أ): السيناريو هنا = كل الفريق في المشروع
 
 loc = repo.add_location(FULL, "شقة حسام", "", None, None)
 database.run_query("INSERT INTO characters (project_id, name) VALUES (?, ?)", (FULL, "إسراء"))

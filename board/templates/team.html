@@ -42,7 +42,7 @@
     {% if companies %}
     <section class="card">
       <div class="card__head">
-        <h2>أعضاء المشروع</h2>
+        <h2>أعضاء مساحة العمل</h2>
         {% if can_view_audit %}<a class="btn" href="../activity/">🧾 سجل النشاط</a>{% endif %}
         <form id="rename" class="inline admin-only" hidden>
           <input name="name" placeholder="اسم مساحة العمل" aria-label="اسم مساحة العمل" required>
@@ -53,7 +53,7 @@
         <thead><tr><th>الاسم</th><th>المستخدم</th><th>المسمى</th><th>الدور</th><th>آخر دخول</th><th class="admin-only" hidden></th></tr></thead>
         <tbody id="members"></tbody>
       </table>
-      <p id="not-admin" class="muted" hidden>مدير المشروع بس هو اللي يضيف ناس أو يغيّر أدوارهم.</p>
+      <p id="not-admin" class="muted" hidden>مدير المشروع بس هو اللي يضيف ناس أو يغيّر أدوارهم. مين يدخل أنهي مشروع بيتحدد من ⚙️ إعدادات المشروع.</p>
     </section>
 
     <section class="card admin-only" hidden>

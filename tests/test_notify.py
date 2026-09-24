@@ -57,9 +57,9 @@ def _texts(username):
 
 
 _as("boss_a", CO_A)
-P_A = accounts.create_project("boss_a", CO_A, "مشروع أ", "فيلم", "1080p", "أفقي", "16:9")
+P_A = accounts.create_project("boss_a", CO_A, "مشروع أ", "فيلم", "1080p", "أفقي", "16:9", add_all_members=True)  # (أ): السيناريو هنا = كل الفريق في المشروع
 _as("boss_b", CO_B)
-P_B = accounts.create_project("boss_b", CO_B, "مشروع ب", "فيلم", "1080p", "أفقي", "16:9")
+P_B = accounts.create_project("boss_b", CO_B, "مشروع ب", "فيلم", "1080p", "أفقي", "16:9", add_all_members=True)  # (أ): السيناريو هنا = كل الفريق في المشروع
 
 _as("boss_a", CO_A, P_A)
 run_query("INSERT INTO locations (project_id, name, base_description) VALUES (?, ?, ?)", (P_A, "شقة حسين", ""))

@@ -502,7 +502,8 @@ async def api_create_project(request: Request):
             return JSONResponse({"error": "اكتب عدد حلقات المسلسل"}, status_code=400)
     res, orient, ratio = project_types.technical_defaults(kind)
     try:
-        pid = accounts.create_project(user, cid, name, kind, res, orient, ratio, episode_count=episodes)
+        pid = accounts.create_project(user, cid, name, kind, res, orient, ratio, episode_count=episodes,
+                                      add_all_members=bool(b.get("add_all_members")))
     except (accounts.AccessDenied, permissions.Denied) as exc:
         return JSONResponse({"error": str(exc)}, status_code=403)
     except ValueError as exc:
