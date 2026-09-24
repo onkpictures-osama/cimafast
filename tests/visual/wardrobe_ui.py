@@ -51,7 +51,7 @@ def stage(page, shot_dir):
     _tab(page, "الممثلين")
     _no_exception(page, "cast tab")
     body = page.locator("body").inner_text()
-    check("cast tab opens on the project's cast", "ممثلين المشروع" in body and "خزانة المواهب" in body)
+    check("cast tab opens on the project's cast", "ممثلين المشروع" in body and "افتح مكتبة الممثلين" in body)
 
     _tab(page, "الملابس")
     _no_exception(page, "wardrobe tab")

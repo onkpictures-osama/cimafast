@@ -38,7 +38,7 @@ def render(project, project_id, board_url):
         df = pd.DataFrame([{
             t("رقم"): r["cast_number"] or "",
             t("الشخصية"): r["name"],
-            t("الممثل/ة"): r["actor"] or "—",
+            t("الممثل"): r["actor"] or "—",
             t("أيام تصوير"): r["work_days"],
             t("أيام انتظار"): r["hold_days"],
             t("من يوم"): r["first_day"],

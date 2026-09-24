@@ -1,7 +1,7 @@
 """الممثل جوه السيستم — في متصفح حقيقي، على قاعدة بيانات مزروعة مؤقتة.
 
 البلاغ (2026-09-23): "فين إضافة الممثل للمشروع وربطه بشخصية". اللي بيتختبر:
-- كارت الشخصية فيه قسم الكاستينج: ممثل/ة جديد/ة من الكارت نفسه → تعاقد.
+- كارت الشخصية فيه قسم الكاستينج: ممثل جديد من الكارت نفسه → تعاقد.
 - الكارت بعدها بيبان فيه رقم الكاست واسم الممثل/ة، والملخص فوق بيتحدّث.
 - «رقّم الباقيين» بيرقّم كل الشخصيات، وجدول المشاهد فيه عمود أرقام الكاست.
 
@@ -49,23 +49,23 @@ def stage(page, shot_dir):
     _tab(page, "الشخصيات")
     _no_exception(page, "characters tab")
     body = page.locator("body").inner_text()
-    check("cast summary line shows", "دور اتعاقد له ممثل/ة" in body, body[:200])
+    check("cast summary line shows", "دور اتعاقد له ممثل" in body, body[:200])
 
     card = _char_card(page, "نادية")
     card.locator("summary").first.click()
     _settle(page, 1500)
     card = _char_card(page, "نادية")
-    check("casting section inside the card", "الممثل/ة والكاستينج" in card.inner_text())
+    check("casting section inside the card", "الممثل والكاستينج" in card.inner_text())
 
     # الاختيار بقى من مكتبة الممثلين نفسها (المالك 2026-09-24): الكارت بيفتحها
     # في وضع "بتختار لدور نادية"، وبعد التعاقد بترجع للشخصية
     card.get_by_role("button").filter(has_text="اختار من مكتبة الممثلين").first.click()
     _settle(page, 2000)
-    page.get_by_text("إضافة ممثل/ة جديد/ة").first.click()
+    page.get_by_text("إضافة ممثل جديد").first.click()
     _settle(page, 800)
-    form = page.locator('[data-testid="stForm"]').filter(has_text="إضافة الممثل/ة").first
+    form = page.locator('[data-testid="stForm"]').filter(has_text="إضافة الممثل").first
     form.locator("input").first.fill("ممثلة اختبار")
-    form.get_by_role("button").filter(has_text="إضافة الممثل/ة").first.click()
+    form.get_by_role("button").filter(has_text="إضافة الممثل").first.click()
     _settle(page, 2000)
     page.get_by_role("button").filter(has_text="تعاقد للدور ده").first.click()
     _settle(page, 2500)

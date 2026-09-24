@@ -586,7 +586,7 @@ async def api_usage(request: Request):
                              target_labels=audit.TARGET_LABELS))
 
 
-# --- البروفايل العام للممثل/ة (P9، من غير دخول) ----------------------------------
+# --- البروفايل العام للممثل (P9، من غير دخول) ----------------------------------
 # هنا مش في Streamlit عشان صفحة HTML حقيقية بتقدر تحط Open Graph: واتساب وفيسبوك
 # بيعرضوا الاسم والصورة في معاينة اللينك. الحقول المسموحة كلها في public_profile.py.
 # PUBLIC_BOARD_URL: المسار اللي Caddy بيوصّل بيه للتطبيق ده من برّه (بيشيله قبل
@@ -615,7 +615,7 @@ async def public_actor_page(request: Request):
     lang = "en" if request.query_params.get("lang") == "en" else "ar"
     actor = repo.actor_by_public_token(token)
     if not actor:
-        # نفس الرد لتوكن غلط أو اتلغى أو ممثل/ة اتمسح — مفيش فرق يكشف حاجة
+        # نفس الرد لتوكن غلط أو اتلغى أو ممثل اتمسح — مفيش فرق يكشف حاجة
         return HTMLResponse(public_profile.render_not_found(lang, asset_base="../"),
                             status_code=404, headers=_PUBLIC_HEADERS)
     url = _public_url(request, token)
@@ -627,7 +627,7 @@ async def public_actor_page(request: Request):
 
 
 async def public_actor_photo(request: Request):
-    """صورة الممثل/ة صاحب التوكن ده بس. مفيش أي جزء من المسار جاي من الطلب."""
+    """صورة الممثل صاحب التوكن ده بس. مفيش أي جزء من المسار جاي من الطلب."""
     import public_profile
     actor = repo.actor_by_public_token(request.path_params["token"])
     path = public_profile.photo_file(actor) if actor else None

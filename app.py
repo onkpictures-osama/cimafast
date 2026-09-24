@@ -257,7 +257,7 @@ def _auth_users():
 
 _bootstrap_accounts()
 
-# البروفايل العام للممثل/ة (P9): ‎?profile=<token>‎ بيتعرض من غير دخول وبيقف
+# البروفايل العام للممثل (P9): ‎?profile=<token>‎ بيتعرض من غير دخول وبيقف
 # هنا — قبل بوابة الدخول، ومن غير ما أي حاجة من البرنامج نفسه تترسم.
 if st.query_params.get("profile"):
     views.actors.render_public_profile(st.query_params.get("profile"))

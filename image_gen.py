@@ -125,7 +125,7 @@ def build_character_prompt(name, role_type="", species="", gender="", personalit
 def generate_image(prompt, api_key, model=None, reference_images=None):
     """بترجع (bytes, امتداد الملف). بترمي ImageGenError برسالة عربي واضحة.
 
-    reference_images: قائمة (bytes, mime_type) اختيارية - صورة ممثل/ة حقيقية
+    reference_images: قائمة (bytes, mime_type) اختيارية - صورة ممثل حقيقية
     و/أو صورة خلفية/مكان بتتبعت مع البرومبت كصور مش نص بس، عشان الصورة
     المتولدة تتقيّد بيهم (identity/خلفية) مش توصيف نصي بس. من غيرها السلوك
     زي الأول بالظبط (رسالة نصية عادية) - موديل gemini-3.1-flash-image بيعلن

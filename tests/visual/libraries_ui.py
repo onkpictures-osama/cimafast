@@ -76,11 +76,11 @@ def run(port, shot_dir):
         page.get_by_role("button").filter(has_text="اختار من مكتبة الممثلين").first.click(); _settle(page, 2200)
         _no_exception(page, "pick mode")
         main = page.locator("section[data-testid=stMain]").inner_text()
-        check("library opens in 'choosing for نادية' mode", "بتختار ممثل/ة لدور" in main and "نادية" in main)
-        page.get_by_text("إضافة ممثل/ة جديد/ة").first.click(); _settle(page, 800)
-        form = page.locator('[data-testid="stForm"]').filter(has_text="إضافة الممثل/ة").first
+        check("library opens in 'choosing for نادية' mode", "بتختار ممثل لدور" in main and "نادية" in main)
+        page.get_by_text("إضافة ممثل جديد").first.click(); _settle(page, 800)
+        form = page.locator('[data-testid="stForm"]').filter(has_text="إضافة الممثل").first
         form.locator("input").first.fill("ممثلة المكتبة")
-        form.get_by_role("button").filter(has_text="إضافة الممثل/ة").first.click(); _settle(page, 2200)
+        form.get_by_role("button").filter(has_text="إضافة الممثل").first.click(); _settle(page, 2200)
         _no_exception(page, "add actor in pick mode")
         if shot_dir:
             page.screenshot(path=os.path.join(shot_dir, "pick-profile.png"), full_page=True)

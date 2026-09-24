@@ -362,7 +362,7 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
     characters = fetch_all(
         "SELECT * FROM characters WHERE project_id=? ORDER BY id", (project_id,)
     )
-    # الرقم = رقم الكاست لو متحط (نفس رقم التفريغ والجدول)؛ الترشيح = الممثل/ة
+    # الرقم = رقم الكاست لو متحط (نفس رقم التفريغ والجدول)؛ الترشيح = الممثل
     # المتعاقد أو المرشحين؛ عدد الأيام = أيام الشغل من جدول التصوير.
     cast = repo.cast_by_character(project_id)
     work_days = {r["character_id"]: r["work_days"] for r in repo.day_out_of_days(project_id)["rows"]}
@@ -498,7 +498,7 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
 # ---------- كشف الملابس (P10) ----------
 WARDROBE_SHEET_COLUMNS = [
     ("character", "الشخصية", 18),
-    ("actor", "الممثل/ة", 18),
+    ("actor", "الممثل", 18),
     ("change", "الغيار", 16),
     ("item", "القطعة", 20),
     ("category", "النوع", 12),

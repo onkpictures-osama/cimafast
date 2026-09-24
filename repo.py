@@ -1008,8 +1008,8 @@ def actors_directory():
     """كل الممثلين الظاهرين في البحث (discoverable) - القايمة اللي شاشة البحث
     بالحرف بتحمّلها مرة واحدة وتفلترها في الذاكرة (مفيش استعلام لكل حرف).
 
-    مفيش شرط صورة أو وسيلة تواصل عشان يظهر: الممثل/ة الحقيقي المضاف من
-    مصدر عام بيبقى من غير تواصل بالقصد (ACTOR-CASTING-PLAN)، وممثل/ة اتضاف
+    مفيش شرط صورة أو وسيلة تواصل عشان يظهر: الممثل الحقيقي المضاف من
+    مصدر عام بيبقى من غير تواصل بالقصد (ACTOR-CASTING-PLAN)، وممثل اتضاف
     من غير صورة كان بيختفي من القايمة وكأنه اتمسح. الصورة الناقصة بتبان
     أيقونة + تنبيه "الصورة محتاجة تحديث" بدل ما البروفايل يستخبى."""
     return fetch_all("""
@@ -1085,7 +1085,7 @@ def update_actor(actor_id, values, company_id, role):
 
 
 def set_actor_photo(actor_id, photo_path, updated_at=None):
-    """بيحدّث صورة الممثل/ة وتاريخ آخر تحديث للصورة مع بعض - ده الأساس اللي
+    """بيحدّث صورة الممثل وتاريخ آخر تحديث للصورة مع بعض - ده الأساس اللي
     تنبيه "الصورة قديمة" (أكتر من 3 شهور) بيتحسب عليه."""
     now = _now_iso()
     return run_query("UPDATE actors SET photo_path=?, photo_updated_at=?, updated_at=? WHERE id=?",
@@ -1127,7 +1127,7 @@ def actor_by_public_token(token):
 
 
 def actor_unlocked_for_company(actor_id, company_id):
-    """True لو الشركة دي رشّحت أو تعاقدت مع الممثل/ة ده في أي مشروع من
+    """True لو الشركة دي رشّحت أو تعاقدت مع الممثل ده في أي مشروع من
     مشاريعها، أو هي اللي أضافت البروفايل - وقتها بس الحقول الحساسة بتتعرض
     لمستخدمينها (production، القرار المحسوم 2026-09-23). صف الكاستينج نفسه
     بيسجل مين فتحها وإمتى (created_by/created_at)."""
@@ -1143,15 +1143,15 @@ def actor_unlocked_for_company(actor_id, company_id):
 
 
 class AlreadyCastError(IntegrityError):
-    """الشخصية دي متعاقد لها ممثل/ة تاني - لازم يتشال الأول."""
-    user_message = "الشخصية دي متعاقد لها ممثل/ة تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره."
+    """الشخصية دي متعاقد لها ممثل تاني - لازم يتشال الأول."""
+    user_message = "الشخصية دي متعاقد لها ممثل تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره."
 
     def __init__(self):
         super().__init__(self.user_message)
 
 
 def cast_actor(actor_id, project_id, character_id, status, role_note, created_by):
-    """بيرشّح (shortlisted) أو بيتعاقد (cast) مع ممثل/ة لشخصية في مشروع.
+    """بيرشّح (shortlisted) أو بيتعاقد (cast) مع ممثل لشخصية في مشروع.
 
     صف واحد لكل (ممثل، شخصية): الترشيح اللي بعده تعاقد بيتحدّث مكانه بدل
     ما يتكرر. الشخصية لازم تبقى تبع المشروع فعلًا (فحص جوه الجملة)، وتعاقد
@@ -1202,7 +1202,7 @@ def castings_of_actor_in_project(actor_id, project_id):
 
 
 def casting_for_character(*params):
-    """الممثل/ة المتعاقد للشخصية لو فيه، وإلا آخر ترشيح - أو None."""
+    """الممثل المتعاقد للشخصية لو فيه، وإلا آخر ترشيح - أو None."""
     rows = fetch_all("""
         SELECT cac.id AS casting_id, cac.status, cac.actor_id,
                a.full_name, a.stage_name, a.photo_path
@@ -1222,7 +1222,7 @@ def shortlist_count_for_character(*params):
 
 # --- الممثل جوه باقي السيستم (رقم الكاست، التفريغ، الجدول، التتبع) ---------------
 # التعاقد نفسه صف في character_actor_casting؛ هنا بس القراءات اللي بتلزق اسم
-# الممثل/ة ورقمه في كل شاشة وورقة فيها الشخصية، في استعلامين للمشروع كله بدل
+# الممثل ورقمه في كل شاشة وورقة فيها الشخصية، في استعلامين للمشروع كله بدل
 # استعلام لكل شخصية.
 
 class CastNumberTakenError(IntegrityError):
@@ -1238,7 +1238,7 @@ _ROLE_RANK = {"بطل": 0, "شرير": 1, "مساعد": 2, "غير محدد": 3,
 
 
 def project_cast(project_id):
-    """كل شخصيات المشروع برقمها وعدد مشاهدها والممثل/ة المتعاقد والمرشحين.
+    """كل شخصيات المشروع برقمها وعدد مشاهدها والممثل المتعاقد والمرشحين.
 
     مترتبة زي الكول شيت: اللي ليها رقم بالرقم، وبعدين الباقي بعدد المشاهد."""
     chars = fetch_all("""
@@ -1278,7 +1278,7 @@ def cast_by_character(project_id):
 
 
 def cast_label(c, with_actor=True):
-    """"#3 سلمى — اسم الممثل/ة" — الشكل الواحد اللي بيظهر في كل مكان."""
+    """"#3 سلمى — اسم الممثل" — الشكل الواحد اللي بيظهر في كل مكان."""
     label = f"#{c['cast_number']} {c['name']}" if c.get("cast_number") else c["name"]
     actor = c.get("actor")
     if with_actor and actor:
@@ -1400,7 +1400,7 @@ def delete_episode_scenes(project_id, episode_number):
 
 WARDROBE_CATEGORIES = ["قميص", "تيشيرت", "بنطلون", "فستان", "جيبة", "جاكيت", "بدلة", "عباية / جلابية",
                        "طرحة / غطاء راس", "جزمة", "شنطة", "إكسسوار", "ملابس داخلية", "أخرى"]
-WARDROBE_SOURCES = ["شراء", "إيجار", "تفصيل", "من الممثل/ة", "من المخزن"]
+WARDROBE_SOURCES = ["شراء", "إيجار", "تفصيل", "من الممثل", "من المخزن"]
 WARDROBE_STATUSES = ["محتاج شراء", "في التفصيل", "في البروفة", "جاهز", "في الغسيل"]
 WARDROBE_READY = "جاهز"
 
@@ -1596,7 +1596,7 @@ def wardrobe_items_of_project(project_id):
 
 
 def actor_sizes_for_character(project_id, character_id, company_id):
-    """مقاسات الممثل/ة المتعاقد للدور - لو الشركة فاتحة بياناته (التعاقد
+    """مقاسات الممثل المتعاقد للدور - لو الشركة فاتحة بياناته (التعاقد
     نفسه بيفتحها). None لو مفيش تعاقد أو البيانات مقفولة."""
     cast = cast_by_character(project_id).get(character_id) or {}
     actor = cast.get("actor")

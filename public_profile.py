@@ -1,4 +1,4 @@
-"""البروفايل العام للممثل/ة (P9): صفحة من غير تسجيل دخول، بلينك سري الممثل/ة
+"""البروفايل العام للممثل (P9): صفحة من غير تسجيل دخول، بلينك سري الممثل
 يشيره على السوشيال ميديا.
 
 الموديول ده ملوش دعوة بـ Streamlit ولا Starlette: بياخد صف actors ويطلّع منه
@@ -34,14 +34,14 @@ PUBLIC_FIELDS = frozenset({
     "link_showreel", "link_instagram",
 })
 
-# بيظهر بس لو الممثل/ة اختاره في always_public_fields ("بيانات تظهر للكل").
+# بيظهر بس لو الممثل اختاره في always_public_fields ("بيانات تظهر للكل").
 # دي حاجات كارت الكاستينج العادي فيه (طول، شعر، عين، مهارات) — مش مقاسات جسم.
 OPT_IN_FIELDS = frozenset({
     "height_cm", "hair_color", "eye_color",
     "drives_car", "drives_motorcycle", "swims", "skills_notes",
 })
 
-# عمره ما بيظهر، حتى لو الممثل/ة اختاره "ظاهر للكل" جوه المنصة: الاختيار ده
+# عمره ما بيظهر، حتى لو الممثل اختاره "ظاهر للكل" جوه المنصة: الاختيار ده
 # معناه "ظاهر للشركات على المنصة"، مش "ظاهر لأي حد على النت".
 PRIVATE_FIELDS = frozenset({
     "id",                                           # رقم داخلي — اللينك بالتوكن بس
@@ -68,7 +68,7 @@ _ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def new_token():
-    """توكن عشوائي 128 بت — مستحيل يتخمّن، ومش مشتق من رقم الممثل/ة."""
+    """توكن عشوائي 128 بت — مستحيل يتخمّن، ومش مشتق من رقم الممثل."""
     return secrets.token_urlsafe(16)
 
 
@@ -94,7 +94,7 @@ def _blank(v):
 
 def public_view(actor):
     """الـ dict الوحيد اللي الصفحة العامة بتشوفه. كل مفتاح هنا جاي من
-    PUBLIC_FIELDS أو من OPT_IN_FIELDS اللي الممثل/ة اختارها — ولا حاجة تانية."""
+    PUBLIC_FIELDS أو من OPT_IN_FIELDS اللي الممثل اختارها — ولا حاجة تانية."""
     if not actor:
         return None
     stage = (actor.get("stage_name") or "").strip()
@@ -125,11 +125,11 @@ def public_view(actor):
 
 
 def photo_file(actor):
-    """المسار المطلق لصورة الممثل/ة ده بس، أو None.
+    """المسار المطلق لصورة الممثل ده بس، أو None.
 
     المسار جاي من قاعدة البيانات (مش من الطلب)، وبرضو بنتأكد إنه جوه
-    ‎uploads/actors/<id>/‎ بتاع نفس الممثل/ة بعد realpath — فلا symlink ولا ‎../‎
-    يقدروا يطلّعوا ملف تاني، ولا صورة ممثل/ة تاني."""
+    ‎uploads/actors/<id>/‎ بتاع نفس الممثل بعد realpath — فلا symlink ولا ‎../‎
+    يقدروا يطلّعوا ملف تاني، ولا صورة ممثل تاني."""
     rel = (actor or {}).get("photo_path")
     if not rel or actor.get("id") is None:
         return None
@@ -183,7 +183,7 @@ def description(view, lang="ar"):
     if view.get("bio"):
         bio = view["bio"].replace("\n", " ")
         bits.append(bio[:180] + ("…" if len(bio) > 180 else ""))
-    return " — ".join(bits) or _tr("بروفايل ممثل/ة على CimaFast Studio", lang)
+    return " — ".join(bits) or _tr("بروفايل ممثل على CimaFast Studio", lang)
 
 
 CSS = """
@@ -312,7 +312,7 @@ def render_page(view, lang="ar", photo_url=None, share_url=None, lang_switch_url
 
 
 def render_not_found(lang="ar", asset_base=""):
-    """نفس الصفحة لأي توكن غلط أو اتلغى أو ممثل/ة اتمسح — مفيش فرق يكشف إنه كان موجود."""
+    """نفس الصفحة لأي توكن غلط أو اتلغى أو ممثل اتمسح — مفيش فرق يكشف إنه كان موجود."""
     msg = _e(_tr("البروفايل ده مش متاح.", lang))
     return ("<!doctype html>"
             f'<html lang="{"en" if lang == "en" else "ar"}" dir="{"ltr" if lang == "en" else "rtl"}">'

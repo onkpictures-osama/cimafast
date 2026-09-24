@@ -238,7 +238,7 @@
     if (!d.rows.length) { wrap.append(el("p", "hint", "لسه مفيش أيام فيها ممثلين.")); return; }
     const table = el("table");
     const head = el("tr");
-    head.append(el("th", null, "#"), el("th", null, "الشخصية"), el("th", null, "الممثل/ة"));
+    head.append(el("th", null, "#"), el("th", null, "الشخصية"), el("th", null, "الممثل"));
     d.days.forEach((n, i) => {
       const th = el("th", null, String(n));
       if (d.dates && d.dates[i]) th.title = d.dates[i];

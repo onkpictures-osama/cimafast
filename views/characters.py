@@ -12,13 +12,13 @@ import views.actors
 from ui import ltr
 from views.looks import render_looks_summary as _render_looks_summary
 
-# صورة الممثل/ة الحقيقي المتعاقد معاه/ا + صورة خلفية/مكان - نفس الفكرة
+# صورة الممثل الحقيقي المتعاقد معاه + صورة خلفية/مكان - نفس الفكرة
 # للشخصية وللمظهر الإضافي، عشان التوليد يتقيّد بيهم لو موجودين (P2 - مرجع
 # 2026-09-23: "خزانة المواهب" فيها صورة الممثل أصلًا لو اتعيّن، لكن هنا
 # بنسيب رفع يدوي بسيط بدل ما نربط التبويبين - أبسط وميحتاجش الممثل يبقى
 # متعيّن الأول عشان تولّد صورة للشخصية).
 _CHAR_REFERENCE_SLOTS = [
-    ("actor", "صورة الممثل/ة الحقيقي (اختياري)"),
+    ("actor", "صورة الممثل الحقيقي (اختياري)"),
     ("bg", "صورة خلفية/مكان (اختياري)"),
 ]
 
@@ -77,8 +77,8 @@ def render(project_id):
                                 key=f"exp_char_{ch['id']}", on_change="rerun")
         with _lazy_exp:
             if _lazy_exp.open:
-                # P9 خزانة المواهب: مين الممثل/ة المتعاقد معاه/ا لهذا الدور -
-                # لو لسه مفيش حد، بروفايل الممثل/ة نفسه (تبويب خزانة المواهب)
+                # P9 خزانة المواهب: مين الممثل المتعاقد معاه لهذا الدور -
+                # لو لسه مفيش حد، بروفايل الممثل نفسه (تبويب خزانة المواهب)
                 # هو اللي بيعمل التعيين (مش من هنا)، عشان نفس المنطق يفضل
                 # مكانه واحد بدل ما يتكرر جوه كل شاشة.
                 views.actors.render_character_casting(
@@ -195,7 +195,7 @@ def _render_cast_summary(project_id, cast):
     short_n = sum(1 for c in cast if not c["actor"] and c["shortlist"])
     numbered = sum(1 for c in cast if c["cast_number"])
     c1, c2 = st.columns([3, 1], vertical_alignment="center")
-    c1.caption(f"🎬 {ltr(cast_n)}/{ltr(total)} {t('دور اتعاقد له ممثل/ة')} · ⭐ {ltr(short_n)} {t('فيه ترشيحات بس')}"
+    c1.caption(f"🎬 {ltr(cast_n)}/{ltr(total)} {t('دور اتعاقد له ممثل')} · ⭐ {ltr(short_n)} {t('فيه ترشيحات بس')}"
                f" · #️⃣ {ltr(numbered)}/{ltr(total)} {t('ليهم رقم في التفريغ')}")
     if numbered < total and c2.button(f"#️⃣ {t('رقّم الباقيين')}", key=f"auto_cast_num_{project_id}",
                                       help=t("بيدّي رقم لكل شخصية مالهاش، الأكتر مشاهد الأول. الأرقام الموجودة مش بتتغيّر."),

@@ -1,10 +1,10 @@
 """تبويب خزانة المواهب (P9 - Talent Vault): بحث كاستينج بالحرف الأول + بروفايل
-كل ممثل/ة + ترشيح/تعاقد لشخصيات المشروع المفتوح.
+كل ممثل + ترشيح/تعاقد لشخصيات المشروع المفتوح.
 
 عابر للشركات عمدًا (production، القرار المحسوم 2026-09-23): القايمة والبروفايل
 العام هنا مش مفلترين بشركة المستخدم الحالي - مسبح ممثلين واحد كل شركات المنصة
 بتدوّر فيه. الحقول الحساسة (مقاسات، تواصل، عادات) بس هي اللي بتتفلتر حسب
-الشركة (رشّحت/تعاقدت مع الممثل/ة ده قبل كده ولا لأ) - repo.actor_unlocked_for_company.
+الشركة (رشّحت/تعاقدت مع الممثل ده قبل كده ولا لأ) - repo.actor_unlocked_for_company.
 التعديل للشركة اللي أضافت البروفايل أو مشغّل المنصة بس - repo.can_edit_actor.
 
 حدود البيانات (ACTOR-CASTING-PLAN.md، محسومة): الممثلين الحقيقيين المعروفين
@@ -43,10 +43,10 @@ _SENSITIVE_LABELS = {
     "height_cm": "الطول", "weight_kg": "الوزن", "chest_cm": "محيط الصدر",
     "waist_cm": "محيط الخصر", "hips_cm": "محيط الورك", "shoe_size_eu": "مقاس الحذاء",
     "hair_color": "لون الشعر", "eye_color": "لون العين", "contact_phone": "رقم التواصل",
-    "contact_email": "البريد الإلكتروني", "agent_name": "اسم الوكيل/ة",
-    "agent_contact": "وسيلة تواصل الوكيل/ة", "hobbies": "الهوايات",
+    "contact_email": "البريد الإلكتروني", "agent_name": "اسم الوكيل",
+    "agent_contact": "وسيلة تواصل الوكيل", "hobbies": "الهوايات",
     "drives_car": "يقود عربية", "drives_motorcycle": "يقود موتوسيكل", "swims": "يعرف يعوم",
-    "smokes": "مدخّن/ة", "skills_notes": "مهارات إضافية",
+    "smokes": "مدخّن", "skills_notes": "مهارات إضافية",
 }
 
 
@@ -111,7 +111,7 @@ def render_library(current_user, project_id, company_id, pick=None):
             char = None
     if char:
         c1, c2 = st.columns([3, 1], vertical_alignment="center")
-        c1.info(f"🎯 {t('بتختار ممثل/ة لدور')} **{char['name']}**")
+        c1.info(f"🎯 {t('بتختار ممثل لدور')} **{char['name']}**")
         c2.button(f"↩ {t('رجوع للشخصية')}", key="pick_back", use_container_width=True,
                   on_click=close_page, args=("characters",))
     selected_id = st.session_state.get(_SELECTED_KEY)
@@ -175,8 +175,8 @@ def _actor_fields(prefix, a=None):
     phone = tc1.text_input(t("رقم التواصل"), value=a.get("contact_phone") or "",
                            help=FIELD_HELP["actor_sensitive_gate"], key=f"{prefix}_phone")
     email = tc2.text_input(t("البريد الإلكتروني"), value=a.get("contact_email") or "", key=f"{prefix}_email")
-    agent = tc1.text_input(t("اسم الوكيل/ة (اختياري)"), value=a.get("agent_name") or "", key=f"{prefix}_agent")
-    agent_contact = tc2.text_input(t("وسيلة تواصل الوكيل/ة"), value=a.get("agent_contact") or "",
+    agent = tc1.text_input(t("اسم الوكيل (اختياري)"), value=a.get("agent_name") or "", key=f"{prefix}_agent")
+    agent_contact = tc2.text_input(t("وسيلة تواصل الوكيل"), value=a.get("agent_contact") or "",
                                    key=f"{prefix}_agent_c")
 
     st.markdown(f"**{t('مهارات الكاستينج')}**")
@@ -184,7 +184,7 @@ def _actor_fields(prefix, a=None):
     car = sc1.checkbox(t("يقود عربية"), value=bool(a.get("drives_car")), key=f"{prefix}_car")
     moto = sc2.checkbox(t("يقود موتوسيكل"), value=bool(a.get("drives_motorcycle")), key=f"{prefix}_moto")
     swims = sc3.checkbox(t("يعرف يعوم"), value=bool(a.get("swims")), key=f"{prefix}_swim")
-    smokes = sc4.checkbox(t("مدخّن/ة"), value=bool(a.get("smokes")), key=f"{prefix}_smoke")
+    smokes = sc4.checkbox(t("مدخّن"), value=bool(a.get("smokes")), key=f"{prefix}_smoke")
     hk1, hk2 = st.columns(2)
     hobbies = hk1.text_area(t("الهوايات"), value=a.get("hobbies") or "", key=f"{prefix}_hobbies")
     skills = hk2.text_area(t("مهارات إضافية"), value=a.get("skills_notes") or "", key=f"{prefix}_skills")
@@ -222,14 +222,14 @@ def _actor_fields(prefix, a=None):
 
 
 def _render_add_actor_form(company_id):
-    with st.expander(f"➕ {t('إضافة ممثل/ة جديد/ة')}", expanded=False):
-        st.caption(t("الحقول اللي مالهاش مصدر عام موثوق (زي رقم التواصل أو المقاسات) سيبها فاضية - متخترعش قيم لها، خصوصًا لو الممثل/ة شخص حقيقي معروف."))
+    with st.expander(f"➕ {t('إضافة ممثل جديد')}", expanded=False):
+        st.caption(t("الحقول اللي مالهاش مصدر عام موثوق (زي رقم التواصل أو المقاسات) سيبها فاضية - متخترعش قيم لها، خصوصًا لو الممثل شخص حقيقي معروف."))
         with st.form("add_actor_form", clear_on_submit=True):
             values, photo = _actor_fields("new_actor")
-            submitted = st.form_submit_button(t("إضافة الممثل/ة"), disabled=not _can_write())
+            submitted = st.form_submit_button(t("إضافة الممثل"), disabled=not _can_write())
         if submitted:
             if not values["full_name"]:
-                st.warning(t("اسم الممثل/ة مينفعش يبقى فاضي"))
+                st.warning(t("اسم الممثل مينفعش يبقى فاضي"))
                 return
             new_id = repo.add_actor(values, owner_company_id=company_id,
                                     created_by=st.session_state.get("_auth_user"))
@@ -237,7 +237,7 @@ def _render_add_actor_form(company_id):
                 repo.set_actor_photo(new_id, save_uploaded_image(photo, f"actors/{new_id}"))
             _flag_unrecognised(values["credits_text"])
             st.session_state[_SELECTED_KEY] = new_id
-            st.toast(t("تم إضافة الممثل/ة"), icon="✅")
+            st.toast(t("تم إضافة الممثل"), icon="✅")
             st.rerun()
 
 
@@ -399,9 +399,9 @@ def _render_sensitive_section(actor, company_id):
 
     st.markdown(f"**{t('بيانات القياس والكاستينج')}**")
     if not unlocked and not always_public:
-        st.info(t("البيانات دي بتفضل مخفية لحد ما فريقك يرشّح أو يتعاقد مع الممثل/ة ده لدور في أحد مشاريعك."))
+        st.info(t("البيانات دي بتفضل مخفية لحد ما فريقك يرشّح أو يتعاقد مع الممثل ده لدور في أحد مشاريعك."))
     elif not unlocked:
-        st.caption(t("جزء من البيانات دي ظاهر لأن الممثل/ة اختار يبينه للكل — الباقي محتاج ترشيح أول."))
+        st.caption(t("جزء من البيانات دي ظاهر لأن الممثل اختار يبينه للكل — الباقي محتاج ترشيح أول."))
 
     def field(key, formatter=str):
         label = t(_SENSITIVE_LABELS[key])
@@ -507,14 +507,14 @@ def _render_casting_section(actor, project_id, pick_char=None):
     if b1.button(f"⭐ {t('رشّح للدور ده')}", key=f"actor_shortlist_btn_{actor_id}",
                  disabled=not _can_write(), use_container_width=True):
         repo.cast_actor(actor_id, project_id, chosen, "shortlisted", role_note, user)
-        st.toast(t("تم ترشيح الممثل/ة للشخصية"), icon="⭐")
+        st.toast(t("تم ترشيح الممثل للشخصية"), icon="⭐")
         st.rerun()
     if b2.button(f"✅ {t('تعاقد للدور ده')}", key=f"actor_cast_btn_{actor_id}",
                  disabled=not _can_write(), use_container_width=True):
         # guarded_delete بيمسك IntegrityError ويعرض رسالته (AlreadyCastError)
         if guarded_delete(repo.cast_actor, (actor_id, project_id, chosen, "cast", role_note, user),
                           t("معرفش أسجّل التعاقد ده.")):
-            st.toast(t("تم تعيين الممثل/ة للشخصية"), icon="✅")
+            st.toast(t("تم تعيين الممثل للشخصية"), icon="✅")
             st.rerun()
     st.caption(t("الترشيح بيفتح لفريقك بيانات القياس والتواصل، ومتسجّل باسمك."))
 
@@ -530,7 +530,7 @@ def _render_edit_section(actor, company_id):
             saved = st.form_submit_button(f"💾 {t('حفظ التعديل')}")
         if saved:
             if not values["full_name"]:
-                st.warning(t("اسم الممثل/ة مينفعش يبقى فاضي"))
+                st.warning(t("اسم الممثل مينفعش يبقى فاضي"))
                 return
             repo.update_actor(actor["id"], values, company_id, role)
             _flag_unrecognised(values["credits_text"])
@@ -597,7 +597,7 @@ def _render_public_share_section(actor, company_id):
 def render_public_profile(token):
     """‎?profile=<token>‎ من غير دخول (app.py بيناديها قبل بوابة الدخول).
     بيرسم نفس HTML الصفحة العامة (public_profile.render_body) — مفيش أي قراءة
-    تانية من صف الممثل/ة هنا غير الصورة، ودي بتتقري من public_profile.photo_file."""
+    تانية من صف الممثل هنا غير الصورة، ودي بتتقري من public_profile.photo_file."""
     lang = "en" if st.query_params.get("lang") == "en" else st.session_state.get("ui_lang", "ar")
     actor = repo.actor_by_public_token(token)
     if not actor:
@@ -650,7 +650,7 @@ def render_credits(items, show_unrecognised=False):
 
 
 # ---------- الكاستينج من كارت الشخصية نفسها ----------
-# نفس repo.cast_actor اللي بروفايل الممثل/ة بيستعمله - المنطق مكانه واحد،
+# نفس repo.cast_actor اللي بروفايل الممثل بيستعمله - المنطق مكانه واحد،
 # بس الاختيار بقى متاح من المكان اللي المنتج بيدوّر فيه فعلًا: الشخصية.
 
 def _open_actor_profile(actor_id):
@@ -669,16 +669,16 @@ def _fmt_date(value):
 
 def render_character_casting(project_id, company_id, ch, cast_entry):
     """ch: صف الشخصية. cast_entry: صفها من repo.cast_by_character (فيه
-    الرقم والممثل/ة والمرشحين)."""
+    الرقم والممثل والمرشحين)."""
     char_id = ch["id"]
     writable = _can_write()
     user = st.session_state.get("_auth_user")
     actor = cast_entry.get("actor") if cast_entry else None
     shortlist = cast_entry.get("shortlist", []) if cast_entry else []
 
-    st.markdown(f"**🎬 {t('الممثل/ة والكاستينج')}**")
+    st.markdown(f"**🎬 {t('الممثل والكاستينج')}**")
 
-    # الممثل/ة المتعاقد + المرشحين، كل واحد بزرار يفتح بروفايله أو يشيله
+    # الممثل المتعاقد + المرشحين، كل واحد بزرار يفتح بروفايله أو يشيله
     people = ([(actor, "cast")] if actor else []) + [(p, "shortlisted") for p in shortlist]
     for person, status in people:
         c_img, c_name, c_open, c_rm = st.columns([1, 5, 2, 2], vertical_alignment="center")
@@ -704,7 +704,7 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
             repo.remove_casting(project_id, person["casting_id"])
             st.rerun()
     if not people:
-        st.caption(t("لسه مفيش ممثل/ة للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت."))
+        st.caption(t("لسه مفيش ممثل للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت."))
 
     # رقم الكاست - ثابت، وبيظهر في التفريغ والجدول والكول شيت
     n1, n2 = st.columns([2, 3], vertical_alignment="bottom")
@@ -734,7 +734,7 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
             for d in tr_["days"]:
                 st.markdown(f"- {t('يوم')} {ltr(d['day_number'])} · {_fmt_date(d['date'])} · `{d['code']}`")
 
-    # اختيار ممثل/ة: من مكتبة الممثلين نفسها (المالك 2026-09-24) - بتتفتح
+    # اختيار ممثل: من مكتبة الممثلين نفسها (المالك 2026-09-24) - بتتفتح
     # في وضع "بتختار لدور X"، وبعد الترشيح/التعاقد بترجع هنا لوحدها
     if writable:
         st.button(f"🔎 {t('اختار من مكتبة الممثلين')}", key=f"chcast_lib_{char_id}", type="primary",
@@ -742,17 +742,17 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
 
 
 def _render_project_cast(project_id):
-    """كل دور في المشروع: رقمه، والممثل/ة المتعاقد أو المرشحين، ومشاهده
-    وأيام تصويره. التعاقد نفسه من كارت الشخصية أو بروفايل الممثل/ة."""
+    """كل دور في المشروع: رقمه، والممثل المتعاقد أو المرشحين، ومشاهده
+    وأيام تصويره. التعاقد نفسه من كارت الشخصية أو بروفايل الممثل."""
     import pandas as pd
     cast = repo.project_cast(project_id)
     st.markdown(f"#### {t('ممثلين المشروع')}")
     if not cast:
-        st.info(t("لسه مفيش شخصيات في المشروع. ضيف الشخصيات (أو استورد السيناريو) الأول، وبعدها عيّن ممثل/ة لكل دور."))
+        st.info(t("لسه مفيش شخصيات في المشروع. ضيف الشخصيات (أو استورد السيناريو) الأول، وبعدها عيّن ممثل لكل دور."))
         return
     days = {r["character_id"]: r for r in repo.day_out_of_days(project_id)["rows"]}
     done = sum(1 for c in cast if c["actor"])
-    st.caption(f"🎬 {ltr(done)} {t('من')} {ltr(len(cast))} {t('دور اتعاقد له ممثل/ة')}")
+    st.caption(f"🎬 {ltr(done)} {t('من')} {ltr(len(cast))} {t('دور اتعاقد له ممثل')}")
     rows = []
     for c in cast:
         d = days.get(c["id"]) or {}
@@ -765,7 +765,7 @@ def _render_project_cast(project_id):
         rows.append({
             t("رقم"): c["cast_number"] or "",
             t("الشخصية"): c["name"],
-            t("الممثل/ة"): who,
+            t("الممثل"): who,
             t("مشاهد"): c["scene_count"],
             t("أيام تصوير"): d.get("work_days") or "",
         })
@@ -774,4 +774,4 @@ def _render_project_cast(project_id):
         df = df[df.columns[::-1]]
     st.dataframe(df, hide_index=True, use_container_width=True,
                  height=min(38 + 35 * len(df), 360))
-    st.caption(t("التعيين والترشيح من كارت الشخصية في تبويب «الشخصيات»، أو من بروفايل الممثل/ة تحت."))
+    st.caption(t("التعيين والترشيح من كارت الشخصية في تبويب «الشخصيات»، أو من بروفايل الممثل تحت."))

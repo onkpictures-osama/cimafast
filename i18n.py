@@ -575,11 +575,11 @@ TRANSLATIONS = {
     "⬇️ التفريغ العام": "⬇️ General Breakdown",
     "⬇️ كشف أماكن التصوير": "⬇️ Filming Locations Sheet",
     "⬇️ كشف الإكسسوار": "⬇️ Props Sheet",
-    # خزانة المواهب (P9) - بحث الكاستينج وبروفايل الممثل/ة
+    # خزانة المواهب (P9) - بحث الكاستينج وبروفايل الممثل
     "غير متوفر": "Not available",
     "بطولة": "Lead", "أدوار مساعدة": "Supporting roles", "أطفال": "Children",
-    "إضافة ممثل/ة جديد/ة": "Add a new actor",
-    "الحقول اللي مالهاش مصدر عام موثوق (زي رقم التواصل أو المقاسات) سيبها فاضية - متخترعش قيم لها، خصوصًا لو الممثل/ة شخص حقيقي معروف.":
+    "إضافة ممثل جديد": "Add a new actor",
+    "الحقول اللي مالهاش مصدر عام موثوق (زي رقم التواصل أو المقاسات) سيبها فاضية - متخترعش قيم لها، خصوصًا لو الممثل شخص حقيقي معروف.":
         "Leave fields with no legitimate public source (like contact number or measurements) empty — don't invent values for them, especially for a real, known actor.",
     "الاسم الحقيقي": "Real name",
     "التصنيف": "Category",
@@ -592,21 +592,21 @@ TRANSLATIONS = {
     "أعمال سابقة (سطر لكل عمل)": "Past work (one line per credit)",
     "مثال: فيلم كذا (2023) - دور كذا": "e.g. Film Name (2023) - role name",
     "رقم التواصل": "Contact number", "البريد الإلكتروني": "Email",
-    "اسم الوكيل/ة (اختياري)": "Agent name (optional)", "اسم الوكيل/ة": "Agent name",
-    "وسيلة تواصل الوكيل/ة": "Agent contact",
+    "اسم الوكيل (اختياري)": "Agent name (optional)", "اسم الوكيل": "Agent name",
+    "وسيلة تواصل الوكيل": "Agent contact",
     "الهوايات": "Hobbies", "مهارات إضافية": "Additional skills",
     "مهارات الكاستينج": "Casting skills",
     "يقود عربية": "Drives a car", "يقود موتوسيكل": "Rides a motorcycle",
-    "يعرف يعوم": "Can swim", "مدخّن/ة": "Smokes",
+    "يعرف يعوم": "Can swim", "مدخّن": "Smokes",
     "روابط": "Links", "رابط الشوريل": "Showreel link", "شوريل": "Showreel",
     "رابط إنستجرام أو سوشيال ميديا": "Instagram / social media link",
     "إنستجرام / سوشيال ميديا": "Instagram / social media",
     "روابط تانية (سطر لكل رابط)": "Other links (one per line)",
     "ظاهر في بحث الكاستينج؟": "Discoverable in casting search?",
     "صورة شخصية (لازم تتجدد كل 3 شهور تقريبًا)": "Headshot photo (should be refreshed roughly every 3 months)",
-    "إضافة الممثل/ة": "Add actor",
-    "اسم الممثل/ة مينفعش يبقى فاضي": "Actor name can't be empty",
-    "تم إضافة الممثل/ة": "Actor added",
+    "إضافة الممثل": "Add actor",
+    "اسم الممثل مينفعش يبقى فاضي": "Actor name can't be empty",
+    "تم إضافة الممثل": "Actor added",
     "لسه مفيش ممثلين في خزانة المواهب": "No actors in the Talent Vault yet",
     "قفز بالحرف الأول": "Jump by first letter",
     "اكتب اسم الممثل أو أول حرف": "Type an actor's name or first letter",
@@ -619,9 +619,9 @@ TRANSLATIONS = {
     "آخر تحديث للصورة": "Photo last updated",
     "أعمال سابقة": "Past work",
     "بيانات القياس والكاستينج": "Measurements & casting details",
-    "البيانات دي بتفضل مخفية لحد ما فريقك يرشّح أو يتعاقد مع الممثل/ة ده لدور في أحد مشاريعك.":
+    "البيانات دي بتفضل مخفية لحد ما فريقك يرشّح أو يتعاقد مع الممثل ده لدور في أحد مشاريعك.":
         "These stay hidden until your team shortlists or casts this actor for a role in one of your projects.",
-    "جزء من البيانات دي ظاهر لأن الممثل/ة اختار يبينه للكل — الباقي محتاج ترشيح أول.":
+    "جزء من البيانات دي ظاهر لأن الممثل اختار يبينه للكل — الباقي محتاج ترشيح أول.":
         "Some of this is visible because the actor chose to make it public — the rest needs a shortlist first.",
     "سم": "cm", "كجم": "kg",
     "تعيين لشخصية في هذا المشروع": "Cast for a character in this project",
@@ -630,11 +630,11 @@ TRANSLATIONS = {
     "اختار شخصية": "Choose a character",
     "ملاحظة عن الدور (اختياري)": "Note about the role (optional)",
     "تعيين لهذا الدور": "Cast for this role",
-    "تم تعيين الممثل/ة للشخصية": "Actor cast for the character",
-    "الممثل/ة المتعاقد معاه/ا": "Actor cast",
-    "لسه مفيش ممثل/ة متعيّن لهذا الدور. عيّنه من بروفايله في تبويب «خزانة المواهب».":
+    "تم تعيين الممثل للشخصية": "Actor cast for the character",
+    "الممثل المتعاقد معاه": "Actor cast",
+    "لسه مفيش ممثل متعيّن لهذا الدور. عيّنه من بروفايله في تبويب «خزانة المواهب».":
         "No actor assigned to this role yet. Cast one from their profile in the Talent Vault tab.",
-    "مرشّح/ة": "Shortlisted", "متعاقد/ة": "Cast",
+    "مرشّح": "Shortlisted", "متعاقد": "Cast",
     "الطول": "Height", "الوزن": "Weight", "محيط الصدر": "Chest", "محيط الخصر": "Waist",
     "محيط الورك": "Hips", "مقاس الحذاء": "Shoe size",
     "نعم": "Yes", "لا": "No",
@@ -655,9 +655,9 @@ TRANSLATIONS = {
     "الشخصية دي متعاقد لها": "This character is already cast with",
     "رشّح للدور ده": "Shortlist for this role",
     "تعاقد للدور ده": "Cast for this role",
-    "تم ترشيح الممثل/ة للشخصية": "Actor shortlisted for the character",
+    "تم ترشيح الممثل للشخصية": "Actor shortlisted for the character",
     "معرفش أسجّل التعاقد ده.": "Couldn't record this casting.",
-    "الشخصية دي متعاقد لها ممثل/ة تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره.":
+    "الشخصية دي متعاقد لها ممثل تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره.":
         "This character is already cast with another actor. Remove that casting first if you want to change it.",
     "الترشيح بيفتح لفريقك بيانات القياس والتواصل، ومتسجّل باسمك.":
         "Shortlisting unlocks measurements and contact details for your team, and is recorded under your name.",
@@ -665,7 +665,7 @@ TRANSLATIONS = {
     "حفظ التعديل": "Save changes",
     "تم حفظ التعديل": "Changes saved",
     "مرشّحين للدور ده": "shortlisted for this role",
-    "الممثل/ة المرشّح/ة": "Shortlisted actor",
+    "الممثل المرشّح": "Shortlisted actor",
     # البروفايل العام (مشاركة على السوشيال ميديا)
     "البروفايل العام": "Public profile",
     "البروفايل مش منشور. لو نشرته، أي حد معاه اللينك يقدر يشوف الاسم والصورة والبيو والأعمال — من غير أي بيانات تواصل.":
@@ -687,7 +687,7 @@ TRANSLATIONS = {
     "بروفايل عام على CimaFast Studio — بيانات التواصل مش بتظهر هنا.":
         "Public profile on CimaFast Studio — contact details are never shown here.",
     "البروفايل ده مش متاح.": "This profile isn't available.",
-    "بروفايل ممثل/ة على CimaFast Studio": "Actor profile on CimaFast Studio",
+    "بروفايل ممثل على CimaFast Studio": "Actor profile on CimaFast Studio",
     # فيديوهات الأعمال السابقة
     "مثال: فيلم كذا (2023) - دور كذا https://youtu.be/...": "e.g. Film Name (2023) - role name https://youtu.be/...",
     "حط لينك فيديو (يوتيوب، فيميو، ديلي موشن، فيسبوك، أو ملف ‎.mp4‎) في نفس سطر العمل — الفيديو هيتعرض في البروفايل تحت العمل ده.":
@@ -709,7 +709,7 @@ TRANSLATIONS = {
     "صورة مرجعية توجّه الشكل (اختياري)": "Reference image to guide the look (optional)",
     "صورة حقيقية للمكان (اختياري)": "Real photo of the location (optional)",
     "🖼️ صورة الشخصية المرجعية": "🖼️ Character reference photo",
-    "صورة الممثل/ة الحقيقي (اختياري)": "Photo of the real actor (optional)",
+    "صورة الممثل الحقيقي (اختياري)": "Photo of the real actor (optional)",
     "صورة خلفية/مكان (اختياري)": "Background/location photo (optional)",
     "🖼️ صورة مرجعية للمظهر": "🖼️ Reference photo for this look",
     # H4: التنبيهات
@@ -720,12 +720,12 @@ TRANSLATIONS = {
     "تنبيه جديد": "new notifications",
 
     # الممثل جوه السيستم: كاستينج من كارت الشخصية، رقم الكاست، التتبع
-    "الممثل/ة والكاستينج": "Actor & casting",
+    "الممثل والكاستينج": "Actor & casting",
     "البروفايل": "Profile",
     "افتح تبويب «الممثلين» تلاقي البروفايل مفتوح": "Open the Cast tab — the profile is waiting there",
     "تعاقد": "Cast",
     "رشّح": "Shortlist",
-    "لسه مفيش ممثل/ة للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت.":
+    "لسه مفيش ممثل للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت.":
         "No actor for this role yet — pick one from the Talent Vault or add someone new below.",
     "رقم الممثل في التفريغ": "Cast number",
     "0 = من غير رقم": "0 = no number",
@@ -918,7 +918,7 @@ TRANSLATIONS = {
     "رجوع للمشروع": "Back to the project",
     "رجوع": "Back",
     "افتح مكتبة الممثلين": "Open the actors library",
-    "بتختار ممثل/ة لدور": "Choosing an actor for",
+    "بتختار ممثل لدور": "Choosing an actor for",
     "رجوع للشخصية": "Back to the character",
     "لدور": "For",
     "اختار مشروع من الشريط الجانبي عشان ترشّح أو تتعاقد.": "Pick a project in the sidebar to shortlist or cast.",
@@ -985,17 +985,17 @@ TRANSLATIONS = {
     "لسه ولا مشهد من مشاهده متجدول في جدول التصوير": "None of these scenes is on the shooting schedule yet",
     "أيام التصوير": "Shoot days",
     "يوم": "Day",
-    "ممثل/ة جديد/ة مش في الخزانة": "New actor (not in the vault)",
-    "اختار ممثل/ة": "Choose an actor",
+    "ممثل جديد مش في الخزانة": "New actor (not in the vault)",
+    "اختار ممثل": "Choose an actor",
     "اكتب أول الاسم...": "Type the start of a name...",
-    "الاسم (لو جديد/ة)": "Name (if new)",
+    "الاسم (لو جديد)": "Name (if new)",
     "رقم التواصل (اختياري)": "Contact number (optional)",
-    "الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بفريقك (مش ظاهر لفرق تانية) — تقدر تكمّل بياناته من هناك.":
+    "الممثل الجديد بيتحفظ في خزانة المواهب كبروفايل خاص بفريقك (مش ظاهر لفرق تانية) — تقدر تكمّل بياناته من هناك.":
         "A new actor is saved to the Talent Vault as a profile private to your team (hidden from other teams) — complete it there.",
-    "اختار ممثل/ة الأول": "Choose an actor first",
-    "اكتب اسم الممثل/ة الجديد/ة": "Type the new actor's name",
+    "اختار ممثل الأول": "Choose an actor first",
+    "اكتب اسم الممثل الجديد": "Type the new actor's name",
     "مرشح": "shortlisted",
-    "دور اتعاقد له ممثل/ة": "roles cast",
+    "دور اتعاقد له ممثل": "roles cast",
     "فيه ترشيحات بس": "shortlisted only",
     "ليهم رقم في التفريغ": "have a cast number",
     "رقّم الباقيين": "Number the rest",
@@ -1003,7 +1003,7 @@ TRANSLATIONS = {
         "Gives every unnumbered character a cast number, most scenes first. Existing numbers never change.",
     "اترقّمت": "Numbered",
     "أرقام الكاست": "Cast #",
-    "الشخصية دي متعاقد لها ممثل/ة تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره.":
+    "الشخصية دي متعاقد لها ممثل تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره.":
         "This character is already cast with another actor. Remove that casting first to change it.",
     "الرقم ده متحط لشخصية تانية في المشروع. اختار رقم تاني أو فضّي رقمها الأول.":
         "That number belongs to another character in this project. Pick another or clear theirs first.",
