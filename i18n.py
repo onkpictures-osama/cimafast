@@ -17,7 +17,8 @@ UI_TEXT = {
     "tab_import": {"ar": "📤 إضافة سيناريو", "en": "📤 Add Screenplay"},
     "tab_locations": {"ar": "📍 الأماكن", "en": "📍 Locations"},
     "tab_characters": {"ar": "🎭 الشخصيات", "en": "🎭 Characters"},
-    "tab_actors": {"ar": "🎬 خزانة المواهب", "en": "🎬 Talent Vault"},
+    "tab_actors": {"ar": "🎬 الممثلين", "en": "🎬 Cast"},
+    "tab_wardrobe": {"ar": "👗 الملابس", "en": "👗 Wardrobe"},
     "tab_props": {"ar": "🎒 الإكسسوارات", "en": "🎒 Props"},
     "tab_scenes": {"ar": "📝 المشاهد", "en": "📝 Scenes"},
     "tab_breakdown": {"ar": "🎥 اللقطات", "en": "🎥 Shots"},
@@ -27,6 +28,8 @@ UI_TEXT = {
     "sub_locations": {"ar": "مكتبة الأماكن", "en": "Locations Library"},
     "sub_characters": {"ar": "مكتبة الشخصيات", "en": "Characters Library"},
     "sub_actors": {"ar": "بحث الكاستينج عبر كل شركات المنصة", "en": "Casting search across every company on the platform"},
+    "sub_wardrobe": {"ar": "غيارات كل شخصية، مين لابس أنهي غيار في كل مشهد، وقطع كل غيار وتجهيزها",
+                     "en": "Each character's changes, who wears which change in every scene, and every piece and its readiness"},
     "sub_props": {"ar": "مكتبة الإكسسوارات", "en": "Props Library"},
     "sub_scenes": {"ar": "المشاهد", "en": "Scenes"},
     "sub_breakdown": {"ar": "تفريغ اللقطات", "en": "Shot Breakdown"},
@@ -710,7 +713,7 @@ TRANSLATIONS = {
     # الممثل جوه السيستم: كاستينج من كارت الشخصية، رقم الكاست، التتبع
     "الممثل/ة والكاستينج": "Actor & casting",
     "البروفايل": "Profile",
-    "افتح تبويب «خزانة المواهب» تلاقي البروفايل مفتوح": "Open the Talent Vault tab — the profile is waiting there",
+    "افتح تبويب «الممثلين» تلاقي البروفايل مفتوح": "Open the Cast tab — the profile is waiting there",
     "تعاقد": "Cast",
     "رشّح": "Shortlist",
     "لسه مفيش ممثل/ة للدور ده — اختار من خزانة المواهب أو ضيف حد جديد تحت.":

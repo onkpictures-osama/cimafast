@@ -270,6 +270,37 @@ def init_db():
             cast_at TEXT
         );
 
+        -- P10 الملابس: الغيار = المظهر (character_looks) بعد ما اترقّم
+        -- (change_number). المشهد بيحدد كل شخصية لابسة أنهي غيار - مش
+        -- اللقطة، عشان المشهد اللي لسه ماتفرّغش يبقى معروف فيه اللبس.
+        -- وكل غيار ليه قطعه بتفاصيل الشراء/التفصيل/التجهيز.
+        CREATE TABLE IF NOT EXISTS scene_character_looks (
+            id SERIAL PRIMARY KEY,
+            scene_id INTEGER NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+            character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+            look_id INTEGER NOT NULL REFERENCES character_looks(id) ON DELETE CASCADE,
+            note TEXT,
+            UNIQUE(scene_id, character_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS wardrobe_items (
+            id SERIAL PRIMARY KEY,
+            look_id INTEGER NOT NULL REFERENCES character_looks(id) ON DELETE CASCADE,
+            item_name TEXT NOT NULL,
+            category TEXT,
+            color TEXT,
+            material TEXT,
+            size TEXT,
+            source TEXT,
+            multiples INTEGER DEFAULT 1,
+            story_state TEXT,
+            cost REAL,
+            status TEXT,
+            notes TEXT,
+            position INTEGER DEFAULT 0,
+            updated_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS episodes (
             id SERIAL PRIMARY KEY,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -616,6 +647,41 @@ def init_db():
             FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
         );
 
+        -- P10 الملابس: الغيار = المظهر (character_looks) بعد ما اترقّم
+        -- (change_number). المشهد بيحدد كل شخصية لابسة أنهي غيار - مش
+        -- اللقطة، عشان المشهد اللي لسه ماتفرّغش يبقى معروف فيه اللبس.
+        -- وكل غيار ليه قطعه بتفاصيل الشراء/التفصيل/التجهيز.
+        CREATE TABLE IF NOT EXISTS scene_character_looks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scene_id INTEGER NOT NULL,
+            character_id INTEGER NOT NULL,
+            look_id INTEGER NOT NULL,
+            note TEXT,
+            UNIQUE(scene_id, character_id),
+            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
+            FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+            FOREIGN KEY (look_id) REFERENCES character_looks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS wardrobe_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            look_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            category TEXT,
+            color TEXT,
+            material TEXT,
+            size TEXT,
+            source TEXT,
+            multiples INTEGER DEFAULT 1,
+            story_state TEXT,
+            cost REAL,
+            status TEXT,
+            notes TEXT,
+            position INTEGER DEFAULT 0,
+            updated_at TEXT,
+            FOREIGN KEY (look_id) REFERENCES character_looks(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS episodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL,
@@ -951,6 +1017,8 @@ _MIGRATIONS = {
     ],
     "character_looks": [
         ("reference_image_path", "TEXT"),
+        # P10: رقم الغيار (غيار 1، 2، 3...) - بيتملى للقديم بـ repo.ensure_change_numbers
+        ("change_number", "INTEGER"),
     ],
     "shots": [
         ("storyboard_image_path", "TEXT"),
@@ -1022,6 +1090,9 @@ _INDEXES = [
     ("idx_casting_actor", "character_actor_casting (actor_id)"),
     ("idx_casting_project", "character_actor_casting (project_id)"),
     ("idx_casting_character", "character_actor_casting (character_id)"),
+    ("idx_scene_looks_scene", "scene_character_looks (scene_id)"),
+    ("idx_scene_looks_look", "scene_character_looks (look_id)"),
+    ("idx_wardrobe_items_look", "wardrobe_items (look_id)"),
 ]
 
 

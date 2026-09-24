@@ -89,6 +89,11 @@ def stage(page, shot_dir):
     _no_exception(page, "scenes tab")
     grid = page.locator('[data-testid="stDataFrame"]').first
     # الجدول بيترسم على canvas - العناوين في الجدول المخفي بتاع الـ accessibility
+    # الجدول بيترسم متأخر شوية - من غير الانتظار ده الفحص كان بيقرا [] ساعات
+    try:
+        grid.locator('[role="columnheader"]').first.wait_for(timeout=8000)
+    except Exception:
+        pass
     heads = grid.locator('[role="columnheader"]').all_inner_texts() if grid.count() else []
     check("scene table has cast-number column", any("أرقام الكاست" in h for h in heads), str(heads))
     if shot_dir:

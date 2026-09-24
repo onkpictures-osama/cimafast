@@ -40,7 +40,7 @@ def test_exports_are_built_on_click_not_cached_by_counts():
     assert sorted(lazy) == sorted([
         "build_shot_list_excel", "build_shot_list_word", "build_shot_list_pdf",
         "build_characters_sheet_excel", "build_general_breakdown_excel",
-        "build_locations_sheet_excel", "build_props_sheet_excel",
+        "build_locations_sheet_excel", "build_props_sheet_excel", "build_wardrobe_sheet_excel",
     ]), lazy
 
 

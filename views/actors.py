@@ -91,13 +91,18 @@ def _can_write():
 
 def render(project_id, company_id):
     st.subheader(tr("tab_actors"))
-    st.caption(tr("sub_actors"))
 
     selected_id = st.session_state.get(_SELECTED_KEY)
     if selected_id:
         _render_profile(selected_id, project_id, company_id)
         return
 
+    # ممثلين المشروع الأول (طلب المالك 2026-09-24: "بعد الشخصيات قايمة
+    # الممثلين")، وبعدها البحث في خزانة المواهب للترشيح
+    _render_project_cast(project_id)
+    st.divider()
+    st.markdown(f"#### 🔎 {t('خزانة المواهب')}")
+    st.caption(tr("sub_actors"))
     _render_search_and_list(company_id)
     st.divider()
     _render_add_actor_form(company_id)
@@ -632,7 +637,7 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
         if c_open.button(t("البروفايل"), key=f"chcast_open_{char_id}_{person['casting_id']}",
                          use_container_width=True):
             st.session_state[_SELECTED_KEY] = person["actor_id"]
-            st.toast(t("افتح تبويب «خزانة المواهب» تلاقي البروفايل مفتوح"), icon="🎭")
+            st.toast(t("افتح تبويب «الممثلين» تلاقي البروفايل مفتوح"), icon="🎭")
         if status == "shortlisted" and not actor:
             if c_rm.button(f"✅ {t('تعاقد')}", key=f"chcast_promote_{char_id}_{person['casting_id']}",
                            disabled=not writable, use_container_width=True):
@@ -722,3 +727,42 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
         st.toast(t("تم تعيين الممثل/ة للشخصية") if do_cast else t("تم ترشيح الممثل/ة للشخصية"),
                  icon="✅" if do_cast else "⭐")
         st.rerun()
+
+
+
+# ---------- ممثلين المشروع ----------
+
+def _render_project_cast(project_id):
+    """كل دور في المشروع: رقمه، والممثل/ة المتعاقد أو المرشحين، ومشاهده
+    وأيام تصويره. التعاقد نفسه من كارت الشخصية أو بروفايل الممثل/ة."""
+    import pandas as pd
+    cast = repo.project_cast(project_id)
+    st.markdown(f"#### {t('ممثلين المشروع')}")
+    if not cast:
+        st.info(t("لسه مفيش شخصيات في المشروع. ضيف الشخصيات (أو استورد السيناريو) الأول، وبعدها عيّن ممثل/ة لكل دور."))
+        return
+    days = {r["character_id"]: r for r in repo.day_out_of_days(project_id)["rows"]}
+    done = sum(1 for c in cast if c["actor"])
+    st.caption(f"🎬 {ltr(done)} {t('من')} {ltr(len(cast))} {t('دور اتعاقد له ممثل/ة')}")
+    rows = []
+    for c in cast:
+        d = days.get(c["id"]) or {}
+        if c["actor"]:
+            who = f"✅ {c['actor']['name']}"
+        elif c["shortlist"]:
+            who = "⭐ " + "، ".join(p["name"] for p in c["shortlist"])
+        else:
+            who = "—"
+        rows.append({
+            t("رقم"): c["cast_number"] or "",
+            t("الشخصية"): c["name"],
+            t("الممثل/ة"): who,
+            t("مشاهد"): c["scene_count"],
+            t("أيام تصوير"): d.get("work_days") or "",
+        })
+    df = pd.DataFrame(rows)
+    if st.session_state.get("ui_lang", "ar") == "ar":
+        df = df[df.columns[::-1]]
+    st.dataframe(df, hide_index=True, use_container_width=True,
+                 height=min(38 + 35 * len(df), 360))
+    st.caption(t("التعيين والترشيح من كارت الشخصية في تبويب «الشخصيات»، أو من بروفايل الممثل/ة تحت."))

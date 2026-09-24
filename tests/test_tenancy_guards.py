@@ -91,10 +91,12 @@ def test_no_select_star_from_projects_without_a_filter():
 SCOPED_TABLES = {
     "scenes", "shots", "characters", "character_looks",
     "locations", "location_variants", "props", "episodes",
+    "wardrobe_items",          # P10: عن طريق الغيار (character_looks → characters)
 }
 # جداول الربط: مالهاش بيانات خاصة بيها، بس ربط صف بصف من مشروع تاني هو نفسه
 # تسريب. هنا حتى الـ INSERT لازم يتأكد إن الطرفين في المشروع.
-LINK_TABLES = {"scene_characters", "scene_props", "shot_characters", "shot_props"}
+LINK_TABLES = {"scene_characters", "scene_props", "shot_characters", "shot_props",
+               "scene_character_looks"}   # P10: مشهد × شخصية × غيار
 
 _UPDATE_DELETE_RE = re.compile(r"\b(?:UPDATE|DELETE\s+FROM)\s+([a-z_]+)", re.IGNORECASE)
 _INSERT_RE = re.compile(r"\bINSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+([a-z_]+)", re.IGNORECASE)

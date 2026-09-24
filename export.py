@@ -495,6 +495,70 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
     return _build_generic_excel("التفريغ العام", "التفريغ العام", project, GENERAL_BREAKDOWN_COLUMNS, rows)
 
 
+# ---------- كشف الملابس (P10) ----------
+WARDROBE_SHEET_COLUMNS = [
+    ("character", "الشخصية", 18),
+    ("actor", "الممثل/ة", 18),
+    ("change", "الغيار", 16),
+    ("item", "القطعة", 20),
+    ("category", "النوع", 12),
+    ("color", "اللون", 10),
+    ("material", "الخامة", 10),
+    ("size", "المقاس", 8),
+    ("source", "المصدر", 10),
+    ("multiples", "النسخ", 7),
+    ("story_state", "الحالة في الحكاية", 14),
+    ("cost", "التكلفة", 10),
+    ("status", "التجهيز", 12),
+    ("scenes", "المشاهد", 26),
+    ("notes", "ملاحظات", 22),
+]
+
+
+def build_wardrobe_sheet_excel(project, project_id, fetch_all):
+    """كشف الملابس: كل قطعة بغيارها وشخصيتها وممثلها، والمشاهد اللي الغيار
+    متحدد فيها (3/12 في المسلسل). الغيار اللي لسه مالوش قطع بيطلع سطر لوحده
+    عشان يبان إنه ناقص، مش يختفي."""
+    import repo  # متأخر زي كشف الشخصيات
+    cast = repo.cast_by_character(project_id)
+    scenes_by_look = {}
+    for r in fetch_all("""
+        SELECT x.look_id, s.scene_number, s.scene_suffix, s.episode_number
+        FROM scene_character_looks x JOIN scenes s ON s.id = x.scene_id
+        WHERE s.project_id = ?
+    """, (project_id,)):
+        scenes_by_look.setdefault(r["look_id"], []).append(r)
+    items_by_look = {}
+    for it in repo.wardrobe_items_of_project(project_id):
+        items_by_look.setdefault(it["look_id"], []).append(it)
+    changes = sorted(repo.wardrobe_changes(project_id), key=lambda c: (
+        c["cast_number"] is None, c["cast_number"] or 0, c["character_id"], c["change_number"] or 0))
+    rows = []
+    for ch in changes:
+        ce = cast.get(ch["character_id"]) or {}
+        base = {
+            "character": (f"#{ch['cast_number']} " if ch["cast_number"] else "") + ch["character_name"],
+            "actor": (ce.get("actor") or {}).get("name", ""),
+            "change": repo.change_label(ch),
+            "scenes": "، ".join(_scene_labels(scenes_by_look.get(ch["id"], []))),
+        }
+        items = items_by_look.get(ch["id"]) or [None]
+        for it in items:
+            row = dict(base)
+            if it:
+                row.update({
+                    "item": it["item_name"], "category": it["category"] or "", "color": it["color"] or "",
+                    "material": it["material"] or "", "size": it["size"] or "", "source": it["source"] or "",
+                    "multiples": it["multiples"] or 1, "story_state": it["story_state"] or "",
+                    "cost": it["cost"] if it["cost"] is not None else "", "status": it["status"] or "",
+                    "notes": it["notes"] or "",
+                })
+            else:
+                row.update({"item": "— لسه مفيش قطع —"})
+            rows.append(row)
+    return _build_generic_excel("كشف الملابس", "كشف الملابس", project, WARDROBE_SHEET_COLUMNS, rows)
+
+
 # ---------- كشف أماكن التصوير ----------
 LOCATIONS_SHEET_COLUMNS = [
     ("number", "الرقم", 8),

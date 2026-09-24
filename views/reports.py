@@ -2,7 +2,7 @@
 
 import streamlit as st
 from database import fetch_all, scene_label
-from export import build_characters_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel, build_props_sheet_excel, build_shot_list_excel, build_shot_list_pdf, build_shot_list_word
+from export import build_characters_sheet_excel, build_wardrobe_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel, build_props_sheet_excel, build_shot_list_excel, build_shot_list_pdf, build_shot_list_word
 from i18n import t, tr
 from ui import ltr
 import audit
@@ -129,6 +129,13 @@ def render(project, project_id, _char_count, _loc_count, _scene_count, _shot_cou
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"dl_props_sheet_{project_id}",
             )
+        st.download_button(
+            t("⬇️ كشف الملابس"),
+            data=_lazy(build_wardrobe_sheet_excel),
+            file_name=f"{project['name']}_كشف_الملابس.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"dl_wardrobe_sheet_{project_id}",
+        )
         st.divider()
 
     if _loc_count == 0 or _char_count == 0:

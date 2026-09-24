@@ -16,6 +16,7 @@ from i18n import t, tr
 from ui import ltr
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.new_project
+import views.wardrobe
 import project_types
 import views.project_settings
 import repo
@@ -817,7 +818,7 @@ st.markdown(
 # on_change="rerun": التبويب المفتوح بس هو اللي بيتبني (tab.open)، بدل السبعة في
 # كل ضغطة — ومعرفة التبويب المفتوح بتخلّي شريط العنوان رابط للشاشة دي بالظبط.
 _tabs = st.tabs([tr(k) for k in links.TABS.values()], key="main_tabs", on_change="rerun")
-(tab_import, tab_locations, tab_characters, tab_actors, tab_props, tab_scenes, tab_breakdown,
+(tab_import, tab_locations, tab_characters, tab_actors, tab_wardrobe, tab_props, tab_scenes, tab_breakdown,
  tab_dashboard, tab_settings) = _tabs
 _open_tab = next((slug for slug, tab in zip(links.TABS, _tabs) if tab.open), "import")
 # شريط العنوان = الشاشة الحالية: يتحفظ bookmark أو يتبعت لزميل
@@ -860,6 +861,9 @@ if tab_characters.open:
 if tab_actors.open:
     with tab_actors:
         _render(views.actors, project_id=project_id, company_id=company_id)
+if tab_wardrobe.open:
+    with tab_wardrobe:
+        _render(views.wardrobe, project=project, project_id=project_id, company_id=company_id)
 if tab_props.open:
     with tab_props:
         _render(views.props, project_id=project_id)

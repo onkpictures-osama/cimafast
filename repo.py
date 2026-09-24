@@ -557,19 +557,23 @@ def add_character(project_id, name, role_type, species, gender, personality_note
                         VALUES (?,?,?,?,?,?)""",
                         (project_id, name, role_type, species, gender, personality_notes))
     run_query("""INSERT INTO character_looks
-                 (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, is_default)
-                 VALUES (?,?,?,?,?,?,?,1)""",
+                 (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description,
+                  is_default, change_number)
+                 VALUES (?,?,?,?,?,?,?,1,1)""",
               (char_id, DEFAULT_LOOK_NAME, '', '', '', '', ''))
     return char_id
 
 
 def add_character_look(*params):
     # P5: لو دي أول مظهر للشخصية (مفروض مايحصلش بعد الـ backfill) يبقى هو الأساسي
+    # P10: كل مظهر جديد = الغيار اللي بعده للشخصية دي
     return run_query("""INSERT INTO character_looks
-                        (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, reference_image_path, is_default)
+                        (character_id, look_name, apparent_age, makeup_state, hair_state, wardrobe_description, description, reference_image_path, is_default,
+                         change_number)
                         VALUES (?,?,?,?,?,?,?,?,
-                                CASE WHEN EXISTS (SELECT 1 FROM character_looks WHERE character_id=?) THEN 0 ELSE 1 END)""",
-                     tuple(params) + (params[0],))
+                                CASE WHEN EXISTS (SELECT 1 FROM character_looks WHERE character_id=?) THEN 0 ELSE 1 END,
+                                (SELECT COALESCE(MAX(change_number), 0) + 1 FROM character_looks WHERE character_id=?))""",
+                     tuple(params) + (params[0], params[0]))
 
 
 class LastLookError(IntegrityError):
@@ -1376,3 +1380,220 @@ def delete_episode_scenes(project_id, episode_number):
     سكريبت الحلقة". جوه المشروع ده بس."""
     return run_query("DELETE FROM scenes WHERE project_id=? AND episode_number=?",
                      (project_id, int(episode_number)))
+
+
+
+# --- الملابس (P10) -----------------------------------------------------------------
+# الغيار = المظهر (character_looks) برقمه (change_number). المشهد بيحدد كل
+# شخصية لابسة أنهي غيار (scene_character_looks)، وكل غيار ليه قطعه
+# (wardrobe_items). كل كتابة بتتأكد إن المشهد/الشخصية/الغيار تبع المشروع ده.
+
+WARDROBE_CATEGORIES = ["قميص", "تيشيرت", "بنطلون", "فستان", "جيبة", "جاكيت", "بدلة", "عباية / جلابية",
+                       "طرحة / غطاء راس", "جزمة", "شنطة", "إكسسوار", "ملابس داخلية", "أخرى"]
+WARDROBE_SOURCES = ["شراء", "إيجار", "تفصيل", "من الممثل/ة", "من المخزن"]
+WARDROBE_STATUSES = ["محتاج شراء", "في التفصيل", "في البروفة", "جاهز", "في الغسيل"]
+WARDROBE_READY = "جاهز"
+
+
+def ensure_change_numbers(project_id):
+    """بيرقّم مظاهر الشخصيات اللي لسه مالهاش رقم غيار (المظاهر القديمة أو
+    اللي اتعملت من الاستيراد): الأساسي الأول، وبعده بترتيب الإضافة، بعد أكبر
+    رقم موجود للشخصية. الأرقام الموجودة مابتتغيّرش. بيرجّع عدد اللي اترقّم."""
+    rows = fetch_all("""
+        SELECT cl.id, cl.character_id, cl.change_number, COALESCE(cl.is_default, 0) AS is_default
+        FROM character_looks cl JOIN characters c ON c.id = cl.character_id
+        WHERE c.project_id = ?
+        ORDER BY cl.character_id, COALESCE(cl.is_default, 0) DESC, cl.id
+    """, (project_id,))
+    top = {}
+    for r in rows:
+        if r["change_number"]:
+            top[r["character_id"]] = max(top.get(r["character_id"], 0), r["change_number"])
+    todo = [r for r in rows if not r["change_number"]]
+    if not todo:
+        return 0
+    # ترقيم بيانات قديمة مش تعديل من اليوزر: لازم يشتغل حتى لو اللي فاتح
+    # التبويب "مشاهدة فقط"
+    with permissions.system(), _tx() as ex:
+        for r in todo:
+            n = top.get(r["character_id"], 0) + 1
+            top[r["character_id"]] = n
+            ex("UPDATE character_looks SET change_number=? WHERE id=? "
+               "AND character_id IN (SELECT id FROM characters WHERE project_id=?)", (n, r["id"], project_id))
+    return len(todo)
+
+
+def wardrobe_changes(project_id):
+    """كل غيارات المشروع: الشخصية، رقم ونوع الغيار، عدد قطعه وتكلفتها وكام
+    منها لسه مش جاهز، وعدد المشاهد اللي متحدد فيها."""
+    return fetch_all("""
+        SELECT cl.id, cl.character_id, c.name AS character_name, c.cast_number,
+               cl.change_number, cl.look_name, COALESCE(cl.is_default, 0) AS is_default,
+               cl.reference_image_path, cl.wardrobe_description,
+               (SELECT COUNT(*) FROM wardrobe_items w WHERE w.look_id = cl.id) AS items,
+               (SELECT COALESCE(SUM(COALESCE(w.cost, 0) * COALESCE(w.multiples, 1)), 0)
+                  FROM wardrobe_items w WHERE w.look_id = cl.id) AS cost,
+               (SELECT COUNT(*) FROM wardrobe_items w WHERE w.look_id = cl.id
+                  AND COALESCE(w.status, '') <> ?) AS not_ready,
+               (SELECT COUNT(*) FROM scene_character_looks s WHERE s.look_id = cl.id) AS scenes
+        FROM character_looks cl JOIN characters c ON c.id = cl.character_id
+        WHERE c.project_id = ?
+        ORDER BY c.id, cl.change_number, cl.id
+    """, (WARDROBE_READY, project_id))
+
+
+def change_label(change):
+    """"غيار 2 · بدلة الفرح" - الاسم الافتراضي للمظهر مابيتكتبش."""
+    name = change.get("look_name") or ""
+    base = f"غيار {change.get('change_number') or '?'}"
+    return f"{base} · {name}" if name and name != DEFAULT_LOOK_NAME else base
+
+
+def add_change(project_id, character_id, name):
+    """غيار جديد لشخصية (= مظهر جديد برقم الغيار اللي بعده)."""
+    if not fetch_all("SELECT 1 FROM characters WHERE id=? AND project_id=?", (character_id, project_id)):
+        return None
+    return add_character_look(character_id, (name or "").strip() or None, "", "", "", "", "", None)
+
+
+def rename_change(project_id, look_id, name):
+    return run_query("UPDATE character_looks SET look_name=? WHERE id=? "
+                     "AND character_id IN (SELECT id FROM characters WHERE project_id=?)",
+                     ((name or "").strip() or DEFAULT_LOOK_NAME, look_id, project_id))
+
+
+def scene_change_map(project_id):
+    """(scene_id, character_id) → look_id لكل المشروع."""
+    return {(r["scene_id"], r["character_id"]): r["look_id"] for r in fetch_all("""
+        SELECT x.scene_id, x.character_id, x.look_id FROM scene_character_looks x
+        JOIN scenes s ON s.id = x.scene_id WHERE s.project_id = ?
+    """, (project_id,))}
+
+
+def character_scenes_for_wardrobe(project_id, character_id):
+    """المشاهد اللي الشخصية فيها (scene_characters) بغيارها لو متحدد."""
+    return fetch_all("""
+        SELECT s.id, s.scene_number, s.scene_suffix, s.episode_number, s.int_ext, s.day_night,
+               l.name AS location_name, x.look_id
+        FROM scene_characters sc
+        JOIN scenes s ON s.id = sc.scene_id
+        LEFT JOIN location_variants lv ON lv.id = s.location_variant_id
+        LEFT JOIN locations l ON l.id = lv.location_id
+        LEFT JOIN scene_character_looks x ON x.scene_id = s.id AND x.character_id = sc.character_id
+        WHERE sc.character_id = ? AND s.project_id = ?
+        ORDER BY CASE WHEN s.episode_number IS NULL THEN 1 ELSE 0 END, s.episode_number,
+                 s.scene_number, s.scene_suffix
+    """, (character_id, project_id))
+
+
+def set_scene_changes(project_id, character_id, assignments):
+    """assignments: {scene_id: look_id أو None}. None بيشيل التحديد. أي مشهد
+    مش في المشروع أو غيار مش للشخصية دي (في المشروع ده) بيتجاهل. بيرجّع عدد
+    اللي اتغيّر."""
+    own_looks = {r["id"] for r in fetch_all(
+        "SELECT cl.id FROM character_looks cl JOIN characters c ON c.id = cl.character_id "
+        "WHERE cl.character_id=? AND c.project_id=?", (character_id, project_id))}
+    own_scenes = {r["id"] for r in fetch_all("SELECT id FROM scenes WHERE project_id=?", (project_id,))}
+    changed = 0
+    with _tx() as ex:
+        for scene_id, look_id in assignments.items():
+            if scene_id not in own_scenes or (look_id is not None and look_id not in own_looks):
+                continue
+            ex("DELETE FROM scene_character_looks WHERE scene_id=? AND character_id=? "
+               "AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)", (scene_id, character_id, project_id))
+            if look_id is not None:
+                ex("INSERT INTO scene_character_looks (scene_id, character_id, look_id) SELECT ?, ?, ? "
+                   "WHERE EXISTS (SELECT 1 FROM scenes WHERE id=? AND project_id=?) "
+                   "AND EXISTS (SELECT 1 FROM character_looks cl JOIN characters c ON c.id = cl.character_id "
+                   "WHERE cl.id=? AND cl.character_id=? AND c.project_id=?)",
+                   (scene_id, character_id, look_id, scene_id, project_id, look_id, character_id, project_id))
+            changed += 1
+    return changed
+
+
+def scenes_missing_change(project_id):
+    """عدد (مشهد، شخصية) اللي الشخصية فيهم في المشهد ومالهاش غيار متحدد."""
+    return fetch_all("""
+        SELECT COUNT(*) AS n FROM scene_characters sc
+        JOIN scenes s ON s.id = sc.scene_id
+        LEFT JOIN scene_character_looks x ON x.scene_id = sc.scene_id AND x.character_id = sc.character_id
+        WHERE s.project_id = ? AND x.id IS NULL
+    """, (project_id,))[0]["n"]
+
+
+_ITEM_FIELDS = ("item_name", "category", "color", "material", "size", "source", "multiples",
+                "story_state", "cost", "status", "notes")
+
+
+def items_of_change(project_id, look_id):
+    return fetch_all("""
+        SELECT w.* FROM wardrobe_items w
+        JOIN character_looks cl ON cl.id = w.look_id JOIN characters c ON c.id = cl.character_id
+        WHERE w.look_id = ? AND c.project_id = ? ORDER BY w.position, w.id
+    """, (look_id, project_id))
+
+
+def save_change_items(project_id, look_id, rows):
+    """بيستبدل قطع الغيار ده باللي في rows (بالترتيب) - نفس اللي في الجدول
+    على الشاشة. الصف من غير اسم قطعة بيتشال. الغيار لازم يبقى تبع المشروع."""
+    if not fetch_all("SELECT 1 FROM character_looks cl JOIN characters c ON c.id = cl.character_id "
+                     "WHERE cl.id=? AND c.project_id=?", (look_id, project_id)):
+        return 0
+    now = _now_iso()
+    kept = 0
+    with _tx() as ex:
+        ex("DELETE FROM wardrobe_items WHERE look_id=? AND look_id IN (SELECT cl.id FROM character_looks cl "
+           "JOIN characters c ON c.id = cl.character_id WHERE c.project_id=?)", (look_id, project_id))
+        for pos, r in enumerate(rows):
+            name = (r.get("item_name") or "").strip()
+            if not name:
+                continue
+            vals = []
+            for f in _ITEM_FIELDS:
+                v = r.get(f)
+                if f == "multiples":
+                    try:
+                        v = max(1, int(v))
+                    except (TypeError, ValueError):
+                        v = 1
+                elif f == "cost":
+                    try:
+                        v = float(v) if v not in (None, "") else None
+                    except (TypeError, ValueError):
+                        v = None
+                elif isinstance(v, str):
+                    v = v.strip() or None
+                elif v != v:           # NaN من الجدول
+                    v = None
+                vals.append(name if f == "item_name" else v)
+            ex(f"INSERT INTO wardrobe_items (look_id, {', '.join(_ITEM_FIELDS)}, position, updated_at) "
+               f"VALUES (?, {', '.join('?' * len(_ITEM_FIELDS))}, ?, ?)", (look_id, *vals, pos, now))
+            kept += 1
+    return kept
+
+
+def wardrobe_items_of_project(project_id):
+    """كل قطع الملابس في المشروع مع الشخصية والغيار - لقايمة القطع وكشف الملابس."""
+    return fetch_all("""
+        SELECT w.*, cl.change_number, cl.look_name, c.id AS character_id, c.name AS character_name,
+               c.cast_number
+        FROM wardrobe_items w
+        JOIN character_looks cl ON cl.id = w.look_id JOIN characters c ON c.id = cl.character_id
+        WHERE c.project_id = ?
+        ORDER BY CASE WHEN c.cast_number IS NULL THEN 1 ELSE 0 END, c.cast_number, c.id,
+                 cl.change_number, w.position, w.id
+    """, (project_id,))
+
+
+def actor_sizes_for_character(project_id, character_id, company_id):
+    """مقاسات الممثل/ة المتعاقد للدور - لو الشركة فاتحة بياناته (التعاقد
+    نفسه بيفتحها). None لو مفيش تعاقد أو البيانات مقفولة."""
+    cast = cast_by_character(project_id).get(character_id) or {}
+    actor = cast.get("actor")
+    if not actor or not actor_unlocked_for_company(actor["actor_id"], company_id):
+        return None
+    row = actor_by_id(actor["actor_id"])
+    if not row:
+        return None
+    return {"name": actor["name"], **{k: row.get(k) for k in
+            ("height_cm", "weight_kg", "chest_cm", "waist_cm", "hips_cm", "shoe_size_eu")}}
