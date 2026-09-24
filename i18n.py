@@ -854,6 +854,23 @@ TRANSLATIONS = {
     "قريب هنا: الكول شيت، والتقارير اليومية، وباقي أقسام إدارة التصوير.":
         "Coming here: call sheets, daily reports and the rest of production management.",
 
+    # شاشة الاستيراد المبسطة (2026-09-24)
+    "ارفع ملف السيناريو، واختار طريقة التحليل — والمشاهد والأماكن والشخصيات بتتملى لوحدها وتراجعها قبل ما تتضاف.":
+        "Upload the screenplay and pick how to analyse it — scenes, locations and characters fill in for you to review before they're added.",
+    "تحليل الملف": "Analyse the file",
+    "CimaFast AI Inspector": "CimaFast AI Inspector",
+    "التحليل خارج CimaFast": "Analyse outside CimaFast",
+    "سريع · مجاني": "Fast · free",
+    "الأدق · بياخد دقايق": "Most accurate · takes minutes",
+    "على أي AI بره البرنامج": "On any AI outside the app",
+    "سريع ومجاني، على الجهاز من غير ذكاء اصطناعي — أحسن للسيناريوهات المنظمة.":
+        "Fast and free, on the server without AI — best for well-formatted screenplays.",
+    "تحليل عميق بالذكاء الاصطناعي — بيبدأ على طول وبياخد دقايق.": "Deep AI analysis — starts right away and takes a few minutes.",
+    "حلّل على Claude أو ChatGPT أو Gemini بنفسك وارجع بالنتيجة.": "Analyse it yourself on Claude, ChatGPT or Gemini and bring the result back.",
+    "**1.** دوس «📋 نسخ البرومبت».\n\n**2.** افتح Claude أو ChatGPT أو Gemini، الصق البرومبت، وارفق معاه نفس ملف السيناريو.\n\n**3.** احفظ الـ JSON اللي رجعلك في ملف `script.json` وارفعه من خانة الرفع فوق، ودوس «🔍 تحليل الملف».":
+        "**1.** Press «📋 Copy the prompt».\n\n**2.** Open Claude, ChatGPT or Gemini, paste the prompt and attach the same screenplay.\n\n**3.** Save the JSON you get back as `script.json`, upload it above and press «🔍 Analyse the file».",
+    "شوف نص البرومبت": "See the prompt text",
+
     # المكتبات في الشريط الجانبي (2026-09-24)
     "مكتبة الممثلين": "Actors library",
     "مكتبة مواقع التصوير": "Locations library",
