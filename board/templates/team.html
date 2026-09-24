@@ -3,10 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0B1220">
+  <meta name="theme-color" content="#0F1B45">
+  <link rel="icon" type="image/png" href="../brand/app-icon-dark.png?v={{ asset_version }}">
+  <link rel="apple-touch-icon" href="../brand/apple-touch-icon.png?v={{ asset_version }}">
+  <link rel="manifest" href="../brand/manifest.webmanifest?v={{ asset_version }}">
   <title>الفريق — CimaFast Studio</title>
-  <link rel="stylesheet" href="../static/board.css">
-  <link rel="stylesheet" href="../static/team.css">
+  <link rel="stylesheet" href="../static/board.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="../static/team.css?v={{ asset_version }}">
 </head>
 <body class="team">
   <header class="bar">
@@ -16,7 +19,7 @@
     </div>
     {% if companies %}
     <label class="field">
-      <span>الشركة</span>
+      <span>مساحة العمل</span>
       <select id="company">
         {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
@@ -39,10 +42,10 @@
     {% if companies %}
     <section class="card">
       <div class="card__head">
-        <h2>أعضاء الشركة</h2>
+        <h2>أعضاء مساحة العمل</h2>
         {% if can_view_audit %}<a class="btn" href="../activity/">🧾 سجل النشاط</a>{% endif %}
         <form id="rename" class="inline admin-only" hidden>
-          <input name="name" placeholder="اسم الشركة" aria-label="اسم الشركة" required>
+          <input name="name" placeholder="اسم مساحة العمل" aria-label="اسم مساحة العمل" required>
           <button class="btn">تغيير الاسم</button>
         </form>
       </div>
@@ -50,13 +53,13 @@
         <thead><tr><th>الاسم</th><th>المستخدم</th><th>المسمى</th><th>الدور</th><th>آخر دخول</th><th class="admin-only" hidden></th></tr></thead>
         <tbody id="members"></tbody>
       </table>
-      <p id="not-admin" class="muted" hidden>مدير الشركة بس هو اللي يضيف ناس أو يغيّر أدوارهم.</p>
+      <p id="not-admin" class="muted" hidden>مدير المشروع بس هو اللي يضيف ناس أو يغيّر أدوارهم. مين يدخل أنهي مشروع بيتحدد من ⚙️ إعدادات المشروع.</p>
     </section>
 
     <section class="card admin-only" hidden>
       <h2>إضافة شخص للفريق</h2>
       <form id="add" class="grid">
-        <label class="field"><span>اسم المستخدم (إنجليزي)</span><input name="username" dir="ltr" required pattern="[A-Za-z0-9._\-]+"></label>
+        <label class="field"><span>اسم المستخدم (إنجليزي)</span><input name="username" dir="ltr" required pattern="[A-Za-z0-9._\-]+" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"></label>
         <label class="field"><span>الاسم</span><input name="display_name"></label>
         <label class="field"><span>المسمى الوظيفي</span><input name="job_title" placeholder="مدير تصوير، منتج منفذ…"></label>
         <label class="field"><span>الإيميل</span><input name="email" type="email" dir="ltr"></label>
@@ -66,19 +69,19 @@
       </form>
     </section>
     {% else %}
-    <section class="card"><p>حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك.</p></section>
+    <section class="card"><p>حسابك مش مربوط بأي مساحة عمل. كلّم مدير المشروع بتاعك.</p></section>
     {% endif %}
 
     {% if is_operator %}
     <section class="card">
-      <h2>شركة جديدة على المنصة</h2>
-      <p class="muted">للمشغّل بس. الشركة بتبدأ فاضية، وأول مستخدم فيها بيبقى مديرها.</p>
+      <h2>مساحة عمل جديدة على المنصة</h2>
+      <p class="muted">للمشغّل بس. مساحة العمل بتبدأ فاضية، وأول مستخدم فيها بيبقى مديرها.</p>
       <form id="new-company" class="grid">
-        <label class="field"><span>اسم الشركة</span><input name="name" required></label>
+        <label class="field"><span>اسم مساحة العمل</span><input name="name" required></label>
         <label class="field"><span>مستخدم المدير (إنجليزي)</span><input name="admin_username" dir="ltr" required pattern="[A-Za-z0-9._\-]+"></label>
         <label class="field"><span>اسم المدير</span><input name="admin_display_name"></label>
         <label class="field"><span>إيميل المدير</span><input name="admin_email" type="email" dir="ltr"></label>
-        <button class="btn btn--primary">إنشاء الشركة</button>
+        <button class="btn btn--primary">إنشاء مساحة العمل</button>
       </form>
     </section>
     {% endif %}
@@ -86,8 +89,8 @@
     <section class="card">
       <h2>حسابي — تغيير كلمة السر</h2>
       <form id="my-password" class="grid">
-        <label class="field"><span>كلمة السر الحالية</span><input name="old" type="password" autocomplete="current-password" required></label>
-        <label class="field"><span>كلمة السر الجديدة (١٠ حروف على الأقل)</span><input name="new" type="password" autocomplete="new-password" minlength="10" required></label>
+        <label class="field"><span>كلمة السر الحالية</span><input name="old" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+        <label class="field"><span>كلمة السر الجديدة (١٠ حروف على الأقل)</span><input name="new" type="password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" minlength="10" required></label>
         <button class="btn">تغيير</button>
       </form>
     </section>
@@ -95,6 +98,6 @@
 
   <template id="role-options">{% for r, label in roles %}<option value="{{ r }}">{{ label }}</option>{% endfor %}</template>
   <script>window.ROLE_LABELS = {{ roles | tojson }};</script>
-  <script src="../static/team.js"></script>
+  <script src="../static/team.js?v={{ asset_version }}"></script>
 </body>
 </html>

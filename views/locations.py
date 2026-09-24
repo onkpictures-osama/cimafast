@@ -63,6 +63,8 @@ def render(project_id):
 
     st.divider()
 
+    # الموقع الحقيقي المحجوز/المرشح لكل مكان (مكتبة مواقع التصوير)
+    _bookings = repo.venue_bookings(project_id)
     children_by_parent = {}
     for l in locations:
         if l["parent_location_id"]:
@@ -72,9 +74,13 @@ def render(project_id):
         # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
         # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
         # 16 ثانية لكل rerun على الإنتاج).
-        _lazy_exp = st.expander(f"{indent}📍 {l['name']}", key=f"exp_loc_{l['id']}", on_change="rerun")
+        _b = _bookings.get(l["id"]) or {}
+        _venue = f" — 🏠 {_b['booked']['venue_name']}" if _b.get("booked") else (
+            f" — ⭐ {len(_b['shortlist'])} {t('مرشح')}" if _b.get("shortlist") else "")
+        _lazy_exp = st.expander(f"{indent}📍 {l['name']}{_venue}", key=f"exp_loc_{l['id']}", on_change="rerun")
         with _lazy_exp:
             if _lazy_exp.open:
+                _render_venue_slot(project_id, l, _b)
                 # اللينك أول حاجة في المكان: اللي بيدوّر عليه بيبقى واقف في
                 # الشارع. زرار واحد: لو فيه لينك محفوظ بيسأل تفتح ولا تعدل،
                 # ولو لسه مفيش بيطلب اللينك على طول.
@@ -84,9 +90,9 @@ def render(project_id):
                         st.write(t("عاوز تفتح الموقع الجغرافي ولا تعدله؟"))
                         open_col, edit_col = st.columns(2)
                         with open_col:
-                            st.link_button(t("🗺️ فتح"), l["maps_url"], use_container_width=True)
+                            st.link_button(t("🗺️ فتح"), l["maps_url"], width="stretch")
                         with edit_col:
-                            if st.button(t("✏️ تعديل"), key=f"loc_maps_edit_btn_{l['id']}", use_container_width=True):
+                            if st.button(t("✏️ تعديل"), key=f"loc_maps_edit_btn_{l['id']}", width="stretch"):
                                 st.session_state[_editing_key] = True
                                 st.rerun()
                     else:
@@ -97,7 +103,7 @@ def render(project_id):
                             key=f"loc_maps_input_{l['id']}",
                         )
                         if st.button(t("💾 حفظ"), key=f"loc_maps_save_{l['id']}"):
-                            repo.set_location_maps_url(_clean_maps_url(new_maps_url), l["id"])
+                            repo.set_location_maps_url(project_id, _clean_maps_url(new_maps_url), l["id"])
                             st.session_state[_editing_key] = False
                             mark_saved(f"loc_maps_{l['id']}")
                             st.rerun()
@@ -106,13 +112,14 @@ def render(project_id):
                 st.markdown(f"**{t('🖼️ صورة المكان')}**")
 
                 def _save_loc_image(rel, _id=l["id"]):
-                    repo.set_location_image(rel, _id)
+                    repo.set_location_image(project_id, rel, _id)
 
                 render_image_picker(
                     f"locimg_{l['id']}", l["reference_image_path"], f"locations/{l['id']}",
-                    lambda extra, _l=l: image_gen.build_prompt(
-                        _l["name"], _l["base_description"] or "", extra=extra),
+                    lambda shot_size, light, _l=l: image_gen.build_prompt(
+                        _l["name"], _l["base_description"] or "", shot_size=shot_size, light=light),
                     _save_loc_image,
+                    reference_slots=[("bg", "صورة حقيقية للمكان (اختياري)")],
                 )
                 st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
 
@@ -141,14 +148,14 @@ def render(project_id):
                         new_parent_id = None
                         if e_loc_parent != "بدون - مكان رئيسي":
                             new_parent_id = {o["name"]: o["id"] for o in locations if o["id"] != l["id"]}.get(e_loc_parent)
-                        repo.update_location(e_loc_name, e_loc_desc, new_parent_id, l.get("maps_url"), l["id"])
+                        repo.update_location(project_id, e_loc_name, e_loc_desc, new_parent_id, l.get("maps_url"), l["id"])
                         mark_saved(f"loc_{l['id']}")
                         st.rerun()
                     else:
                         st.warning(t("اسم المكان مينفعش يبقى فاضي"))
                 show_saved_badge(f"loc_{l['id']}")
                 if del_loc:
-                    ok = guarded_delete(repo.delete_location, (l["id"],), t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."))
+                    ok = guarded_delete(repo.delete_location, (project_id, l["id"]), t("معرفش أمسح المكان ده لأنه مستخدم في مشهد، أو ليه أماكن فرعية تابعة له. شيل الارتباطات دي الأول."))
                     if ok:
                         delete_image_file(l["reference_image_path"])
                         st.success(t("تم حذف المكان"))
@@ -178,11 +185,11 @@ def render(project_id):
                             with vdel_col:
                                 del_var = st.form_submit_button(t("🗑️ حذف الحالة"))
                         if save_var:
-                            repo.update_location_state(ev_name, ev_desc, move_options[ev_move_to], v["id"])
+                            repo.update_location_state(project_id, ev_name, ev_desc, move_options[ev_move_to], v["id"])
                             mark_saved(f"variant_{v['id']}")
                             st.rerun()
                         if del_var:
-                            ok = guarded_delete(repo.delete_location_state, (v["id"],), t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."))
+                            ok = guarded_delete(repo.delete_location_state, (project_id, v["id"]), t("معرفش أمسح الحالة دي لأنها مستخدمة في مشهد أو أكتر. شيلها من المشاهد دي الأول من تبويب السكريبت."))
                             if ok:
                                 delete_image_file(v["reference_image_path"])
                                 st.success(t("تم حذف الحالة"))
@@ -192,14 +199,16 @@ def render(project_id):
                         st.caption(t("صورة مرجعية للحالة"))
 
                         def _save_var_image(rel, _id=v["id"]):
-                            repo.set_location_state_image(rel, _id)
+                            repo.set_location_state_image(project_id, rel, _id)
 
                         render_image_picker(
                             f"varimg_{v['id']}", v["reference_image_path"], f"locations/{l['id']}",
-                            lambda extra, _l=l, _v=v: image_gen.build_prompt(
+                            lambda shot_size, light, _l=l, _v=v: image_gen.build_prompt(
                                 _l["name"], _l["base_description"] or "",
-                                _v["variant_name"], _v["description"] or "", extra=extra),
+                                _v["variant_name"], _v["description"] or "",
+                                shot_size=shot_size, light=light),
                             _save_var_image,
+                            reference_slots=[("bg", "صورة حقيقية للمكان (اختياري)")],
                         )
 
                 # فورم إضافة الحالة مقفول لحد ما اليوزر يطلبه — لو مفتوح تحت كل
@@ -249,3 +258,20 @@ def render(project_id):
             _loc_shown += 1
     if _loc_q:
         library_result_count(_loc_shown, len(top_level_locations))
+
+
+def _render_venue_slot(project_id, l, booking):
+    """الموقع الحقيقي للمكان ده: المحجوز والمرشحين، وزرار يفتح مكتبة مواقع
+    التصوير في وضع "بتدوّر لـ ده" (المالك 2026-09-24)."""
+    from ui import open_page
+    booked, shortlist = booking.get("booked"), booking.get("shortlist", [])
+    for row, badge in ([(booked, "✅")] if booked else []) + [(r, "⭐") for r in shortlist]:
+        c1, c2 = st.columns([5, 1], vertical_alignment="center")
+        c1.markdown(f"{badge} **{row['venue_name']}**" + (f" · {row['city']}" if row.get("city") else "")
+                    + f" — {t('محجوز') if badge == '✅' else t('مرشح')}")
+        if c2.button(t("إلغاء"), key=f"vbook_rm_{row['id']}", use_container_width=True):
+            repo.remove_venue_booking(project_id, row["id"])
+            st.rerun()
+    st.button(f"🔎 {t('اختار من مكتبة المواقع')}", key=f"loc_pick_venue_{l['id']}", type="primary",
+              on_click=open_page, args=("locations_lib",), kwargs={"pick": l["id"]})
+    st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)

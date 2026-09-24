@@ -1,0 +1,31 @@
+[Unit]
+Description=CimaFast drama analyser worker — /v1 preview spool
+Documentation=file:/etc/systemd/system/cimafast-v1.service.d/ai-spool.conf
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=root
+# claude reads its credentials from /root/.claude; the app user cannot.
+Environment=HOME=/root
+Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# The preview's own spool, written by cimafast-v1.service. Nothing here is
+# shared with production's spool at /var/lib/cimafast/ai-jobs.
+Environment=CIMAFAST_AI_SPOOL=/var/lib/cimafast-v1/ai-jobs
+# Its own singleton lock, so it does not lock out the production worker.
+Environment=CIMAFAST_AI_LOCKFILE=/run/cimafast-ai-worker-v1.lock
+# Read the prompt from the preview checkout: /v1 should analyse with the prompt
+# it actually ships, not production's.
+Environment=CIMAFAST_APP_DIR=/srv/cimafast-v1
+WorkingDirectory=/opt/cimafast-ai
+ExecStart=/usr/bin/python3 /opt/cimafast-ai/worker.py
+Restart=always
+RestartSec=5
+# reap any claude child if the worker is stopped mid-call
+KillMode=control-group
+TimeoutStopSec=30
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

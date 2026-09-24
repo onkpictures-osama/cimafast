@@ -73,7 +73,13 @@ def test_login_screen_blocks_the_app():
     assert _widget(at, "text_input", "_login_password") is not None
     # مفيش أي حاجة من البرنامج نفسه ظاهرة قبل الدخول
     assert not at.sidebar.selectbox, "app content leaked before login"
-    assert "CimaFast Studio" in _body_text(at)
+    # اللوجو الرسمي هو اللي بيعرّف المنتج على شاشة الدخول: العلامة +
+    # الووردمارك + وصف STUDIO. كان قبل كده نص "🎬 CimaFast Studio" عادي.
+    # من 337f022 شاشة الدخول بتعرض ماستر الـ lockup الرسمي (PNG) مش النسخة
+    # المركّبة، فالعلامة ممكن تيجي بأي شكل من الاتنين.
+    body = _body_text(at)
+    assert "cf-logo__mark" in body or "cf-logo-master" in body, "brand mark missing from the login screen"
+    assert 'alt="CimaFast"' in body or ("CimaFast" in body and "STUDIO" in body), "wordmark missing"
 
 
 @check

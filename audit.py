@@ -37,7 +37,8 @@ import sys
 
 # جداول مش بتتسجّل: السجل نفسه (عشان مايسجّلش نفسه للأبد)، وذاكرة "آخر شاشة"
 # بتاعت الصفحة الرئيسية (بتتكتب مع كل ضغطة تبويب — دي حدث استخدام مش تغيير بيانات).
-SKIP_TABLES = {"audit_log", "usage_events", "user_profile"}
+# notification_seen (H4) نفس فكرة user_profile: "اتشاف لحد فين" حالة شاشة، مش تغيير بيانات.
+SKIP_TABLES = {"audit_log", "usage_events", "user_profile", "notification_seen"}
 
 # أعمدة قيمتها ماتتكتبش في السجل أبدًا. hash كلمة السر لو اتخزن في اللوج يبقى
 # اللوج بقى نسخة تانية من ملف كلمات السر.
@@ -53,13 +54,13 @@ ACTION_LABELS = {
     "login": "دخول", "logout": "خروج", "login_failed": "محاولة دخول فاشلة",
     "password_change": "تغيير كلمة السر", "password_reset": "تصفير كلمة السر",
     "member_add": "إضافة عضو", "member_remove": "شيل عضو", "role_change": "تغيير دور",
-    "company_create": "إنشاء شركة", "company_rename": "تغيير اسم الشركة",
+    "company_create": "إنشاء مساحة عمل", "company_rename": "تغيير اسم مساحة العمل",
     "project_create": "إنشاء مشروع", "import_script": "استيراد سيناريو",
     "schedule_save": "حفظ جدول التصوير", "schedule_suggest": "اقتراح جدول تصوير",
 }
 
 ENTITY_LABELS = {
-    "auth": "الدخول", "users": "الحسابات", "memberships": "العضوية", "companies": "الشركات",
+    "auth": "الدخول", "users": "الحسابات", "memberships": "العضوية", "companies": "مساحات العمل",
     "projects": "المشاريع", "scenes": "المشاهد", "locations": "الأماكن",
     "location_variants": "حالات الأماكن", "characters": "الشخصيات",
     "character_looks": "لوكات الشخصيات", "props": "الإكسسوارات", "shots": "اللقطات",
@@ -68,6 +69,7 @@ ENTITY_LABELS = {
     "scene_props": "إكسسوارات المشاهد", "shot_characters": "شخصيات اللقطات",
     "shot_props": "إكسسوارات اللقطات", "reference_images": "الصور المرجعية",
     "camera_setups": "إعدادات الكاميرا",
+    "post_departments": "أقسام ما بعد الإنتاج", "post_comments": "تعليقات ما بعد الإنتاج",
 }
 
 EVENT_LABELS = {
@@ -81,14 +83,14 @@ TARGET_LABELS = {
     # تبويبات التطبيق
     "import": "إضافة سيناريو", "locations": "الأماكن", "characters": "الشخصيات",
     "props": "الإكسسوارات", "scenes": "المشاهد", "shots": "اللقطات",
-    "reports": "التقارير النهائية",
+    "reports": "التقارير النهائية", "schedule": "جدول التصوير", "post": "ما بعد الإنتاج",
     # شاشات الواجهة الجديدة
     "board": "جدول التصوير", "home": "الرئيسية", "team": "الفريق", "activity": "سجل النشاط",
     # ملفات التصدير
     "shot_list_excel": "تفريغ اللقطات (Excel)", "shot_list_word": "تفريغ اللقطات (Word)",
     "shot_list_pdf": "تفريغ اللقطات (PDF)", "characters_sheet_excel": "كشف الشخصيات",
     "general_breakdown_excel": "التفريغ العام", "locations_sheet_excel": "كشف أماكن التصوير",
-    "props_sheet_excel": "كشف الإكسسوار",
+    "props_sheet_excel": "كشف الإكسسوار", "post_report_excel": "تقرير ما بعد الإنتاج",
     # غير كده
     "script_analysis": "تحليل سيناريو", "streamlit": "التطبيق",
 }
@@ -474,7 +476,17 @@ def _summary(token, entity_id):
 # --- الكتابة في الجدولين ----------------------------------------------------------------
 
 _AUDIT_SQL = ("INSERT INTO audit_log (at, username, company_id, project_id, entity, entity_id, "
-              "action, summary, changes, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+              "action, summary, changes, source, departments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+
+
+def _departments(entity, action, changes):
+    """H4: الأقسام اللي الصف ده يخصّها. غلطة هنا بتسيب الصف من غير وسم، مش بتوقّعه."""
+    try:
+        import notify
+        return notify.tag(entity, action, changes)
+    except Exception as exc:  # noqa: BLE001
+        _warn("departments", exc)
+        return None
 _USAGE_SQL = ("INSERT INTO usage_events (at, username, company_id, project_id, event, target, "
               "detail, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
 
@@ -483,7 +495,8 @@ def _insert_audit(cur, row):
     from database import _adapt_query
     cur.execute(_adapt_query(_AUDIT_SQL), (
         row["at"], row["username"], row["company_id"], row["project_id"], row["entity"],
-        row["entity_id"], row["action"], row["summary"], row["changes"], row["source"]))
+        row["entity_id"], row["action"], row["summary"], row["changes"], row["source"],
+        _departments(row["entity"], row["action"], row["changes"])))
 
 
 def _own_write(sql, values):
@@ -509,9 +522,9 @@ def log(action, entity, entity_id=None, summary=None, changes=None,
         if username:
             ctx = dict(ctx, username=username)
         user, company, project, src = _resolved(ctx, project_id, company_id)
+        changes_text = json.dumps(changes, ensure_ascii=False) if isinstance(changes, dict) else changes
         row = (_now(), user, company, project, entity, entity_id, action, summary,
-               json.dumps(changes, ensure_ascii=False) if isinstance(changes, dict) else changes,
-               source or src)
+               changes_text, source or src, _departments(entity, action, changes_text))
         if cur is not None:
             from database import _adapt_query
             cur.execute(_adapt_query(_AUDIT_SQL), row)
@@ -623,10 +636,10 @@ def _scope(actor, company_id):
             return "1=1", []
         return "company_id = ?", [company_id]
     if not allowed:
-        raise accounts.AccessDenied("سجل النشاط لمدير الشركة بس")
+        raise accounts.AccessDenied("سجل النشاط لمدير المشروع بس")
     if company_id is not None:
         if company_id not in allowed:
-            raise accounts.AccessDenied("مش مدير الشركة دي")
+            raise accounts.AccessDenied("مش مدير مشروع في الحساب ده")
         return "company_id = ?", [company_id]
     marks = ",".join("?" * len(allowed))
     return f"company_id IN ({marks})", list(allowed)

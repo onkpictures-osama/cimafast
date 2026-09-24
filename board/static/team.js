@@ -63,7 +63,7 @@
     } else {
       roleCell.textContent = labels[m.role] || m.role;
     }
-    td(active ? when(m.last_login_at) : "اتشال من الشركة");
+    td(active ? when(m.last_login_at) : "اتشال من مساحة العمل");
     if (isAdmin) {
       const cell = td("");
       if (m.username !== me) {
@@ -76,8 +76,8 @@
             try { const r = await call("POST", `../api/team/members/${encodeURIComponent(m.username)}/reset`, { company_id: companyId() }); showSecret(m.username, r.temp_password); }
             catch (e) { say(e.message, true); }
           });
-          btn("شيل من الشركة", "btn--danger", async () => {
-            if (!confirm(`تشيل ${m.username} من الشركة؟ هيبطل يشوف مشاريعها. تقدر ترجّعه بعدين.`)) return;
+          btn("شيل من مساحة العمل", "btn--danger", async () => {
+            if (!confirm(`تشيل ${m.username} من مساحة العمل؟ هيبطل يشوف مشاريعها. تقدر ترجّعه بعدين.`)) return;
             try { await call("DELETE", `../api/team/members/${encodeURIComponent(m.username)}`, { company_id: companyId() }); say("اتشال"); load(); }
             catch (e) { say(e.message, true); }
           });
@@ -117,7 +117,7 @@
       const r = await call("POST", "../api/team/members", { ...d, company_id: companyId() });
       ev.target.reset();
       if (r.temp_password) showSecret(d.username, r.temp_password);
-      else say(`${d.username} عنده حساب بالفعل — اتضاف للشركة بكلمة سره الحالية`);
+      else say(`${d.username} عنده حساب بالفعل — اتضاف لمساحة العمل بكلمة سره الحالية`);
       load();
     } catch (e) { say(e.message, true); }
   });
@@ -128,7 +128,7 @@
     try {
       await call("POST", "../api/companies/rename", { company_id: companyId(), name });
       companySel.selectedOptions[0].textContent = name;
-      say("اسم الشركة اتغيّر");
+      say("اسم مساحة العمل اتغيّر");
     } catch (e) { say(e.message, true); }
   });
 
@@ -144,7 +144,7 @@
         load();
       }
       if (r.temp_password) showSecret(d.admin_username, r.temp_password);
-      else say(`الشركة اتعملت، و${d.admin_username} مديرها بكلمة سره الحالية`);
+      else say(`مساحة العمل اتعملت، و${d.admin_username} مديرها بكلمة سره الحالية`);
     } catch (e) { say(e.message, true); }
   });
 

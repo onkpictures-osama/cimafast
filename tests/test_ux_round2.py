@@ -40,7 +40,7 @@ def test_exports_are_built_on_click_not_cached_by_counts():
     assert sorted(lazy) == sorted([
         "build_shot_list_excel", "build_shot_list_word", "build_shot_list_pdf",
         "build_characters_sheet_excel", "build_general_breakdown_excel",
-        "build_locations_sheet_excel", "build_props_sheet_excel",
+        "build_locations_sheet_excel", "build_props_sheet_excel", "build_wardrobe_sheet_excel",
     ]), lazy
 
 
@@ -102,7 +102,7 @@ def test_app_is_split_into_views():
     # with one render(). If a tab creeps back into app.py this fails.
     app = open(os.path.join(ROOT, "app.py"), encoding="utf-8").read()
     assert len(app.splitlines()) < 900, len(app.splitlines())
-    for view in ("import_tab", "locations", "characters", "props", "scenes", "shots", "reports"):
+    for view in ("import_tab", "locations", "characters", "props", "scenes", "shots", "reports", "project_settings"):
         # F2: rendered through _render(views.X, ...) so a refused write shows a message
         assert f"views.{view}.render(" in app or f"_render(views.{view}," in app, view
         assert "def render(" in _view(view), view

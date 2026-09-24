@@ -5,10 +5,12 @@
 import image_gen
 import os
 import re
+import html
+
 import streamlit as st
 from database import IntegrityError
 import uuid
-from database import DAY_NIGHT_LABELS, INT_EXT_LABELS, bilingual_label
+from database import DAY_NIGHT_LABELS, INT_EXT_LABELS, FIELD_HELP, SHOT_SIZE_OPTIONS, bilingual_label
 from i18n import t
 from importer import DEFAULT_VARIANT
 import repo
@@ -115,23 +117,27 @@ def bump_version(project_id):
     repo.bump_project_data_version(project_id)
 
 
-def shift_scene_numbers(project_id, from_number, exclude_scene_id=None):
+def shift_scene_numbers(project_id, from_number, exclude_scene_id=None, episode_number=None):
     """لو المستخدم ضاف أو غيّر رقم مشهد لرقم مستخدم قبل كده، بندفع كل المشاهد
     اللي رقمها >= الرقم الجديد رقم واحد لقدام - بما إن اللقطات مربوطة
     بالمشهد عن طريق scene_id (مش رقم المشهد)، الدفع ده آمن ومبيأثرش على أي
     بيانات تانية، بس بيحدث رقم المشهد المعروض بس."""
     if exclude_scene_id is not None:
-        repo.shift_scene_numbers_up_except(project_id, from_number, exclude_scene_id)
+        repo.shift_scene_numbers_up_except(project_id, from_number, exclude_scene_id, episode_number)
     else:
-        repo.shift_scene_numbers_up(project_id, from_number)
+        repo.shift_scene_numbers_up(project_id, from_number, episode_number)
 
 
-def shift_shot_numbers(scene_id, from_number, exclude_shot_id=None):
-    """نفس فكرة shift_scene_numbers بس على مستوى اللقطات جوه مشهد واحد."""
+def shift_shot_numbers(project_id, scene_id, from_number, exclude_shot_id=None):
+    """نفس فكرة shift_scene_numbers بس على مستوى اللقطات جوه مشهد واحد.
+
+    اللقطات مفيهاش project_id، فالمشروع بيتمرر عشان طبقة البيانات تقفل الكتابة
+    على مشاهد المشروع ده بس.
+    """
     if exclude_shot_id is not None:
-        repo.shift_shot_numbers_up_except(scene_id, from_number, exclude_shot_id)
+        repo.shift_shot_numbers_up_except(project_id, scene_id, from_number, exclude_shot_id)
     else:
-        repo.shift_shot_numbers_up(scene_id, from_number)
+        repo.shift_shot_numbers_up(project_id, scene_id, from_number)
 
 
 _DIALOGUE_LINE_RE = re.compile(r'^([^:：]{1,30})[:：]\s*(.+)$')
@@ -222,13 +228,30 @@ IMG_SRC_CAMERA = "📷 الكاميرا"
 
 IMG_SRC_GENERATE = "✨ توليد بالذكاء الاصطناعي"
 
+# اختيار سريع لحجم الكادر جوه شاشة التوليد - نفس مفردات SHOT_SIZE_OPTIONS
+# المستخدمة أصلًا في تبويب اللقطات، مش قايمة جديدة.
+SHOT_SIZE_OPTIONS_WITH_BLANK = ["غير محدد"] + SHOT_SIZE_OPTIONS
 
-def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved):
+
+def _uploaded_mime(f):
+    """MIME من f.type لو موجود، وإلا تخمين من امتداد الاسم - عشان data URL
+    التوليد يبقى نوعه صح."""
+    if getattr(f, "type", None):
+        return f.type
+    ext = os.path.splitext(f.name or "")[1].lower().lstrip(".")
+    return f"image/{'jpeg' if ext == 'jpg' else ext or 'png'}"
+
+
+def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved, reference_slots=None):
     """صورة مرجعية بتلات طرق: رفع، كاميرا، أو توليد.
 
     برّه أي st.form عن قصد: جوه الفورم الاختيار مابيعملش rerun، فكان اختيار
-    "توليد" بيفضل عارض خانة الرفع. prompt_for(extra) بيرجّع برومبت التوليد،
-    وon_saved(rel_path أو None) بيكتب المسار في قاعدة البيانات."""
+    "توليد" بيفضل عارض خانة الرفع. prompt_for(shot_size, light) بيرجّع
+    البرومبت المتجمّع تلقائيًا من بيانات المكان/الشخصية المحفوظة (مش نص فاضي
+    اليوزر يكتبه من الصفر) - بيتعرض في خانة قابلة للتعديل قبل التوليد.
+    reference_slots: قائمة (مفتاح، تسمية) لصور مرجعية اختيارية بتتبعت للموديل
+    كصور مش نص (صورة ممثل/ة، صورة خلفية/مكان) - افتراضيًا خانة عامة واحدة.
+    on_saved(rel_path أو None) بيكتب المسار في قاعدة البيانات."""
     current_abs = image_abs_path(current_rel)
     if current_abs:
         st.image(current_abs, width=340)
@@ -246,12 +269,31 @@ def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved):
         if shot is not None and st.button(t("💾 حفظ الصورة"), key=f"{key}_save_cam"):
             new_bytes, ext = shot.getvalue(), os.path.splitext(shot.name or "")[1] or ".jpg"
     else:
-        st.caption(t("الصورة هتتولّد من اسم المكان ووصفه. ضيف أي تفاصيل تحب تشوفها فيها:"))
-        extra = st.text_input(t("تفاصيل إضافية (اختياري)"), key=f"{key}_extra")
+        st.caption(t("البرومبت اتجمّع تلقائيًا من البيانات المحفوظة — عدّله زي ما تحب."))
+        pick_col1, pick_col2 = st.columns(2)
+        with pick_col1:
+            shot_size = st.selectbox(t("حجم الكادر"), SHOT_SIZE_OPTIONS_WITH_BLANK,
+                                     format_func=t, key=f"{key}_shot_size", help=FIELD_HELP.get("shot_size"))
+        with pick_col2:
+            light = st.selectbox(t("الإضاءة"), image_gen.LIGHT_OPTIONS, format_func=t, key=f"{key}_light")
+        default_prompt = prompt_for(shot_size, light)
+        prompt_key = f"{key}_prompt"
+        if prompt_key not in st.session_state:
+            st.session_state[prompt_key] = default_prompt
+        if st.button(t("🔄 إعادة التعبئة من البيانات المحفوظة"), key=f"{key}_reset_prompt"):
+            st.session_state[prompt_key] = default_prompt
+            st.rerun()
+        prompt_text = st.text_area(t("وصف الصورة المطلوبة"), key=prompt_key, height=110)
+        ref_bytes = []
+        for slot_key, label in (reference_slots or [("ref", "صورة مرجعية توجّه الشكل (اختياري)")]):
+            rf = st.file_uploader(t(label), type=IMAGE_TYPES, key=f"{key}_ref_{slot_key}")
+            if rf is not None:
+                ref_bytes.append((rf.getvalue(), _uploaded_mime(rf)))
         if st.button(t("✨ ولّد صورة"), key=f"{key}_gen"):
             with st.spinner(t("بنولّد الصورة... ده بياخد حوالي 10 ثواني")):
                 try:
-                    new_bytes, ext = image_gen.generate_image(prompt_for(extra), _openrouter_key())
+                    new_bytes, ext = image_gen.generate_image(
+                        prompt_text, _openrouter_key(), reference_images=ref_bytes or None)
                 except image_gen.ImageGenError as e:
                     st.error(t(str(e)))
     if new_bytes:
@@ -290,6 +332,136 @@ def guarded_delete(delete_fn, params, friendly_error):
     try:
         delete_fn(*params)
         return True
-    except IntegrityError:
-        st.error(friendly_error)
+    except IntegrityError as exc:
+        # P5: لو طبقة البيانات عندها سبب أدق (زي "ده آخر مظهر للشخصية")
+        # بنوريه هو بدل الرسالة العامة بتاعت الشاشة
+        st.error(t(getattr(exc, "user_message", None) or friendly_error))
         return False
+
+
+
+# --- مراحل الشغل والتبويبات (اتفاق المالك 2026-09-24) ---------------------------
+# مفتاح المرحلة فوق التبويبات: ما قبل الإنتاج / الإنتاج. كل مرحلة بتعرض
+# تبويباتها بس (links.PHASES) عشان الشريط مايبقاش 11 تبويب مرة واحدة.
+
+def open_tab_by_slug(slug):
+    """بيفتح تبويب معيّن (من رابط أو زرار) — ومرحلته معاه. لازم يتنده قبل ما
+    مفتاح المرحلة والتبويبات يتبنوا في الـ run ده."""
+    import links
+    from i18n import tr
+    phase = links.phase_of(slug, st.session_state.get("_cf_phase", "pre"))
+    st.session_state["_cf_phase"] = phase
+    st.session_state[f"main_tabs_{phase}"] = tr(links.TABS[slug])
+
+
+def phase_tabs():
+    """بيرسم مفتاح المرحلة وتبويباتها. بيرجّع ({slug: tab}, slug التبويب المفتوح)."""
+    import links
+    from i18n import t, tr
+    st.session_state.setdefault("_cf_phase", "pre")
+    phase = st.segmented_control(
+        t("المرحلة"), list(links.PHASES), key="_cf_phase", required=True,
+        label_visibility="collapsed", format_func=lambda p: tr(f"phase_{p}")) or "pre"
+    slugs = links.PHASES[phase]
+    tabs = dict(zip(slugs, st.tabs([tr(links.TABS[s]) for s in slugs], key=f"main_tabs_{phase}",
+                                   on_change="rerun")))
+    return tabs, next((slug for slug, tab in tabs.items() if tab.open), slugs[0])
+
+
+
+def nav_link(label, href, title=None, icon_only=False):
+    """لينك بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا بيفتح تاب
+    جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب.
+
+    ‎st.markdown‎ عادي مش ‎st.sidebar.markdown‎ عمدًا: بيترسم في أي حاوية
+    (عمود، شريط جانبي...) اللي بينادي عليها من جواها، مش الشريط الجانبي
+    دايمًا.
+
+    ‎title‎: لما اللينك يبقى أيقونة لوحدها من غير كلام (زي 🏠 بعد تعديل
+    2026-09-23)، الأيقونة مش اسم يقراه قارئ الشاشة. فبنحط الكلمة في
+    ‎aria-label‎ (الاسم المنطوق) و‎title‎ (تلميح الماوس) - الكلمة اتشالت من
+    الشاشة بس، مش من الوصول."""
+    attrs = ""
+    if title:
+        esc = html.escape(title, quote=True)
+        attrs = f' title="{esc}" aria-label="{esc}"'
+    cls = "cf-navlink cf-navlink--icon" if icon_only else "cf-navlink"
+    st.markdown(
+        f'<a class="{cls}" href="{html.escape(href, quote=True)}" target="_self"{attrs}>{html.escape(label)}</a>',
+        unsafe_allow_html=True)
+
+
+# --- التنقّل: الشريط الجانبي بيتقفل لما ننتقل لصفحة (طلب المالك 2026-09-24) ---
+# "لما بندوس على ترس الإعدادات ... الـ Side bar المفروض يقفل ونروح" - وكمان بعد
+# إنشاء مشروع، تغيير المشروع أو مساحة العمل، وأي زرار بيودّي لصفحة تانية.
+# Streamlit مالوش API يقفل الشريط، فبنعلّم إن الـ run الجاي لازم يقفله،
+# والسكريبت بيدوس زرار القفل بتاع Streamlit نفسه (الشريط بيتقفل بنفس حركته
+# العادية، ويتفتح تاني من نفس الزرار). من غير أي حرف "أصغر من" في السكريبت:
+# st.html بيمسحه بصمت لو لقى حاجة شبه تاج HTML.
+
+_CLOSE_KEY = "_cf_close_sidebar"
+# data-n: رقم جديد مع كل طلب. من غيره، طلبين ورا بعض (الترس وبعده إنشاء
+# مشروع) بيطلعوا نفس العنصر بالظبط في نفس المكان، فـ Streamlit مابيعيدش
+# رسمه والسكريبت مابيتنفذش تاني.
+_CLOSE_JS = (
+    "<script data-n=\"%d\">(function(){var n=0;var iv=setInterval(function(){n++;"
+    "var sb=document.querySelector('section[data-testid=stSidebar]');"
+    "if(sb&&sb.getAttribute('aria-expanded')==='true'){"
+    "var b=document.querySelector('[data-testid=stSidebarCollapseButton] button')"
+    "||document.querySelector('[data-testid=stSidebarCollapseButton]');"
+    "if(b){b.click();clearInterval(iv);}}"
+    "else if(sb){clearInterval(iv);}"
+    "if(n>40)clearInterval(iv);},100);})();</script>"
+)
+
+
+def request_close_sidebar():
+    """الـ run الجاي يقفل الشريط الجانبي (للكولباك وon_change)."""
+    st.session_state[_CLOSE_KEY] = True
+
+
+def go_to(slug):
+    """يفتح تبويب (ومرحلته) ويقفل الشريط - لأي زرار بيودّي لصفحة جوه المشروع.
+    لو كان فيه صفحة مكتبة مفتوحة، بيقفلها (التبويب يبان مكانها)."""
+    for k in ("page", "pick"):
+        if k in st.query_params:
+            del st.query_params[k]
+    open_tab_by_slug(slug)
+    request_close_sidebar()
+
+
+def close_sidebar_now():
+    """بيتنده مرة في كل run: لو فيه طلب قفل، بيبعت السكريبت مرة واحدة."""
+    if st.session_state.pop(_CLOSE_KEY, False):
+        n = st.session_state.get("_cf_close_n", 0) + 1
+        st.session_state["_cf_close_n"] = n
+        st.html(_CLOSE_JS % n, unsafe_allow_javascript=True)
+
+
+# --- صفحات المكتبات (المالك 2026-09-24) -----------------------------------------
+# مكتبة الممثلين، مكتبة مواقع التصوير، مكتبة التحليلات: صفحات لوحدها
+# (?page=...) بتتفتح من الشريط الجانبي على طول، أو من جوه المشروع في وضع
+# "اختار لـ..." (?pick=<id> - زي اختيار ممثل لشخصية). تغيير الـ query params
+# مابيعملش reload للصفحة، فالجلسة والشريط بيفضلوا زي ما هم.
+LIBRARY_PAGES = ("actors", "locations_lib", "library")
+
+
+def open_page(page, **params):
+    """كولباك: يفتح صفحة مكتبة (ومعاها params زي pick) ويقفل الشريط."""
+    for k in ("page", "pick", "tab"):
+        if k in st.query_params:
+            del st.query_params[k]
+    st.query_params["page"] = page
+    for k, v in params.items():
+        st.query_params[k] = str(v)
+    request_close_sidebar()
+
+
+def close_page(tab=None):
+    """كولباك: يقفل صفحة المكتبة ويرجع للمشروع (وتبويب معيّن لو اتحدد)."""
+    for k in ("page", "pick"):
+        if k in st.query_params:
+            del st.query_params[k]
+    if tab:
+        open_tab_by_slug(tab)
+    request_close_sidebar()

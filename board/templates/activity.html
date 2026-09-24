@@ -3,11 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0B1220">
+  <meta name="theme-color" content="#0F1B45">
+  <link rel="icon" type="image/png" href="../brand/app-icon-dark.png?v={{ asset_version }}">
+  <link rel="apple-touch-icon" href="../brand/apple-touch-icon.png?v={{ asset_version }}">
+  <link rel="manifest" href="../brand/manifest.webmanifest?v={{ asset_version }}">
   <title>سجل النشاط — CimaFast Studio</title>
-  <link rel="stylesheet" href="../static/board.css">
-  <link rel="stylesheet" href="../static/team.css">
-  <link rel="stylesheet" href="../static/activity.css">
+  <link rel="stylesheet" href="../static/board.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="../static/team.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="../static/activity.css?v={{ asset_version }}">
 </head>
 <body class="team">
   <header class="bar">
@@ -17,7 +20,7 @@
     </div>
     {% if companies %}
     <label class="field">
-      <span>الشركة</span>
+      <span>مساحة العمل</span>
       <select id="company">
         {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
@@ -29,7 +32,7 @@
 
   <main class="team__main">
     {% if denied %}
-    <section class="card"><p>سجل النشاط لمدير الشركة بس. لو محتاج تشوفه، كلّم مدير الشركة بتاعتك.</p></section>
+    <section class="card"><p>سجل النشاط لمدير المشروع بس. لو محتاج تشوفه، كلّم مدير المشروع بتاعك.</p></section>
     {% else %}
 
     <!-- تبنّي المنتج: الناس بتستخدم إيه فعلًا -->
@@ -73,6 +76,6 @@
     {% endif %}
   </main>
 
-  <script src="../static/activity.js"></script>
+  <script src="../static/activity.js?v={{ asset_version }}"></script>
 </body>
 </html>

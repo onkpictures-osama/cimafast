@@ -9,11 +9,48 @@ from ui import _loc_display, bump_version, fmt_day_night, fmt_int_ext, library_r
 import repo
 
 
+def _group_table_badge(sc):
+    """بادچ مختصر لعمود "مجاميع" في جدول المشاهد - نظرة واحدة على كل
+    المشاهد بتوضح مين لسه محتاج مراجعة (❔) ومين اتأكد إنه مفيهوش (✅) أو
+    فيه وعدده تقريبًا (👥)."""
+    hg = sc["has_background_group"]
+    if hg == 1:
+        hc = (sc["background_group_headcount"] or "").strip()
+        return f"👥 {hc}" if hc else "👥"
+    if hg == 0:
+        return "✅"
+    return "❔"
+
+
+def _group_popover_label(sc):
+    hg = sc["has_background_group"]
+    if hg == 1:
+        return f"👥 {t('مجاميع')}"
+    if hg == 0:
+        return f"✅ {t('مفيش مجاميع')}"
+    return f"❔ {t('فيه مجاميع؟')}"
+
+
 def render(project, project_id, _is_ar):
     st.subheader(tr("sub_scenes"))
 
     locations_all = repo.location_state_labels(project_id)
     loc_variant_map = {r["label"]: r["id"] for r in locations_all}
+
+    # المسلسل: فلتر بالحلقة فوق كل حاجة - الجدول والفورم بيمشوا عليه
+    # (طلب المالك 2026-09-24). "الكل" = كل الحلقات، و"—" = مشاهد من غير حلقة.
+    _series = repo.is_series(project)
+    _episodes = repo.episode_overview(project_id) if _series else []
+    _ep_numbers = [e["episode_number"] for e in _episodes]
+    _ep_filter = None
+    if _series and _ep_numbers:
+        _loose = repo.scenes_without_episode_count(project_id)
+        _opts = ["all"] + _ep_numbers + (["none"] if _loose else [])
+        _ep_filter = st.pills(
+            t("الحلقة"), _opts, default="all", key=f"scene_ep_filter_{project_id}",
+            format_func=lambda o: t("كل الحلقات") if o == "all" else (
+                f"{t('من غير حلقة')} ({_loose})" if o == "none" else f"{t('ح')} {o}")) or "all"
+    _default_episode = _ep_filter if isinstance(_ep_filter, int) else None
 
     _scenes_before = repo.scene_ids_of_project(project_id)
     _scene_q = (library_search(f"scene_search_{project_id}", len(_scenes_before), "مشاهد")
@@ -24,7 +61,9 @@ def render(project, project_id, _is_ar):
             with col1:
                 sc_number = st.number_input(
                     t("رقم المشهد"), min_value=1, step=1,
-                    value=next_free_number(r["scene_number"] for r in repo.scene_numbers_of_project(project_id)))
+                    value=next_free_number(r["scene_number"] for r in (
+                        repo.scene_numbers_in_episode(project_id, _default_episode) if _series
+                        else repo.scene_numbers_of_project(project_id))))
                 sc_int_ext = st.selectbox(t("داخلي/خارجي"), INT_EXT_OPTIONS, format_func=fmt_int_ext, key="scene_int_ext")
             with col2:
                 sc_day_night = st.selectbox(t("التوقيت"), DAY_NIGHT_OPTIONS, format_func=fmt_day_night, key="scene_day_night")
@@ -34,14 +73,17 @@ def render(project, project_id, _is_ar):
         
             # Episode selection for series
             sc_episode_id = None
-            if project["project_type"] == "مسلسل":
-                episodes = repo.episode_labels(project_id)
-                if episodes:
-                    ep_options = ["بدون حلقة"] + [f"الحلقة {ep['episode_number']}: {ep['title']}" for ep in episodes]
-                    sc_episode_choice = st.selectbox(t("اختر الحلقة"), ep_options, key=f"scene_episode_{project_id}")
-                    if sc_episode_choice != "بدون حلقة":
-                        ep_idx = ep_options.index(sc_episode_choice) - 1
-                        sc_episode_id = episodes[ep_idx]['id']
+            sc_episode_number = None
+            if _series and _episodes:
+                _ep_by_num = {e["episode_number"]: e for e in _episodes}
+                _add_opts = [None] + _ep_numbers
+                sc_episode_number = st.selectbox(
+                    t("الحلقة"), _add_opts,
+                    index=_add_opts.index(_default_episode) if _default_episode in _add_opts else 1,
+                    format_func=lambda n: t("بدون حلقة") if n is None else (
+                        f"{t('الحلقة')} {n}" + (f": {_ep_by_num[n]['title']}" if _ep_by_num[n]["title"] else "")),
+                    key=f"scene_episode_{project_id}")
+                sc_episode_id = (_ep_by_num.get(sc_episode_number) or {}).get("id")
             sc_notes = st.text_area(t("ملاحظات المشهد العامة"), height=150)
             all_chars_for_scene = repo.character_names_by_id(project_id)
             char_map_for_scene = {c["name"]: c["id"] for c in all_chars_for_scene}
@@ -52,24 +94,28 @@ def render(project, project_id, _is_ar):
             if st.form_submit_button(t("إضافة مشهد")):
                 loc_id = loc_variant_map.get(sc_location)
                 existing_scene_numbers_now = {
-                    s["scene_number"] for s in repo.scene_numbers_of_project(project_id)
+                    s["scene_number"] for s in repo.scene_numbers_in_episode(project_id, sc_episode_number)
                 }
                 if sc_number in existing_scene_numbers_now:
-                    # الرقم ده مستخدم قبل كده - بندفع كل المشاهد اللي رقمها أكبر
-                    # أو يساويه رقم واحد لقدام، عشان المشهد الجديد يحتل الرقم ده
-                    # بالظبط من غير ما يبوّظ ترتيب المشاهد التانية
-                    shift_scene_numbers(project_id, sc_number)
+                    # الرقم ده مستخدم قبل كده (في نفس الحلقة) - بندفع كل المشاهد
+                    # اللي رقمها أكبر أو يساويه رقم واحد لقدام، عشان المشهد الجديد
+                    # يحتل الرقم ده بالظبط من غير ما يبوّظ ترتيب المشاهد التانية
+                    shift_scene_numbers(project_id, sc_number, episode_number=sc_episode_number)
                     st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
                 new_scene_id = repo.add_scene(project_id, sc_episode_id, sc_number, sc_int_ext, sc_day_night, sc_weather, loc_id, sc_notes)
                 for _cname in sc_characters:
-                    repo.link_character_to_scene(new_scene_id, char_map_for_scene[_cname])
+                    repo.link_character_to_scene(project_id, new_scene_id, char_map_for_scene[_cname])
                 for _pname in sc_props:
-                    repo.link_prop_to_scene(new_scene_id, prop_map_for_scene[_pname])
+                    repo.link_prop_to_scene(project_id, new_scene_id, prop_map_for_scene[_pname])
                 bump_version(project_id)
                 st.rerun()
 
     st.divider()
     scenes = repo.scenes_of_project(project_id)
+    if _ep_filter == "none":
+        scenes = [sc for sc in scenes if sc["episode_number"] is None]
+    elif isinstance(_ep_filter, int):
+        scenes = [sc for sc in scenes if sc["episode_number"] == _ep_filter]
     id_to_loc_label = {v: k for k, v in loc_variant_map.items()}
 
     # جدول المشاهد: نظرة واحدة على كل المشاهد بدل 143 سطر مقفول شبه بعض.
@@ -77,6 +123,9 @@ def render(project, project_id, _is_ar):
     _chars_by_scene = {}
     for r in repo.scene_character_names(project_id):
         _chars_by_scene.setdefault(r["scene_id"], []).append(r["name"])
+    # أرقام الكاست وأسماء الممثلين لكل مشهد - نفس اللي بيطلع في الـ strip
+    # بتاع الجدول، عشان التفريغ يتقري بالأرقام زي الكول شيت
+    _cast_by_scene = {s["id"]: s["cast"] for s in repo.board_scenes(project_id)}
     _shots_by_scene = {r["scene_id"]: r["n"] for r in repo.shot_counts_per_scene(project_id)}
 
     _scenes_shown = scenes
@@ -85,7 +134,8 @@ def render(project, project_id, _is_ar):
             sc for sc in scenes
             if matches(_scene_q, scene_label(sc), sc["int_ext"], sc["day_night"],
                        id_to_loc_label.get(sc["location_variant_id"]), sc["notes"],
-                       " ".join(_chars_by_scene.get(sc["id"], [])))
+                       " ".join(_chars_by_scene.get(sc["id"], [])),
+                       " ".join(c["actor"] or "" for c in _cast_by_scene.get(sc["id"], [])))
         ]
         _table = pd.DataFrame([{
             t("رقم"): scene_label(sc),
@@ -93,6 +143,9 @@ def render(project, project_id, _is_ar):
             t("التوقيت"): fmt_day_night(sc["day_night"] or "غير محدد"),
             t("المكان"): _loc_display(id_to_loc_label.get(sc["location_variant_id"])) or "—",
             t("الشخصيات"): len(_chars_by_scene.get(sc["id"], [])),
+            t("مجاميع"): _group_table_badge(sc),
+            t("أرقام الكاست"): "، ".join(str(c["num"]) for c in _cast_by_scene.get(sc["id"], [])
+                                        if c["num"]) or "—",
             t("اللقطات"): _shots_by_scene.get(sc["id"], 0),
         } for sc in _scenes_shown])
         if _is_ar and not _table.empty:
@@ -115,6 +168,19 @@ def render(project, project_id, _is_ar):
             # ضغطة في أي مكان، فكانوا بيتبنوا مع كل حركة في البرنامج.
             _scenes_shown = []
             st.caption(t("اختار مشهد أو أكتر من الجدول (المربع جنب الصف) عشان تعدّلهم أو تمسحهم."))
+    # H4: جاي من تنبيه (‎&item=‎) — المشهد اللي اتغيّر بس، وفورمته مفتوحة.
+    # لو المشهد مش في المشروع ده (اتمسح، أو رابط مشروع تاني) بنتجاهل الرابط.
+    _focus_id = st.session_state.get("_focus_scene")
+    _focused = [sc for sc in scenes if sc["id"] == _focus_id] if (_focus_id and scenes) else []
+    if _focus_id and not _focused:
+        st.session_state.pop("_focus_scene", None)
+    if _focused:
+        _scenes_shown = _focused
+        _fc1, _fc2 = st.columns([0.7, 0.3], vertical_alignment="center")
+        _fc1.info(f"🔔 {t('بتعرض المشهد اللي اتغيّر بس.')}")
+        if _fc2.button(t("اعرض كل المشاهد"), key="clear_scene_focus", use_container_width=True):
+            st.session_state.pop("_focus_scene", None)
+            st.rerun()
     int_ext_edit_options = ["غير محدد"] + INT_EXT_OPTIONS
     day_night_edit_options = ["غير محدد"] + DAY_NIGHT_OPTIONS
     loc_edit_options = ["بدون تحديد"] + list(loc_variant_map.keys())
@@ -135,13 +201,54 @@ def render(project, project_id, _is_ar):
         # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
         # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
         # 16 ثانية لكل rerun على الإنتاج).
-        _lazy_exp = exp_col.expander(title, key=f"exp_scene_{sc['id']}", on_change="rerun")
+        _lazy_exp = exp_col.expander(title, key=f"exp_scene_{sc['id']}", on_change="rerun",
+                                     expanded=bool(_focused))
         with _lazy_exp:
             if _lazy_exp.open:
+                # زرار مستقل بره فورم التعديل الكبير (زي بادچ لينك الموقع في
+                # locations.py) - عشان حقول العدد واللبس والفعل تظهر لحظيًا
+                # أول ما تختار "أيوه فيه" من غير ما تستنى submit الفورم
+                # التاني، وتتحفظ فورًا لوحدها.
+                with st.popover(_group_popover_label(sc)):
+                    st.caption(t("المشهد ده فيه ناس في الخلفية (مجاميع/كومبارس) - مش شخصية باسمها - ولا لأ؟"))
+                    _grp_has = st.radio(
+                        t("مجاميع/كومبارس"), [False, True],
+                        index=1 if sc["has_background_group"] == 1 else 0,
+                        format_func=lambda v: t("أيوه فيه") if v else t("لأ، مفيش"),
+                        key=f"grp_choice_{sc['id']}", label_visibility="collapsed", horizontal=True,
+                    )
+                    _grp_headcount = _grp_wardrobe = _grp_action = ""
+                    if _grp_has:
+                        _grp_headcount = st.text_input(
+                            t("العدد التقريبي"), value=sc["background_group_headcount"] or "",
+                            placeholder=t("مثال: 10-15 أو حوالي 30"), key=f"grp_headcount_{sc['id']}")
+                        _grp_wardrobe = st.text_input(
+                            t("وصف ملابسهم"), value=sc["background_group_wardrobe"] or "",
+                            placeholder=t("مثال: يونيفورم عمال، جلاليب، بدل رسمية"), key=f"grp_wardrobe_{sc['id']}")
+                        _grp_action = st.text_area(
+                            t("بيعملوا إيه في المشهد"), value=sc["background_group_action"] or "",
+                            placeholder=t("مثال: بيمشوا في الخلفية، بيهتفوا، بيشتغلوا"),
+                            key=f"grp_action_{sc['id']}", height=80)
+                    if st.button(t("💾 حفظ"), key=f"grp_save_{sc['id']}"):
+                        repo.update_scene_background(
+                            project_id, sc["id"], 1 if _grp_has else 0,
+                            _grp_headcount.strip() or None, _grp_wardrobe.strip() or None,
+                            _grp_action.strip() or None,
+                        )
+                        mark_saved(f"scene_grp_{sc['id']}")
+                        st.rerun()
+                    show_saved_badge(f"scene_grp_{sc['id']}")
                 with st.form(f"edit_scene_{sc['id']}"):
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         esc_number = st.number_input(t("رقم المشهد"), min_value=1, step=1, value=sc["scene_number"])
+                        esc_episode = sc["episode_number"]
+                        if _series and _ep_numbers:
+                            _e_opts = [None] + _ep_numbers
+                            esc_episode = st.selectbox(
+                                t("الحلقة"), _e_opts,
+                                index=_e_opts.index(sc["episode_number"]) if sc["episode_number"] in _e_opts else 0,
+                                format_func=lambda n: t("بدون حلقة") if n is None else f"{t('الحلقة')} {n}")
                         esc_int_ext = st.selectbox(
                             t("داخلي/خارجي"), int_ext_edit_options,
                             index=safe_index(int_ext_edit_options, sc["int_ext"] or "غير محدد"),
@@ -191,23 +298,26 @@ def render(project, project_id, _is_ar):
                     new_int_ext = None if esc_int_ext == "غير محدد" else esc_int_ext
                     new_day_night = None if esc_day_night == "غير محدد" else esc_day_night
                     new_loc_id = loc_variant_map.get(esc_location)
-                    if esc_number != sc["scene_number"]:
-                        colliding = repo.other_scene_with_number(project_id, esc_number, sc["id"])
+                    if esc_episode != sc["episode_number"]:
+                        repo.set_scene_episode(project_id, sc["id"], esc_episode)
+                    if esc_number != sc["scene_number"] or esc_episode != sc["episode_number"]:
+                        colliding = repo.other_scene_with_number(project_id, esc_number, sc["id"], esc_episode)
                         if colliding:
-                            shift_scene_numbers(project_id, esc_number, exclude_scene_id=sc["id"])
+                            shift_scene_numbers(project_id, esc_number, exclude_scene_id=sc["id"],
+                                                episode_number=esc_episode)
                             st.info(t("الرقم ده كان مستخدم - تم نقل باقي المشاهد رقم واحد لقدام عشان تتزبط."))
-                    repo.update_scene(esc_number, new_int_ext, new_day_night, esc_weather, new_loc_id, esc_notes, sc["id"])
-                    repo.unlink_scene_characters(sc["id"])
+                    repo.update_scene(project_id, esc_number, new_int_ext, new_day_night, esc_weather, new_loc_id, esc_notes, sc["id"])
+                    repo.unlink_scene_characters(project_id, sc["id"])
                     for _cname in esc_characters:
-                        repo.link_character_to_scene(sc["id"], char_map_for_scene[_cname])
-                    repo.unlink_scene_props(sc["id"])
+                        repo.link_character_to_scene(project_id, sc["id"], char_map_for_scene[_cname])
+                    repo.unlink_scene_props(project_id, sc["id"])
                     for _pname in esc_props:
-                        repo.link_prop_to_scene(sc["id"], prop_map_for_scene[_pname])
+                        repo.link_prop_to_scene(project_id, sc["id"], prop_map_for_scene[_pname])
                     bump_version(project_id)
                     mark_saved(f"scene_{sc['id']}")
                     st.rerun()
                 if del_sc:
-                    repo.delete_scene(sc["id"])
+                    repo.delete_scene(project_id, sc["id"])
                     bump_version(project_id)
                     st.success(t("تم حذف المشهد"))
                     st.rerun()
@@ -219,7 +329,7 @@ def render(project, project_id, _is_ar):
                 f"🗑️ {t('حذف')} {len(selected_scene_ids_for_bulk_delete)} {t('مشهد مختار (وكل لقطاتهم)')}",
             ):
                 for _sid in selected_scene_ids_for_bulk_delete:
-                    repo.delete_scene(_sid)
+                    repo.delete_scene(project_id, _sid)
                 bump_version(project_id)
                 st.success(t("تم حذف المشاهد المختارة"))
                 st.rerun()

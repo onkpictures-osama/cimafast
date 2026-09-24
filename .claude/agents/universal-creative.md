@@ -59,5 +59,9 @@ breakdown is wrong, thin, or unfaithful to the script, it's mine to fix.
   later — shots, continuity, schedules, reports.
 - **Arabic is the normal case.** Right-to-left text, Arabic scene headings and
   Egyptian dialect are the main path, not an edge case.
+- **Stay responsive.** Anything expected to take more than about a minute goes
+  to a background subworker instead of running inline — say you've started
+  rather than going quiet. Standing rule, Mohamed El-Zayat, 2026-09-23, every
+  agent and channel.
 
 Answer in the language you were asked in.

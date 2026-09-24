@@ -89,6 +89,23 @@ def _applies(rule, role, job_title):
     return role in roles or any(normalize(w) in job for w in words)
 
 
+# شارة "محتاجك": أيقونة + لون ثابتين لكل نوع مهمة (مش هاش عشوائي) — نفس
+# الـ id بتاع RULES فوق. العائلة اللونية بترجّع لمجال الشغل: الجدولة أزرق،
+# اللقطات أخضر، الأزياء/اللوك وردي، الصور برتقالي، السيناريو بنفسجي.
+NEED_BADGES = {
+    "unscheduled": ("🗓️", "sched"),
+    "no_schedule": ("🗓️", "sched"),
+    "undated_days": ("📅", "sched"),
+    "no_shots": ("🎬", "shots"),
+    "unreviewed": ("🎥", "shots"),
+    "no_look": ("👗", "look"),
+    "look_changes": ("👗", "look"),
+    "location_images": ("📍", "photo"),
+    "character_images": ("🖼️", "photo"),
+    "no_script": ("📄", "script"),
+}
+
+
 def needs_you(role, job_title, cards):
     """العناصر اللي محتاجة المستخدم ده، من كل مشاريعه. المشاهد مالوش مهام."""
     if role == "viewer":
@@ -102,14 +119,33 @@ def needs_you(role, job_title, cards):
             rid, _, _, count_of, text, target = rule
             n = count_of(ov)
             if n > 0:
+                icon, badge = NEED_BADGES.get(rid, ("•", "sched"))
                 items.append({"id": rid, "count": n, "text": text, "project": card["name"],
-                              "project_id": card["id"],
+                              "project_id": card["id"], "icon": icon, "badge": badge,
                               "href": card["board_href"] if target == "board" else card["tab_href"](target)})
     items.sort(key=lambda i: -i["count"])
     return items
 
 
 # --- المشاريع ---------------------------------------------------------------------------
+# مفيش ميزة رفع غلاف/بوستر للمشروع في البرنامج لسه (مفيش عمود ولا مسار رفع
+# في database.py/repo.py) — بدل ما نختلق صورة مش حقيقية لمشروع حد، الكارت
+# بياخد تعبئة متدرّجة ثابتة (مش عشوائية: p["id"] % طول القايمة) من نفس
+# ألوان العلامة، وفوقها أيقونة نوع المشروع. لما ميزة الغلاف الحقيقي تتبني
+# يوم ما، دي هتتستبدل مش هتتلغي.
+COVER_GRADIENTS = (
+    "linear-gradient(135deg, #243677, #0F438A)",
+    "linear-gradient(135deg, #212F70, #1A2860)",
+    "linear-gradient(135deg, #0F438A, #1B254B)",
+    "linear-gradient(135deg, #1A2860, #212F70)",
+)
+TYPE_ICON = {"فيلم": "🎬", "مسلسل": "📺", "إعلان": "📣", "فيديو": "🎞️", "فيديو قصير": "🎞️"}
+
+
+def _cover(project_id, project_type, name):
+    icon = TYPE_ICON.get(project_type) or (name.strip()[:1].upper() if name.strip() else "🎬")
+    return {"gradient": COVER_GRADIENTS[project_id % len(COVER_GRADIENTS)], "icon": icon}
+
 
 def cards(username, app_base, board_base):
     """كارت لكل مشروع المستخدم يقدر يشوفه، في كل شركاته."""
@@ -127,6 +163,7 @@ def cards(username, app_base, board_base):
         out.append({"id": p["id"], "name": p["name"], "type": p["project_type"],
                     "company": company.get("name"), "role": company.get("role"),
                     "overview": ov, "progress": progress(ov),
+                    "cover": _cover(p["id"], p["project_type"], p["name"]),
                     "next_text": step_text, "next_href": step_href,
                     # "افتح": مشروع لسه من غير سيناريو يبدأ من الإضافة، غير كده من المشاهد
                     "open_href": tab_href("scenes" if ov["scenes"] else "import"), "board_href": board,

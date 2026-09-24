@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
 
 import docx
-from docx.shared import Pt, Cm
+from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -27,9 +27,57 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as pdfcanvas
 
-NAVY = "12203D"
-YELLOW = "E8B923"
-WHITE = "FFFFFF"
+from theme.brand import MASTER_ASPECT, lockup_master_path
+from theme.tokens import BRAND
+
+# --------------------------------------------------------------------------
+# ألوان التقارير — بتتقرا من بالتة البراند نفسها (‎theme/tokens.py‎) مش من
+# قيم مكتوبة بالإيد قريبة منها. الملف ده اتكتب قبل ما نظام الهوية يتعمل،
+# فكان فيه كحلي وأصفر بتوعه هو (12203D / E8B923) قريبين من الرسمي بس مش
+# هو. دلوقتي مصدر واحد للحقيقة: الواجهة والورق بيشربوا من نفس البئر.
+#
+# قاعدة الدليل الذهبية محفوظة هنا برضو: الحروف فوق الحقل الأصفر دايمًا
+# Ink (9.67:1) مش كحلي، والأبيض فوق Navy (12.31:1).
+#
+# openpyxl عايز الهكس من غير "#"، و reportlab عايزه بيها — فبنخزّن الصيغة
+# القصيرة وبنضيف "#" عند الرسم.
+# --------------------------------------------------------------------------
+
+
+def _hex6(token):
+    """لون براند بصيغة ‎RRGGBB‎ (الصيغة اللي openpyxl بيفهمها)."""
+    return BRAND[token].lstrip("#").upper()
+
+
+NAVY = _hex6("navy")        # #212F70 — شريط أسماء الأعمدة، الحروف البارزة
+INK = _hex6("ink")          # #1B254B — الحروف فوق الحقل الأصفر ونص الجدول
+YELLOW = _hex6("yellow")    # #FECA05 — بانر العنوان (الحقل الأصفر)
+WHITE = _hex6("white")
+CREAM = _hex6("cream")      # #F3F3ED — الصف المظلل في الجدول المتبدّل
+MIST = _hex6("mist")        # #D9D9D4 — حدود الخانات والخطوط الفاصلة
+
+# python-docx بياخد ‎RGBColor‎ مش سترنج، فبنحوّل مرة واحدة هنا
+_WORD_INK = RGBColor.from_string(INK)
+_WORD_NAVY = RGBColor.from_string(NAVY)
+_WORD_WHITE = RGBColor.from_string(WHITE)
+
+# --------------------------------------------------------------------------
+# اللوجو على الورق — نفس ماستر الـ lockup الرسمي اللي الواجهة بتستخدمه، من
+# ‎static/brand/‎ زي ما هو. الدليل (ص 06 · Logo rules) بيمنع إعادة التلوين
+# أو التنميط أو القص: إحنا بنغيّر المقاس بس وبنختار النسخة حسب السطح —
+#   ورق أبيض أو الحقل الأصفر  →  الشخصية كحلي  →  النسخة "light"
+#   شريط كحلي/غامق            →  الشخصية صفرا  →  النسخة "dark"
+# --------------------------------------------------------------------------
+
+
+def _logo_file(surface="light"):
+    """مسار ماستر الـ lockup، أو ‎None‎ لو الأصل مش موجود.
+
+    التقرير نفسه أهم من اللوجو: لو الأصل ناقص لأي سبب بنكمّل التصدير من
+    غيره بدل ما شغل المستخدم كله يقع على استيراد صورة.
+    """
+    path = lockup_master_path(surface)
+    return path if os.path.exists(path) else None
 
 COLUMNS = [
     ("scene_number", "مشهد", 8),
@@ -53,13 +101,13 @@ COLUMNS = [
 
 def _fetch_breakdown_rows(project_id, fetch_all):
     scenes = fetch_all("""
-        SELECT s.id as scene_id, s.scene_number, s.int_ext, s.day_night, s.notes as scene_notes,
-               l.name as location_name, lv.variant_name
+        SELECT s.id as scene_id, s.scene_number, s.scene_suffix, s.episode_number, s.int_ext, s.day_night,
+               s.notes as scene_notes, l.name as location_name, lv.variant_name
         FROM scenes s
         LEFT JOIN location_variants lv ON s.location_variant_id = lv.id
         LEFT JOIN locations l ON lv.location_id = l.id
         WHERE s.project_id = ?
-        ORDER BY s.scene_number
+        ORDER BY """ + _EPISODE_ORDER + """
     """, (project_id,))
 
     rows = []
@@ -142,7 +190,38 @@ _BOLD_NAME_KEYS = {
     "name", "location", "decor", "characters", "main_characters",
     "secondary_characters", "locations",
 }
-_THIN_BORDER = Border(*(Side(style="thin", color="BFBFBF") for _ in range(4)))
+_THIN_BORDER = Border(*(Side(style="thin", color=MIST) for _ in range(4)))
+
+# ارتفاع اللوجو جوه البانر الأصفر بالبكسل — البانر نفسه 60px (26+20+14)،
+# فبنسيب هامش بسيط فوق وتحت بدل ما يلزق في حرف الجدول
+_EXCEL_LOGO_H_PX = 46
+
+
+def _place_excel_logo(ws):
+    """بيحط ماستر اللوجو فوق البانر الأصفر في أول الورقة.
+
+    الورقة ‎rightToLeft‎، يعني إكسل بيقلب الشبكة نفسها وعمود A بيبقى في
+    أقصى اليمين — فالمرساة ‎A1‎ بتوقّع اللوجو في ركن البداية بالنسبة للقارئ
+    العربي، بعيد عن العنوان المتوسّط. والنسخة "light" لأن الحقل الأصفر
+    بياخد الشخصية الكحلي (الدليل ص 06).
+
+    الصورة عائمة فوق الخانات المدموجة، فمش بتزق أي صف ولا بتكسر تنسيق
+    الجدول تحتها.
+    """
+    path = _logo_file("light")
+    if not path:
+        return
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+        img = XLImage(path)
+    except Exception:
+        # openpyxl بيحتاج Pillow عشان يقرا أبعاد الصورة — لو مش متسطّب
+        # بنكمّل من غير لوجو بدل ما التصدير كله يفشل
+        return
+    img.height = _EXCEL_LOGO_H_PX
+    img.width = round(_EXCEL_LOGO_H_PX * MASTER_ASPECT)
+    img.anchor = "A1"
+    ws.add_image(img)
 
 
 def _project_type_name_line(project):
@@ -170,9 +249,11 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
 
     header_fill = PatternFill(start_color=NAVY, end_color=NAVY, fill_type="solid")
     header_font = Font(color=WHITE, bold=True, size=10)
-    title_font = Font(color=NAVY, bold=True, size=16)
-    subtitle_font = Font(color=NAVY, bold=True, size=12)
-    version_font = Font(color=NAVY, size=8, italic=True)
+    # فوق الحقل الأصفر الحروف Ink مش Navy — ده نص الدليل (ص 05)، وبيدي
+    # 9.67:1 بدل 7.4:1
+    title_font = Font(color=INK, bold=True, size=16)
+    subtitle_font = Font(color=INK, bold=True, size=12)
+    version_font = Font(color=INK, size=8, italic=True)
     title_fill = PatternFill(start_color=YELLOW, end_color=YELLOW, fill_type="solid")
 
     n_cols = len(columns)
@@ -197,6 +278,8 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
     version_cell.fill = title_fill
     version_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[3].height = 14
+
+    _place_excel_logo(ws)
 
     header_row = 5
     for col_idx, (key, label, width) in enumerate(columns, start=1):
@@ -237,12 +320,12 @@ def _build_generic_excel(sheet_title, report_name, project, columns, rows):
                 cell.font = Font(bold=True)
             else:
                 cell.alignment = Alignment(horizontal="right", vertical="top", wrap_text=True)
-            # صفوف متبدلة الألوان (رصاصي فاتح / أبيض) عشان العين تتابع السطر
-            # بسهولة في الأوراق الطويلة
+            # صفوف متبدلة الألوان (كريم البراند / أبيض) عشان العين تتابع
+            # السطر بسهولة في الأوراق الطويلة
             if r % 2 == 0:
-                cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+                cell.fill = PatternFill(start_color=CREAM, end_color=CREAM, fill_type="solid")
             else:
-                cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+                cell.fill = PatternFill(start_color=WHITE, end_color=WHITE, fill_type="solid")
 
     buf = BytesIO()
     wb.save(buf)
@@ -275,13 +358,27 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
     المصدر الأساسي لمشاهد كل شخصية هو ربط scene_characters (بيتسجل من وقت
     استيراد السكريبت، أو بالإضافة اليدوية من تبويب السكريبت)، عشان التقرير
     يبقى صحيح حتى لو المشاهد ديه لسه ملهاش لقطات مفرّغة."""
+    import repo  # متأخر: التصدير بيتنادى من غير Streamlit في الاختبارات
     characters = fetch_all(
         "SELECT * FROM characters WHERE project_id=? ORDER BY id", (project_id,)
     )
+    # الرقم = رقم الكاست لو متحط (نفس رقم التفريغ والجدول)؛ الترشيح = الممثل
+    # المتعاقد أو المرشحين؛ عدد الأيام = أيام الشغل من جدول التصوير.
+    cast = repo.cast_by_character(project_id)
+    work_days = {r["character_id"]: r["work_days"] for r in repo.day_out_of_days(project_id)["rows"]}
+    order = {cid: i for i, cid in enumerate(cast)}
+    characters = sorted(characters, key=lambda c: order.get(c["id"], len(order)))
     rows = []
     for idx, ch in enumerate(characters, start=1):
+        ce = cast.get(ch["id"], {})
+        if ce.get("actor"):
+            nomination = ce["actor"]["name"]
+        else:
+            nomination = "، ".join(p["name"] for p in ce.get("shortlist", []))
+            if nomination:
+                nomination += " (مرشح)"
         scene_rows = fetch_all("""
-            SELECT DISTINCT s.scene_number, l.name AS location_name
+            SELECT DISTINCT s.scene_number, s.scene_suffix, s.episode_number, l.name AS location_name
             FROM scene_characters sch
             JOIN scenes s ON sch.scene_id = s.id
             LEFT JOIN location_variants lv ON s.location_variant_id = lv.id
@@ -289,16 +386,16 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
             WHERE sch.character_id = ?
             ORDER BY s.scene_number
         """, (ch["id"],))
-        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        scene_numbers = _scene_labels(scene_rows)   # 3/12 في المسلسل
         location_names = sorted({r["location_name"] for r in scene_rows if r["location_name"]})
         rows.append({
-            "number": idx,
+            "number": ce.get("cast_number") or idx,
             "name": ch["name"],
             "description": ch["personality_notes"] or "",
-            "nomination": "",
+            "nomination": nomination,
             "scene_count": len(scene_numbers),
             "scene_numbers": "، ".join(str(n) for n in scene_numbers),
-            "day_count": "",
+            "day_count": work_days.get(ch["id"], ""),
             "locations": "، ".join(location_names),
         })
     return _build_generic_excel(
@@ -324,6 +421,26 @@ GENERAL_BREAKDOWN_COLUMNS = [
 _MAIN_ROLE_TYPES = {"بطل", "شرير"}
 
 
+def _scene_labels(rows):
+    """أرقام المشاهد بالترتيب ومن غير تكرار، بنفس scene_label (3/12 في
+    المسلسل). العد بالمشهد نفسه مش بالرقم بس: مشهد 1 في الحلقة 1 ومشهد 1 في
+    الحلقة 2 مشهدين."""
+    ordered = sorted(rows, key=lambda r: (r["episode_number"] is None, r["episode_number"] or 0,
+                                          r["scene_number"], r["scene_suffix"] or ""))
+    return list(dict.fromkeys(scene_label(r) for r in ordered))
+
+
+_EPISODE_ORDER = "CASE WHEN s.episode_number IS NULL THEN 1 ELSE 0 END, s.episode_number, s.scene_number"
+
+
+def _numbered_names(rows):
+    """"1- سلمى"، "4- سامي"... بترتيب رقم الكاست، واللي مالوش رقم بالاسم آخر
+    القايمة - نفس الأرقام اللي في جدول التصوير والكول شيت."""
+    rows = {(r["name"], r["cast_number"]) for r in rows}
+    ordered = sorted(rows, key=lambda r: (r[1] is None, r[1] or 0, r[0]))
+    return [f"{n}- {name}" if n else name for name, n in ordered]
+
+
 def build_general_breakdown_excel(project, project_id, fetch_all):
     """التفريغ العام: ورقة واحدة لكل مشهد بمعلومات الديكور والمكان والتوقيت
     والشخصيات المقسّمة لرئيسية/ثانوية حسب نوع الدور، زي الورقة القياسية
@@ -334,7 +451,7 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
         FROM scenes s
         LEFT JOIN location_variants lv ON s.location_variant_id = lv.id
         LEFT JOIN locations l ON lv.location_id = l.id
-        WHERE s.project_id=? ORDER BY s.scene_number
+        WHERE s.project_id=? ORDER BY """ + _EPISODE_ORDER + """
     """, (project_id,))
     rows = []
     for idx, sc in enumerate(scenes, start=1):
@@ -343,13 +460,13 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
         # السكريبت) - ده اللي بيخلي التقرير ده يتملى بالداتا فعليًا حتى لو
         # لسه مفيش لقطات مفرّغة للمشهد
         char_rows = fetch_all("""
-            SELECT DISTINCT ch.name, ch.role_type
+            SELECT DISTINCT ch.name, ch.role_type, ch.cast_number
             FROM scene_characters sch
             JOIN characters ch ON sch.character_id = ch.id
             WHERE sch.scene_id = ?
         """, (sc["id"],))
-        main_chars = sorted({r["name"] for r in char_rows if r["role_type"] in _MAIN_ROLE_TYPES})
-        secondary_chars = sorted({r["name"] for r in char_rows if r["role_type"] not in _MAIN_ROLE_TYPES})
+        main_chars = _numbered_names(r for r in char_rows if r["role_type"] in _MAIN_ROLE_TYPES)
+        secondary_chars = _numbered_names(r for r in char_rows if r["role_type"] not in _MAIN_ROLE_TYPES)
         prop_rows = fetch_all("""
             SELECT DISTINCT p.name
             FROM scene_props sp
@@ -378,6 +495,70 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
     return _build_generic_excel("التفريغ العام", "التفريغ العام", project, GENERAL_BREAKDOWN_COLUMNS, rows)
 
 
+# ---------- كشف الملابس (P10) ----------
+WARDROBE_SHEET_COLUMNS = [
+    ("character", "الشخصية", 18),
+    ("actor", "الممثل", 18),
+    ("change", "الغيار", 16),
+    ("item", "القطعة", 20),
+    ("category", "النوع", 12),
+    ("color", "اللون", 10),
+    ("material", "الخامة", 10),
+    ("size", "المقاس", 8),
+    ("source", "المصدر", 10),
+    ("multiples", "النسخ", 7),
+    ("story_state", "الحالة في الحكاية", 14),
+    ("cost", "التكلفة", 10),
+    ("status", "التجهيز", 12),
+    ("scenes", "المشاهد", 26),
+    ("notes", "ملاحظات", 22),
+]
+
+
+def build_wardrobe_sheet_excel(project, project_id, fetch_all):
+    """كشف الملابس: كل قطعة بغيارها وشخصيتها وممثلها، والمشاهد اللي الغيار
+    متحدد فيها (3/12 في المسلسل). الغيار اللي لسه مالوش قطع بيطلع سطر لوحده
+    عشان يبان إنه ناقص، مش يختفي."""
+    import repo  # متأخر زي كشف الشخصيات
+    cast = repo.cast_by_character(project_id)
+    scenes_by_look = {}
+    for r in fetch_all("""
+        SELECT x.look_id, s.scene_number, s.scene_suffix, s.episode_number
+        FROM scene_character_looks x JOIN scenes s ON s.id = x.scene_id
+        WHERE s.project_id = ?
+    """, (project_id,)):
+        scenes_by_look.setdefault(r["look_id"], []).append(r)
+    items_by_look = {}
+    for it in repo.wardrobe_items_of_project(project_id):
+        items_by_look.setdefault(it["look_id"], []).append(it)
+    changes = sorted(repo.wardrobe_changes(project_id), key=lambda c: (
+        c["cast_number"] is None, c["cast_number"] or 0, c["character_id"], c["change_number"] or 0))
+    rows = []
+    for ch in changes:
+        ce = cast.get(ch["character_id"]) or {}
+        base = {
+            "character": (f"#{ch['cast_number']} " if ch["cast_number"] else "") + ch["character_name"],
+            "actor": (ce.get("actor") or {}).get("name", ""),
+            "change": repo.change_label(ch),
+            "scenes": "، ".join(_scene_labels(scenes_by_look.get(ch["id"], []))),
+        }
+        items = items_by_look.get(ch["id"]) or [None]
+        for it in items:
+            row = dict(base)
+            if it:
+                row.update({
+                    "item": it["item_name"], "category": it["category"] or "", "color": it["color"] or "",
+                    "material": it["material"] or "", "size": it["size"] or "", "source": it["source"] or "",
+                    "multiples": it["multiples"] or 1, "story_state": it["story_state"] or "",
+                    "cost": it["cost"] if it["cost"] is not None else "", "status": it["status"] or "",
+                    "notes": it["notes"] or "",
+                })
+            else:
+                row.update({"item": "— لسه مفيش قطع —"})
+            rows.append(row)
+    return _build_generic_excel("كشف الملابس", "كشف الملابس", project, WARDROBE_SHEET_COLUMNS, rows)
+
+
 # ---------- كشف أماكن التصوير ----------
 LOCATIONS_SHEET_COLUMNS = [
     ("number", "الرقم", 8),
@@ -401,13 +582,12 @@ def build_locations_sheet_excel(project, project_id, fetch_all):
     rows = []
     for idx, loc in enumerate(locations, start=1):
         scene_rows = fetch_all("""
-            SELECT s.scene_number
+            SELECT s.scene_number, s.scene_suffix, s.episode_number
             FROM scenes s
             JOIN location_variants lv ON s.location_variant_id = lv.id
             WHERE lv.location_id = ?
-            ORDER BY s.scene_number
         """, (loc["id"],))
-        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        scene_numbers = _scene_labels(scene_rows)
         # لو المكان ده ديكور/تكوين فرعي تابع لمكان رئيسي، نوضح ده في خانة
         # الديكور مع اسم المكان الرئيسي اللي بينتمي له
         if loc["parent_location_id"]:
@@ -432,7 +612,8 @@ PROPS_SHEET_COLUMNS = [
     ("number", "الرقم", 8),
     ("name", "الإكسسوار", 24),
     ("owner_character", "تابع لشخصية", 22),
-    ("continuity", "حساس للاستمرارية", 16),
+    ("quantity", "الكمية", 10),
+    ("notes", "ملاحظات", 24),
     ("scene_count", "عدد المشاهد", 12),
     ("scene_numbers", "ارقام المشاهد", 30),
 ]
@@ -440,8 +621,9 @@ PROPS_SHEET_COLUMNS = [
 
 def build_props_sheet_excel(project, project_id, fetch_all):
     """كشف الإكسسوار: ورقة واحدة لكل إكسسوار، بعدد وأرقام المشاهد اللي
-    ظاهر فيها (من ربط scene_props)، والشخصية التابع لها لو محدد، وعلامة
-    لو الإكسسوار حساس للاستمرارية (يحتاج انتباه خاص وقت التصوير)."""
+    ظاهر فيها (من ربط scene_props)، والشخصية التابع لها لو محدد، والكمية
+    المطلوبة من نفس القطعة (زي كام نسخة من خطاب هيتقطع في أكتر من تيك)
+    وملاحظاتها."""
     props = fetch_all(
         "SELECT * FROM props WHERE project_id=? ORDER BY id", (project_id,)
     )
@@ -452,17 +634,17 @@ def build_props_sheet_excel(project, project_id, fetch_all):
     rows = []
     for idx, prop in enumerate(props, start=1):
         scene_rows = fetch_all("""
-            SELECT s.scene_number FROM scene_props sp
+            SELECT s.scene_number, s.scene_suffix, s.episode_number FROM scene_props sp
             JOIN scenes s ON sp.scene_id = s.id
             WHERE sp.prop_id = ?
-            ORDER BY s.scene_number
         """, (prop["id"],))
-        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        scene_numbers = _scene_labels(scene_rows)
         rows.append({
             "number": idx,
             "name": prop["name"],
             "owner_character": character_name_by_id.get(prop["character_id"], ""),
-            "continuity": "نعم" if prop["continuity_sensitive"] else "",
+            "quantity": prop["quantity"] or 1,
+            "notes": prop["notes"] or "",
             "scene_count": len(scene_numbers),
             "scene_numbers": "، ".join(str(n) for n in scene_numbers),
         })
@@ -485,6 +667,44 @@ def _set_rtl_center(paragraph):
     pPr.append(bidi)
 
 
+def _shade_cell(cell, hex6):
+    """تظليل خانة في وورد. python-docx مفيهوش API للتظليل، فبنحقن عنصر
+    ‎w:shd‎ في خصائص الخانة بنفسنا زي ما بنعمل مع ‎w:bidi‎."""
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), hex6)
+    cell._tc.get_or_add_tcPr().append(shd)
+
+
+def _brand_table_borders(table, hex6):
+    """حدود الجدول بلون البراند بدل الأسود اللي ‎Table Grid‎ بيجي بيه.
+
+    نفس السُمك (نص نقطة = 4 ثُمن النقطة في وحدة وورد) في الست نواحي عشان
+    الشبكة تبقى موحّدة زي جدول الإكسل بالظبط."""
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        el = OxmlElement("w:%s" % edge)
+        el.set(qn("w:val"), "single")
+        el.set(qn("w:sz"), "4")
+        el.set(qn("w:space"), "0")
+        el.set(qn("w:color"), hex6)
+        borders.append(el)
+    table._tbl.tblPr.append(borders)
+
+
+def _add_word_logo(document):
+    """ماستر اللوجو متوسّط فوق عنوان المستند، على الورق الأبيض — يعني
+    النسخة "light" (الشخصية كحلي). الارتفاع 1.1 سم، والعرض بيتحسب من نسبة
+    الماستر لوحده عشان ميتمطّش."""
+    path = _logo_file("light")
+    if not path:
+        return
+    logo_p = document.add_paragraph()
+    logo_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    logo_p.add_run().add_picture(path, height=Cm(1.1))
+
+
 def build_shot_list_word(project, project_id, fetch_all):
     rows = _fetch_breakdown_rows(project_id, fetch_all)
 
@@ -497,47 +717,64 @@ def build_shot_list_word(project, project_id, fetch_all):
     section.top_margin = Cm(1)
     section.bottom_margin = Cm(1)
 
+    _add_word_logo(document)
+
     title = document.add_paragraph()
     _set_rtl_center(title)
-    run = title.add_run("🎬 تفريغ اللقطات (Shooting List)")
+    # اتشال الإيموجي 🎬: اللوجو الرسمي بقى فوق العنوان، والدليل بيمنع أي
+    # علامة بديلة تقف جنبه
+    run = title.add_run("تفريغ اللقطات (Shooting List)")
     run.bold = True
     run.font.size = Pt(20)
+    run.font.color.rgb = _WORD_INK
 
     subtitle = document.add_paragraph()
     _set_rtl_center(subtitle)
     sub_run = subtitle.add_run(_project_type_name_line(project))
     sub_run.bold = True
     sub_run.font.size = Pt(13)
+    sub_run.font.color.rgb = _WORD_INK
 
     version_p = document.add_paragraph()
     _set_rtl_center(version_p)
     v_run = version_p.add_run(_version_line(project))
     v_run.italic = True
     v_run.font.size = Pt(8)
+    v_run.font.color.rgb = _WORD_NAVY
 
     document.add_paragraph()
 
     headers = [label for _key, label, _width in COLUMNS]
     table = document.add_table(rows=1, cols=len(headers))
-    table.style = "Light Grid Accent 1"
+    # كان ‎Light Grid Accent 1‎ — ستايل أوفيس الجاهز بلونه الأزرق الفاتح،
+    # وده كان بيخلي نسخة الوورد هي التقرير الوحيد اللي مش بلون البراند جنب
+    # الإكسل والـ PDF. ‎Table Grid‎ ستايل محايد، والألوان بنحطها بنفسنا من
+    # نفس التوكنز: شريط كحلي بحروف بيضا، وصفوف متبدلة بالكريم.
+    table.style = "Table Grid"
+    _brand_table_borders(table, MIST)
     for i, label in enumerate(headers):
         cell = table.rows[0].cells[i]
         cell.text = label
+        _shade_cell(cell, NAVY)
         for p in cell.paragraphs:
             _set_rtl(p)
             for r in p.runs:
                 r.bold = True
+                r.font.color.rgb = _WORD_WHITE
 
-    for row in rows:
+    for row_idx, row in enumerate(rows):
         cells = table.add_row().cells
         for i, (key, _label, _width) in enumerate(COLUMNS):
             value = row.get(key, "")
             cells[i].text = str(value) if value != "" else "—"
+            if row_idx % 2 == 1:
+                _shade_cell(cells[i], CREAM)
             is_bold_cell = key in {"scene_number", "shot_number"} | _DIALOGUE_KEYS
             for p in cells[i].paragraphs:
                 _set_rtl(p)
-                if is_bold_cell:
-                    for r in p.runs:
+                for r in p.runs:
+                    r.font.color.rgb = _WORD_INK
+                    if is_bold_cell:
                         r.bold = True
 
     buf = BytesIO()
@@ -548,48 +785,49 @@ def build_shot_list_word(project, project_id, fetch_all):
 # ---------- تصدير PDF ----------
 # النص العربي في مكتبة reportlab محتاج إعادة تشكيل الحروف (ligation) وترتيب
 # ثنائي الاتجاه (bidi) يدويًا قبل الرسم، لأن reportlab أصلًا مبني للغات LTR.
-# وبرضو محتاج خط يدعم العربي - بنستخدم خط Tahoma الموجود مع ويندوز لأنه
-# بيغطي العربي كويس وموجود على أي جهاز ويندوز من غير الحاجة لتوزيع خط إضافي.
-_ARABIC_FONT_CANDIDATES = [
-    r"C:\Windows\Fonts\tahoma.ttf",
-    r"C:\Windows\Fonts\arial.ttf",
-    r"C:\Windows\Fonts\segoeui.ttf",
-]
-_ARABIC_BOLD_FONT_CANDIDATES = [
-    r"C:\Windows\Fonts\tahomabd.ttf",
-    r"C:\Windows\Fonts\arialbd.ttf",
-    r"C:\Windows\Fonts\segoeuib.ttf",
-]
+# وبرضو محتاج خط يدعم العربي فعليًا - كنا قبل كده بنفتش على Tahoma/Arial في
+# مسارات ويندوز (C:\Windows\Fonts)، وده كان شغال بس على جهاز المطور بويندوز؛
+# على السيرفر (لينكس) المسارات دي مش موجودة خالص، فالتسجيل كان بيفشل بصمت
+# ويرجع Helvetica اللي مفيهوش حرف عربي واحد - يعني كل تصدير PDF فيه عربي كان
+# طالع فاضي أو حروف مش مفهومة.
+#
+# الحل: نستضيف خط عربي كامل جوه الريبو نفسه (زي ما إحنا مستضيفين Cairo و
+# Readex Pro لواجهة الموقع في static/fonts) بدل ما نفتش على مسارات نظام
+# التشغيل. اخترنا Amiri (SIL OFL 1.1 - مرخّص للتوزيع الحر) لأنه، على عكس
+# نسخة Cairo المتغيّرة (variable font) المستضافة للويب، بيغطي حروف "أشكال
+# العرض العربية" (Arabic Presentation Forms، النطاقات FB50-FDFF و FE70-FEFF)
+# اللي مكتبة arabic_reshaper بترجّع بيها النص بعد التشكيل - وده بالظبط اللي
+# reportlab محتاجه لأنه بيرسم كل حرف بالـ code point بتاعه من غير أي معالجة
+# OpenType shaping (HarfBuzz) زي المتصفح. جرّبنا Cairo الأول ولقيناه ناقص
+# غطاء كبير من النطاقات دي (حروف زي الألف والراء المنفصلة بتطلع فاضية)،
+# فمكانه فضل مع خطوط الويب وده ملف مستقل مخصوص للتصدير.
+_ARABIC_FONT_DIR = os.path.join(os.path.dirname(__file__), "static", "fonts")
+_ARABIC_FONT_PATH = os.path.join(_ARABIC_FONT_DIR, "Amiri-Regular.ttf")
+_ARABIC_BOLD_FONT_PATH = os.path.join(_ARABIC_FONT_DIR, "Amiri-Bold.ttf")
 _ARABIC_FONT_NAME = None
 _ARABIC_BOLD_FONT_NAME = None
 
 
 def _register_arabic_font():
-    """بيسجل نسخة عادية وبولد من نفس الخط (Tahoma) عشان نقدر نبين عناوين
-    الأعمدة والخانات المهمة بالبولد فعليًا (مش بس تشبيه)."""
+    """بيسجل خط Amiri (عادي وبولد) المستضاف جوه الريبو في static/fonts عشان
+    التصدير يشتغل صح على أي سيرفر - من غير ما نعتمد على خطوط نظام تشغيل معين،
+    ومن غير fallback صامت لخط زي Helvetica مفيهوش عربي أصلًا."""
     global _ARABIC_FONT_NAME, _ARABIC_BOLD_FONT_NAME
     if _ARABIC_FONT_NAME:
         return _ARABIC_FONT_NAME, _ARABIC_BOLD_FONT_NAME
-    for path in _ARABIC_FONT_CANDIDATES:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("CFArabic", path))
-                _ARABIC_FONT_NAME = "CFArabic"
-                break
-            except Exception:
-                continue
-    if not _ARABIC_FONT_NAME:
-        _ARABIC_FONT_NAME = "Helvetica"
 
-    for path in _ARABIC_BOLD_FONT_CANDIDATES:
-        if os.path.exists(path):
-            try:
-                pdfmetrics.registerFont(TTFont("CFArabicBold", path))
-                _ARABIC_BOLD_FONT_NAME = "CFArabicBold"
-                break
-            except Exception:
-                continue
-    if not _ARABIC_BOLD_FONT_NAME:
+    if not os.path.exists(_ARABIC_FONT_PATH):
+        raise FileNotFoundError(
+            f"خط العربي الأساسي مش موجود: {_ARABIC_FONT_PATH} - "
+            "من غيره تصدير PDF فيه نص عربي هيطلع فاضي أو تالف."
+        )
+    pdfmetrics.registerFont(TTFont("CFArabic", _ARABIC_FONT_PATH))
+    _ARABIC_FONT_NAME = "CFArabic"
+
+    if os.path.exists(_ARABIC_BOLD_FONT_PATH):
+        pdfmetrics.registerFont(TTFont("CFArabicBold", _ARABIC_BOLD_FONT_PATH))
+        _ARABIC_BOLD_FONT_NAME = "CFArabicBold"
+    else:
         _ARABIC_BOLD_FONT_NAME = _ARABIC_FONT_NAME
     return _ARABIC_FONT_NAME, _ARABIC_BOLD_FONT_NAME
 
@@ -670,23 +908,40 @@ def build_shot_list_pdf(project, project_id, fetch_all):
     row_v_pad = 4
     header_height = 26
     title_block_height = 56
+    logo_height = 30  # نقطة — جوه بلوك العنوان، مش بيزوّده
 
     buf = BytesIO()
     c = pdfcanvas.Canvas(buf, pagesize=(page_w, page_h))
 
+    def draw_logo():
+        """اللوجو في بلوك العنوان، ناحية اليمين — بداية القراءة بالعربي.
+        reportlab بياخد مسار الملف على طول (مش محتاج ‎data:‎ URI زي
+        المتصفح)، و‎mask="auto"‎ بيخلي الشفافية في الـ PNG تفضل شفافة بدل
+        ما تطلع مربع أسود."""
+        path = _logo_file("light")   # الصفحة بيضا → الشخصية كحلي
+        if not path:
+            return
+        w = logo_height * MASTER_ASPECT
+        c.drawImage(
+            path, page_w - margin - w, page_h - margin - logo_height - 6,
+            width=w, height=logo_height, mask="auto",
+        )
+
     def draw_title_block():
-        c.setFillColor(colors.HexColor(f"#{NAVY}"))
+        draw_logo()
+        c.setFillColor(colors.HexColor(f"#{INK}"))
         c.setFont(bold_font_name, 15)
         c.drawCentredString(page_w / 2, page_h - margin - 14, _ar("تفريغ اللقطات (Shooting List)"))
         c.setFont(bold_font_name, 10.5)
         c.drawCentredString(page_w / 2, page_h - margin - 29, _ar(_project_type_name_line(project)))
+        c.setFillColor(colors.HexColor(f"#{NAVY}"))
         c.setFont(font_name, 7.5)
         c.drawCentredString(page_w / 2, page_h - margin - 42, _ar(_version_line(project)))
 
     def draw_header_row(top_y):
         c.setFillColor(colors.HexColor(f"#{NAVY}"))
         c.rect(margin, top_y - header_height, usable_w, header_height, stroke=0, fill=1)
-        c.setFillColor(colors.white)
+        c.setFillColor(colors.HexColor(f"#{WHITE}"))
         c.setFont(bold_font_name, header_font_size)
         for i, (_key, label, _w) in enumerate(COLUMNS):
             # اسم العمود بيتلف بس على حدود الكلمات (كل كلمة في سطر لو
@@ -720,10 +975,12 @@ def build_shot_list_pdf(project, project_id, fetch_all):
             y = new_page(with_title=False)
 
         if row_idx % 2 == 1:
-            c.setFillColor(colors.HexColor("#F2F2F2"))
+            c.setFillColor(colors.HexColor(f"#{CREAM}"))
             c.rect(margin, y - row_height, usable_w, row_height, stroke=0, fill=1)
 
-        c.setFillColor(colors.black)
+        # نص الجدول Ink مش أسود خام — 14.86:1 على الأبيض، وبيخلي الورقة
+        # كلها في نفس عيلة اللون بتاعة البراند
+        c.setFillColor(colors.HexColor(f"#{INK}"))
         for i, lines in enumerate(cell_lines):
             key = col_keys[i]
             is_numeric = key in numeric_keys
@@ -741,9 +998,282 @@ def build_shot_list_pdf(project, project_id, fetch_all):
                         c.drawRightString(col_right_edges[i] - 3, ly, line)
                 ly -= line_height
 
-        c.setStrokeColor(colors.HexColor("#CCCCCC"))
+        c.setStrokeColor(colors.HexColor(f"#{MIST}"))
         c.line(margin, y - row_height, page_w - margin, y - row_height)
         y -= row_height
 
     c.save()
     return buf.getvalue()
+
+
+# ---------- تقرير البناء الدرامي (dramaturgy.py) ----------
+# المحتوى كله جاي جاهز ومترجم من dramaturgy.to_sections() — هنا الشكل بس.
+# reportlab و python-docx مابيرسموش SVG، فمنحنى التوتر بيترسم تاني كصورة PNG
+# (PIL) بنفس منطق dramaturgy.render_svg، ونفس الصورة بتدخل الوورد والـ PDF.
+
+_DRAMA_CURVE_W, _DRAMA_CURVE_H = 1800, 560
+
+
+def dramaturgy_curve_png(report, lang="ar"):
+    """منحنى التوتر كـ PNG: في العربي بداية القصة (العرض) على اليمين. بنرسم بـ
+    BASIC layout ونشكّل العربي بـ _ar() بنفسنا — لو سبنا raqm يشكّله كمان
+    النص هيتقلب مرتين."""
+    from PIL import Image, ImageDraw, ImageFont
+    import dramaturgy
+
+    width, height = _DRAMA_CURVE_W, _DRAMA_CURVE_H
+    curve = report.get("tension_curve") or []
+    n = len(curve)
+    img = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+    rtl = lang == "ar"
+    pad_l, pad_r, pad_t, pad_b = 30, 30, 30, 70
+    plot_w, plot_h = width - pad_l - pad_r, height - pad_t - pad_b
+
+    def x_of(i):
+        frac = i / (n - 1) if n > 1 else 0.5
+        return pad_l + ((1 - frac) if rtl else frac) * plot_w
+
+    def y_of(v):
+        return pad_t + (1 - float(v) / 100) * plot_h
+
+    try:
+        font = ImageFont.truetype(_ARABIC_BOLD_FONT_PATH if os.path.exists(_ARABIC_BOLD_FONT_PATH)
+                                  else _ARABIC_FONT_PATH, 26, layout_engine=ImageFont.Layout.BASIC)
+    except OSError:
+        font = ImageFont.load_default()
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    labels = []
+    stage_colors = getattr(dramaturgy, "_STAGE_COLORS", {})
+    for st_ in (report.get("stages") or []) if n else []:
+        # حدود الشريط في نص المسافة بين المشهدين، عشان المراحل تلزق في بعض
+        # من غير فراغات، ومرحلة المشهد الواحد تبقى شريط باين مش خط
+        half = (plot_w / (n - 1) / 2) if n > 1 else plot_w / 2
+        x1, x2 = x_of(st_["from_index"] - 1), x_of(st_["to_index"] - 1)
+        left = max(pad_l, min(x1, x2) - half)
+        right = min(pad_l + plot_w, max(x1, x2) + half)
+        hexc = stage_colors.get(st_["stage"], "#888888").lstrip("#")
+        rgb = tuple(int(hexc[i:i + 2], 16) for i in (0, 2, 4))
+        od.rectangle([left, pad_t, right, pad_t + plot_h], fill=rgb + (38,))
+        labels.append(((left + right) / 2, rgb, st_.get("label_ar") if rtl else st_.get("label_en")))
+    img = Image.alpha_composite(img, overlay)
+    d = ImageDraw.Draw(img)
+    mist = tuple(int(MIST[i:i + 2], 16) for i in (0, 2, 4))
+    for v in (0, 50, 100):
+        d.line([(pad_l, y_of(v)), (pad_l + plot_w, y_of(v))], fill=mist, width=1)
+    pts = [(x_of(i), y_of(pt["value"])) for i, pt in enumerate(curve)]
+    if len(pts) > 1:
+        d.line(pts, fill=(192, 70, 60), width=5, joint="curve")
+    for x, y in pts:
+        d.ellipse([x - 4, y - 4, x + 4, y + 4], fill=(192, 70, 60))
+    for cx, rgb, label in labels:
+        text = _ar(label) if rtl else str(label or "")
+        tw = d.textlength(text, font=font)
+        x = min(max(cx - tw / 2, 4), width - tw - 4)      # الاسم مايتقصّش على الحافة
+        d.text((x, height - pad_b + 18), text, font=font, fill=rgb)
+    buf = BytesIO()
+    img.convert("RGB").save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def _drama_title(lang):
+    return "تقرير البناء الدرامي" if lang == "ar" else "Dramatic-Structure Report"
+
+
+def _drama_script_title(script_name):
+    """اسم السيناريو من غير امتداد الملف: ‎"الحلقة الاولى.pdf"‎ في سطر عربي
+    بيتعرض ‎"pdf.الحلقة الاولى"‎ وده بيلخبط القارئ."""
+    name = str(script_name or "").strip()
+    stem, dot, ext = name.rpartition(".")
+    if dot and stem and ext.lower() in ("pdf", "docx", "doc", "txt", "json", "fdx", "md"):
+        name = stem
+    return name or "—"
+
+
+def _drama_blocks(report, lang):
+    """(عنوان، [فقرات]) — نقطة الضعف بتتكتب في سطور (المشكلة / ليه مهم /
+    إزاي نقويه) بدل سطر واحد طويل متقسّم بـ "|"، أسهل في القراية على الورق."""
+    import dramaturgy
+    out = []
+    for sec in dramaturgy.to_sections(report, lang=lang):
+        paras = [p.replace(" | ", "\n") for p in sec["paragraphs"]]
+        out.append((sec["heading"], paras))
+    return out
+
+
+def build_dramatic_structure_pdf(report, script_name, lang="ar"):
+    font_name, bold_font_name = _register_arabic_font()
+    rtl = lang == "ar"
+    page_w, page_h = A4
+    margin = 40
+    usable_w = page_w - 2 * margin
+    body_size, head_size, line_h = 10.5, 13, 15
+    wrap_chars = 88 if rtl else 95
+
+    buf = BytesIO()
+    c = pdfcanvas.Canvas(buf, pagesize=(page_w, page_h))
+    y = page_h - margin
+
+    def text_at(txt, font, size, color=INK):
+        c.setFont(font, size)
+        c.setFillColor(colors.HexColor(f"#{color}"))
+        if rtl:
+            c.drawRightString(page_w - margin, y, txt)
+        else:
+            c.drawString(margin, y, txt)
+
+    def need(h):
+        nonlocal y
+        if y - h < margin:
+            c.showPage()
+            y = page_h - margin
+
+    # بلوك العنوان: اللوجو ناحية بداية القراءة، والعنوان واسم السيناريو في النص
+    path = _logo_file("light")
+    if path:
+        w = 28 * MASTER_ASPECT
+        c.drawImage(path, (page_w - margin - w) if rtl else margin, y - 28,
+                    width=w, height=28, mask="auto")
+    c.setFillColor(colors.HexColor(f"#{INK}"))
+    c.setFont(bold_font_name, 16)
+    c.drawCentredString(page_w / 2, y - 16, _ar(_drama_title(lang)))
+    c.setFont(bold_font_name, 11)
+    c.drawCentredString(page_w / 2, y - 32, _ar(_drama_script_title(script_name)))
+    c.setFillColor(colors.HexColor(f"#{NAVY}"))
+    c.setFont(font_name, 8)
+    c.drawCentredString(page_w / 2, y - 45, _ar(_drama_meta_line(report, lang)))
+    y -= 62
+
+    # منحنى التوتر بعرض الصفحة
+    from reportlab.lib.utils import ImageReader
+    img_h = usable_w * _DRAMA_CURVE_H / _DRAMA_CURVE_W
+    c.drawImage(ImageReader(BytesIO(dramaturgy_curve_png(report, lang))), margin, y - img_h,
+                width=usable_w, height=img_h)
+    y -= img_h + 18
+
+    for heading, paras in _drama_blocks(report, lang):
+        need(head_size + line_h * 2)
+        c.setFillColor(colors.HexColor(f"#{YELLOW}"))
+        c.rect(margin, y - 5, usable_w, head_size + 8, stroke=0, fill=1)
+        text_at(_ar(heading), bold_font_name, head_size)
+        y -= head_size + 12
+        for para in paras:
+            lines = []
+            for part in para.split("\n"):
+                lines.extend(_wrap_lines(part, wrap_chars, max_lines=40))
+            for j, ln in enumerate(lines):
+                need(line_h)
+                # النص بعد _ar مترتب بصريًا: آخر حرف في السترنج هو أقصى
+                # اليمين، فالبولت في العربي بيتحط في الآخر مش الأول
+                if j == 0:
+                    ln = f"{ln} •" if rtl else f"• {ln}"
+                text_at(ln, font_name, body_size)
+                y -= line_h
+            y -= 4
+        y -= 6
+        c.setStrokeColor(colors.HexColor(f"#{MIST}"))
+        c.line(margin, y + 4, page_w - margin, y + 4)
+
+    c.save()
+    return buf.getvalue()
+
+
+def _drama_meta_line(report, lang):
+    meta = report.get("meta") or {}
+    when = (meta.get("generated_at") or "")[:10] or date.today().isoformat()
+    n = report.get("scene_count") or 0
+    if lang == "ar":
+        return f"{n} مشهد · اتعمل {when} · CimaFast STUDIO"
+    return f"{n} scenes · generated {when} · CimaFast STUDIO"
+
+
+def build_dramatic_structure_word(report, script_name, lang="ar"):
+    rtl = lang == "ar"
+    document = docx.Document()
+    section = document.sections[0]
+    for side in ("left_margin", "right_margin", "top_margin", "bottom_margin"):
+        setattr(section, side, Cm(1.8))
+
+    def align(p, center=False):
+        if rtl:
+            (_set_rtl_center if center else _set_rtl)(p)
+        elif center:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    _add_word_logo(document)
+    for text, size, bold, color in ((_drama_title(lang), 20, True, _WORD_INK),
+                                    (_drama_script_title(script_name), 13, True, _WORD_INK),
+                                    (_drama_meta_line(report, lang), 8, False, _WORD_NAVY)):
+        p = document.add_paragraph()
+        align(p, center=True)
+        r = p.add_run(text)
+        r.bold, r.font.size, r.font.color.rgb = bold, Pt(size), color
+
+    pic = document.add_paragraph()
+    pic.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    pic.add_run().add_picture(BytesIO(dramaturgy_curve_png(report, lang)), width=Cm(17))
+
+    for heading, paras in _drama_blocks(report, lang):
+        # العنوان على شريط أصفر بحروف Ink — نفس قاعدة الدليل في الـ PDF
+        table = document.add_table(rows=1, cols=1)
+        table.style = "Table Grid"
+        _brand_table_borders(table, YELLOW)
+        cell = table.rows[0].cells[0]
+        cell.text = heading
+        _shade_cell(cell, YELLOW)
+        for p in cell.paragraphs:
+            align(p)
+            for r in p.runs:
+                r.bold, r.font.size, r.font.color.rgb = True, Pt(13), _WORD_INK
+        for para in paras:
+            for i, part in enumerate(para.split("\n")):
+                p = document.add_paragraph()
+                align(p)
+                r = p.add_run(("• " if i == 0 else "") + part)
+                r.font.size, r.font.color.rgb = Pt(10.5), _WORD_INK
+                if i == 0 and len(para.split("\n")) > 1:
+                    r.bold = True
+        document.add_paragraph()
+
+    buf = BytesIO()
+    document.save(buf)
+    return buf.getvalue()
+
+
+POST_REPORT_COLUMNS = [
+    ("number", "م", 5),
+    ("department", "القسم", 26),
+    ("status", "الحالة", 14),
+    ("progress", "الإنجاز", 10),
+    ("vendor", "الاستوديو / المسؤول", 24),
+    ("contact", "التواصل", 20),
+    ("due_date", "التسليم", 12),
+    ("updated", "آخر تحديث", 16),
+    ("notes", "ملاحظات", 36),
+]
+
+
+def build_post_report_excel(project, project_id, fetch_all):
+    """تقرير ما بعد الإنتاج: سطر لكل قسم بحالته ونسبته، وآخر سطر الإجمالي.
+    القسم الشغّال اللي ماتحدّثش من أسبوع بيتعلّم عليه ⚠️ في آخر تحديث."""
+    import post_production
+    rows_db = fetch_all("SELECT * FROM post_departments WHERE project_id=?", (project_id,))
+    s = post_production.summary([dict(r) for r in rows_db])
+    rows = []
+    for idx, i in enumerate(s["items"], start=1):
+        r = i["row"]
+        rows.append({
+            "number": idx,
+            "department": i["name"],
+            "status": post_production.status(r.get("status"))[2],
+            "progress": f"{i['progress']}%",
+            "vendor": " — ".join(x for x in (r.get("vendor_name"), r.get("vendor_location")) if x),
+            "contact": r.get("vendor_contact") or "",
+            "due_date": r.get("due_date") or "",
+            "updated": ("⚠️ " if i["stale"] else "") + ((r.get("updated_at") or "")[:10]),
+            "notes": r.get("notes") or "",
+        })
+    rows.append({"number": "", "department": "الإجمالي", "status": f"{s['approved']} من {s['total']} معتمد",
+                 "progress": f"{s['overall']}%", "vendor": "", "contact": "", "due_date": "", "updated": "",
+                 "notes": ""})
+    return _build_generic_excel("ما بعد الإنتاج", "تقرير ما بعد الإنتاج", project, POST_REPORT_COLUMNS, rows)

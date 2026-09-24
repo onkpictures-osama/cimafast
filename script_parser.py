@@ -709,8 +709,8 @@ def parse_json_script(file_bytes, known_characters=None):
         warnings.append('لم يتم العثور على أي مشهد صالح في ملف الـ JSON.')
     if 'episode_number' in unsupported:
         warnings.append(
-            'الملف فيه أرقام حلقات (episode_number)، بس الاستيراد لسه مابيوزعش المشاهد '
-            'على الحلقات تلقائيًا — هتحتاج تظبط الحلقة لكل مشهد يدويًا بعد الاستيراد.'
+            'الملف فيه أرقام حلقات: في مشروع مسلسل كل مشهد هيتحط في الحلقات بتاعته '
+            '(وهتأكد التوزيع قبل الاستيراد)، وفي أي نوع مشروع تاني أرقام الحلقات مش هتتسجل.'
         )
     if 'shots' in unsupported:
         warnings.append(

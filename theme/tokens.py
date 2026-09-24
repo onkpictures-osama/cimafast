@@ -5,6 +5,11 @@
 أرقام سايبة، واختبار التباين بيقدر يقرا نفس الأرقام اللي المتصفح شايفها —
 مفيش نسختين من الحقيقة.
 
+مصدر الألوان: دليل هوية CimaFast الرسمي v1.0 (سبتمبر 2026) —
+‎BRAND-GUIDELINES.md‎ و‎web-app-style-guide.md‎. الخام بتاع البراند في
+‎BRAND‎ تحت، والأدوار (خلفية/حروف/لكنة) في ‎DARK‎ / ‎LIGHT‎. قاعدة الدليل:
+المكوّنات بتستهلك الأدوار بس، والخام ما يتلمسش غير في اللوجو والحقل الأصفر.
+
 مادة "Liquid Glass" ليها تلات درجات:
   regular  — الدرجة الافتراضية لأغلب الألواح (شفافية 62%، بلور 24px)
   clear    — أخف وأشف، للاستخدام فوق صور بس (38%، بلور 12px)
@@ -18,80 +23,129 @@
 from __future__ import annotations
 
 # --------------------------------------------------------------------------
+# خام البراند — الخمس ألوان الأساسية والمحايدات، حرفيًا من الدليل الرسمي
+# (صفحة 05 · Colour). مبيتغيروش ولا بيتقربوا: أي درجة تانية في البرنامج
+# لازم تتولد منهم أو تتبرر هنا بسطر.
+#
+# القاعدة الذهبية في الدليل: الحقل الأصفر هو **البراند** مش سطح — نفس
+# القيمة بالظبط في الوضع الغامق والفاتح، والحروف فوقه دايمًا Ink (9.67:1).
+# الأحمر شرارة مش لون بلوك: علامة التشغيل، مؤشرات البث/التقدّم، والتحذير —
+# وممنوع يبقى لون نص صغير على الأصفر (3.35:1 بس).
+# --------------------------------------------------------------------------
+
+BRAND = {
+    "yellow": "#FECA05",    # CF Yellow — الحقل، اللكنة في الغامق، أيقونة البرنامج
+    "navy": "#212F70",      # CF Navy — الشخصية في اللوجو، الأزرار الأساسية في الفاتح
+    "ink": "#1B254B",       # CF Ink — الكلمة المكتوبة، العناوين، الحروف فوق الأصفر
+    "red": "#D4232B",       # CF Red — مثلث التشغيل، البث، التقدّم، الخطر
+    "royal": "#0F438A",     # CF Royal — عمود بلوك الهوية، الروابط، الخطوط الفاصلة
+    # محايدات فاتحة
+    "white": "#FFFFFF",
+    "cream": "#F3F3ED",     # صفحة (فاتح)
+    "sand": "#EFE7D2",      # عنصر مفعّل (فاتح)
+    "mist": "#D9D9D4",      # حدود (فاتح)
+    "graphite": "#3A3A3A",  # نص الجسم (فاتح)
+    # محايدات غامقة (مشتقة من Navy في الدليل)
+    "midnight": "#0F1B45",       # صفحة (غامق)
+    "navy_surface": "#1A2860",   # كارت (غامق)
+    "navy_raised": "#243677",    # hover / مرفوع (غامق)
+    "mist_dark": "#B8BFD9",      # نص ثانوي (غامق)
+    # امتداد وظيفي واحد مش في الدليل: Royal مرفوع عشان يتقرا على Midnight.
+    # Royal نفسه 1.73:1 على الصفحة الغامقة — غير صالح كلون حروف هناك، بس
+    # الأزرق دور وظيفي في ERP (معلومة/مكتمل) مش موجود في بالتة الغامق.
+    # الدرجة دي نفس درجة Royal اللونية، مرفوعة لحد 6.6:1 على Midnight.
+    "royal_lift": "#6FA8E0",
+}
+
+# --------------------------------------------------------------------------
 # الأرضية (ground) — الزجاج محتاج أرضية تستحق الانكسار. لو الخلفية لون
 # واحد مسطح، الزجاج بيطلع مجرد مستطيل رمادي بحواف ناعمة.
 # --------------------------------------------------------------------------
 
 DARK = {
     "name": "dark",
-    # أرضية
-    "ground_base": "#0B1220",
-    "pool_indigo": "rgba(30, 42, 69, 0.92)",     # #1E2A45
-    "pool_navy": "rgba(22, 35, 63, 0.88)",       # #16233F
-    "bloom_gold": "rgba(232, 185, 35, 0.06)",    # وهج دهبي 6%
-    "counter_teal": "rgba(31, 111, 120, 0.15)",  # نقطة برودة واحدة للحرارة اللونية
+    # أرضية: Midnight، وبرك ضوء من Navy Surface / Navy Raised
+    "ground_base": BRAND["midnight"],
+    "pool_indigo": "rgba(26, 40, 96, 0.92)",     # #1A2860 Navy Surface
+    "pool_navy": "rgba(36, 54, 119, 0.85)",      # #243677 Navy Raised
+    "bloom_gold": "rgba(254, 202, 5, 0.07)",     # وهج CF Yellow 7%
+    "counter_teal": "rgba(15, 67, 138, 0.22)",   # CF Royal — نقطة البرودة الوحيدة
     # الزجاج
-    "glass_regular": "rgba(22, 35, 63, 0.62)",
-    "glass_clear": "rgba(22, 35, 63, 0.38)",
-    "glass_opaque": "#16233F",
+    "glass_regular": "rgba(26, 40, 96, 0.62)",
+    "glass_clear": "rgba(26, 40, 96, 0.38)",
+    "glass_opaque": BRAND["navy_surface"],
+    "glass_raised": BRAND["navy_raised"],
     # الحواف والظل
     "edge": "rgba(255, 255, 255, 0.12)",
     "edge_strong": "rgba(255, 255, 255, 0.20)",
     "edge_specular": "inset 0 1px 0 rgba(255, 255, 255, 0.18)",
-    "elevation": "0 8px 32px rgba(0, 0, 0, 0.35)",
-    "elevation_sm": "0 2px 10px rgba(0, 0, 0, 0.28)",
+    "elevation": "0 8px 24px rgba(0, 0, 0, 0.38)",
+    "elevation_sm": "0 2px 8px rgba(0, 0, 0, 0.30)",
     # الحروف
-    "text": "#F5F1E6",
-    "text_dim": "rgba(245, 241, 230, 0.72)",
+    "text": BRAND["white"],
+    "text_dim": BRAND["mist_dark"],
     # اللكنة الدهبية — علامة البراند، مبتتغيرش
-    "accent": "#E8B923",
-    "accent_ink": "#E8B923",        # الدهبي كـ لون حروف (شغال على الغامق)
-    "on_accent": "#12203D",         # الحروف فوق الدهبي
-    "gold_glass": "rgba(232, 185, 35, 0.72)",  # أرضية الشريط الجانبي — 72% حد أدنى مقيس
-    "info": "#2D9CDB",
-    "danger": "#DC2626",
+    "accent": BRAND["yellow"],
+    "accent_ink": BRAND["yellow"],   # الدهبي كـ لون حروف (10.8:1 على Midnight)
+    "on_accent": BRAND["ink"],       # الحروف فوق تعبئة اللكنة (أصفر في الغامق)
+    "on_brand": BRAND["ink"],        # الحروف فوق الحقل الأصفر — Ink في الوضعين
+    "gold_glass": "rgba(254, 202, 5, 0.72)",  # أرضية الشريط الجانبي — 72% حد أدنى مقيس
+    "info": BRAND["royal_lift"],
+    "on_info": BRAND["ink"],         # أبيض على الأزرق المرفوع 2.5:1 — Ink هو الصح
+    "play": BRAND["red"],            # مثلث التشغيل / بث / تقدّم
+    "danger": BRAND["red"],
     # خانات الإدخال: أغمق من الزجاج اللي تحتها عشان الخانة تقرا كـ "فتحة"
     # في اللوح مش كلوح تاني فوقه — وده كمان بيخلّي التباين أعلى للنص.
     # مبتاخدش ‎backdrop-filter‎ أبدًا (ورقة في الشجرة، مش سطح).
-    "field": "rgba(11, 18, 32, 0.55)",
-    "field_strong": "rgba(11, 18, 32, 0.72)",
+    "field": "rgba(15, 27, 69, 0.55)",
+    "field_strong": "rgba(15, 27, 69, 0.72)",
     "hover": "rgba(255, 255, 255, 0.07)",
-    "focus_ring": "rgba(232, 185, 35, 0.55)",
+    "focus_ring": "rgba(254, 202, 5, 0.55)",
     # سطوع الماوس (specular) — بيتحدّث من listener واحد
     "sheen": "rgba(255, 255, 255, 0.10)",
 }
 
 LIGHT = {
     "name": "light",
-    "ground_base": "#F7F4EC",
-    "pool_indigo": "rgba(213, 221, 238, 0.85)",
-    "pool_navy": "rgba(228, 233, 244, 0.90)",
-    "bloom_gold": "rgba(232, 185, 35, 0.10)",
-    "counter_teal": "rgba(31, 111, 120, 0.09)",
+    "ground_base": BRAND["cream"],
+    "pool_indigo": "rgba(239, 231, 210, 0.85)",  # Sand
+    "pool_navy": "rgba(217, 217, 212, 0.75)",    # Mist
+    "bloom_gold": "rgba(254, 202, 5, 0.12)",
+    "counter_teal": "rgba(15, 67, 138, 0.08)",   # Royal
     "glass_regular": "rgba(255, 255, 255, 0.62)",
     "glass_clear": "rgba(255, 255, 255, 0.38)",
-    "glass_opaque": "#FFFFFF",
-    "edge": "rgba(18, 32, 61, 0.14)",
-    "edge_strong": "rgba(18, 32, 61, 0.22)",
+    "glass_opaque": BRAND["white"],
+    "glass_raised": BRAND["sand"],
+    "edge": "rgba(27, 37, 75, 0.14)",
+    "edge_strong": "rgba(27, 37, 75, 0.22)",
     "edge_specular": "inset 0 1px 0 rgba(255, 255, 255, 0.65)",
-    "elevation": "0 8px 32px rgba(18, 32, 61, 0.14)",
-    "elevation_sm": "0 2px 10px rgba(18, 32, 61, 0.10)",
-    "text": "#12203D",
-    "text_dim": "rgba(18, 32, 61, 0.70)",
-    "accent": "#E8B923",
-    # الدهبي الفاتح مبيتقراش على أرضية فاتحة (1.78:1)، فالحروف الدهبية في
-    # الوضع الفاتح بتبقى دهبي غامق. الدهبي الأصلي بيفضل للحدود والتعبئة.
-    "accent_ink": "#7A5D00",
-    "on_accent": "#12203D",
-    "gold_glass": "rgba(232, 185, 35, 0.72)",
-    "info": "#1B6FA8",
-    "danger": "#B91C1C",
+    "elevation": "0 8px 24px rgba(27, 37, 75, 0.14)",
+    "elevation_sm": "0 2px 8px rgba(27, 37, 75, 0.08)",
+    "text": BRAND["ink"],
+    "text_dim": BRAND["graphite"],
+    # في الوضع الفاتح اللكنة بتبقى Navy والحروف فوقها بيضا (الدليل، ص 08).
+    # الأصفر بيفضل حقل البراند بس — مش لكنة — لأنه 1.7:1 على الكريمة.
+    "accent": BRAND["navy"],
+    "accent_ink": BRAND["royal"],    # الروابط والتسميات — Royal على الكريمة 8.6:1
+    "on_accent": BRAND["white"],     # أبيض فوق تعبئة Navy — 12.3:1
+    "on_brand": BRAND["ink"],        # الحروف فوق الحقل الأصفر — Ink في الوضعين
+    "gold_glass": "rgba(254, 202, 5, 0.72)",
+    "info": BRAND["royal"],
+    "on_info": BRAND["white"],
+    "play": BRAND["red"],
+    "danger": BRAND["red"],
     "field": "rgba(255, 255, 255, 0.72)",
     "field_strong": "rgba(255, 255, 255, 0.90)",
-    "hover": "rgba(18, 32, 61, 0.07)",
-    "focus_ring": "rgba(122, 93, 0, 0.55)",
+    "hover": "rgba(27, 37, 75, 0.07)",
+    "focus_ring": "rgba(33, 47, 112, 0.55)",
     "sheen": "rgba(255, 255, 255, 0.45)",
 }
+
+# الحقل الأصفر هو البراند مش سطح: نفس القيمة في الوضعين، والحروف فوقه Ink
+# في الوضعين. الشرطين دول قاعدة من الدليل مش ذوق — مقفولين هنا عشان محدش
+# يعدّلهم بالسهو، ومتأكّد عليهم تاني في ‎tests/test_theme.py‎.
+assert DARK["gold_glass"] == LIGHT["gold_glass"] == "rgba(254, 202, 5, 0.72)"
+assert DARK["on_brand"] == LIGHT["on_brand"] == BRAND["ink"]
 
 # --------------------------------------------------------------------------
 # أرقام المادة (مشتركة بين الوضعين)
@@ -102,26 +156,44 @@ MATERIAL = {
     "blur_clear": "12px",
     "sat_regular": "180%",
     "sat_clear": "140%",
-    # نصف القطر — متداخل (concentric): العنصر الجوّاني أصغر من الحاوية بفرق
-    # الحاشية، عشان الأقواس تبقى متمركزة زي ما آبل بتعمل
-    "radius_lg": "22px",
-    "radius_md": "14px",
-    "radius_sm": "10px",
+    # نصف القطر — سلّم الدليل (‎--r-sm/md/lg/xl/pill‎). متداخل (concentric):
+    # العنصر الجوّاني أصغر من الحاوية بفرق الحاشية عشان الأقواس تبقى متمركزة.
+    "radius_lg": "24px",    # r-xl في الدليل — الألواح الكبيرة
+    "radius_md": "12px",    # r-md — الأزرار والخانات
+    "radius_sm": "8px",     # r-sm — البادچات والشيبس
+    "radius_pill": "999px",
+    # سلّم الحركة من الدليل
+    "ease_out": "cubic-bezier(.2,.8,.2,1)",
+    "dur_fast": "120ms",
+    "dur_base": "220ms",
+    "dur_slow": "400ms",
 }
+
+# سلّم الخطوط — Inter للاتيني، Cairo للعربي. الترتيب ده مقصود: Inter مفيهوش
+# حروف عربية خالص، فالمتصفح بيقع تلقائيًا على Cairo لأي حرف عربي من غير ما
+# نضطر نلف الاتنين في عناصر مختلفة أو نفحص اللغة في بايثون.
+FONT_STACK = '"Inter", "Cairo", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 MODES = {"dark": DARK, "light": LIGHT}
 
 
 def css_vars(mode="dark", selector=":root"):
-    """بتطلع بلوك CSS بكل التوكنز كـ custom properties."""
+    """بتطلع بلوك CSS بكل التوكنز كـ custom properties.
+
+    الخام بتاع البراند بيتطلع كمان (‎--cf-yellow‎، ‎--cf-ink‎ …) عشان اللوجو
+    والحقل الأصفر — دول بس المسموح لهم يلمسوا الخام حسب الدليل.
+    """
     pal = MODES[mode]
     rows = []
+    for key, val in BRAND.items():
+        rows.append(f"    --cf-{key.replace('_', '-')}: {val};")
     for key, val in pal.items():
         if key == "name":
             continue
         rows.append(f"    --cf-{key.replace('_', '-')}: {val};")
     for key, val in MATERIAL.items():
         rows.append(f"    --cf-{key.replace('_', '-')}: {val};")
+    rows.append(f"    --cf-font: {FONT_STACK};")
     # السطوع بيتحرك مع الماوس؛ القيم الافتراضية دي بتخلي اللمعة واقفة على
     # الحرف العلوي لما مفيش pointer (موبايل/تابلت)
     rows.append("    --cf-sheen-x: 50%;")

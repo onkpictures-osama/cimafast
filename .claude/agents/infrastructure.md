@@ -57,6 +57,10 @@ untested, that's mine — and nothing reaches production without passing through
 - **Hold is your real authority — use it** on production proposals; say why in
   one line the owner can act on.
 - **Never overrule a security or data decision.** Raise it, do not settle it.
+- **Stay responsive.** Anything expected to take more than about a minute goes
+  to a background subworker instead of running inline — say you've started
+  rather than going quiet. Standing rule, Mohamed El-Zayat, 2026-09-23, every
+  agent and channel.
 
 Ground truth: production = `/srv/cimafast` (branch `main`, `cimafast.service`,
 port 8501, DB `/var/lib/cimafast/studio.db`). Preview = `/srv/cimafast-v1`

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1920 1920" width="1920" height="1920">
+<defs></defs>
+  <g fill="none" stroke="#FFFFFF" stroke-width="72" stroke-linecap="round" stroke-linejoin="round">
+    <!-- screen frame with a gap at the bottom where the head sits -->
+    <path d="M1090 790 H1290 A100 100 0 0 0 1390 690 V315 A100 100 0 0 0 1290 215 H630 A100 100 0 0 0 530 315 V690 A100 100 0 0 0 630 790 H830"/>
+    <!-- arms: hands grip the frame's lower corners -->
+    <path d="M700 850 L960 955 L1300 835" stroke-width="82"/>
+    <!-- torso -->
+    <path d="M960 990 L990 1185" stroke-width="151"/>
+    <!-- legs -->
+    <path d="M980 1180 L880 1430 L920 1690" stroke-width="96"/>
+    <path d="M990 1180 L1125 1470 L1230 1690" stroke-width="96"/>
+  </g>
+  <!-- play triangle (record-red) -->
+  <path d="M840 345 L1140 500 L840 655 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="44" stroke-linejoin="round"/>
+  <!-- head: the poster placeholder slot -->
+  
+  <circle cx="960" cy="805" r="84" fill="#FFFFFF"/>
+</svg>

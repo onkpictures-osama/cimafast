@@ -42,7 +42,11 @@ VIEWPORTS = {
 }
 
 TAB_LABELS = {
+    "locations": {"ar": "الأماكن", "en": "Locations"},
+    "characters": {"ar": "الشخصيات", "en": "Characters"},
+    "props": {"ar": "الإكسسوارات", "en": "Props"},
     "scenes": {"ar": "المشاهد", "en": "Scenes"},
+    "shots": {"ar": "اللقطات", "en": "Shots"},
     "reports": {"ar": "التقارير النهائية", "en": "Final Reports"},
     "import": {"ar": "إضافة سيناريو", "en": "Add Screenplay"},
 }
@@ -175,7 +179,13 @@ class AppUnderTest:
 def _settle(page, ms=900):
     """Streamlit بيرسم على مراحل — بننتظر لحد ما الـ spinner يختفي
     وبعدين شوية كمان عشان الخطوط والـ transitions يخلصوا."""
-    page.wait_for_load_state("networkidle")
+    # ‎networkidle‎ ساعات مبيوصلش على الشاشات اللي فيها صور/خرايط — ده انتظار
+    # تحسيني مش شرط، فبناخد اللي نقدر عليه في 8 ثواني وبنكمّل بدل ما الجولة
+    # كلها تقع
+    try:
+        page.wait_for_load_state("networkidle", timeout=8000)
+    except Exception:
+        pass
     try:
         page.wait_for_selector('[data-testid="stStatusWidget"]', state="detached", timeout=4000)
     except Exception:
@@ -233,7 +243,8 @@ def capture(app, out_dir, lang, viewport, theme_flag, browser, shots):
     _login(page, app)
 
     if lang == "en":
-        page.get_by_role("button", name="EN", exact=True).first.click()
+        # segmented_control بيطلع كـ radio مش button
+        page.get_by_role("radio", name="EN", exact=True).first.click()
         _settle(page, 1200)
 
     if (w, h) != desktop:
@@ -242,11 +253,16 @@ def capture(app, out_dir, lang, viewport, theme_flag, browser, shots):
 
     shots.append(_shot(page, out_dir, f"{prefix}-02-projects"))
 
-    _click_tab(page, "scenes", lang)
-    shots.append(_shot(page, out_dir, f"{prefix}-03-scene-editor"))
+    # كل تبويب بيتصوّر — مش المشاهد والتقارير بس. خطة الموبايل بتطلب تأكيد
+    # إن كل شاشة بتتراص في عمود واحد على التليفون، فالشاشات كلها لازم تبقى
+    # في المجموعة اللي بنقارنها.
+    for idx, key in enumerate(("locations", "characters", "props", "scenes", "shots"), start=3):
+        _click_tab(page, key, lang)
+        name = "scene-editor" if key == "scenes" else key
+        shots.append(_shot(page, out_dir, f"{prefix}-{idx:02d}-{name}"))
 
     _click_tab(page, "reports", lang)
-    shots.append(_shot(page, out_dir, f"{prefix}-04-reports"))
+    shots.append(_shot(page, out_dir, f"{prefix}-08-reports"))
 
     # لوحة تحليل السيناريو: بترفع ملف وبتدوس تحليل
     _click_tab(page, "import", lang)
@@ -258,7 +274,7 @@ def capture(app, out_dir, lang, viewport, theme_flag, browser, shots):
         _settle(page, 1200)
         page.get_by_role("button").filter(has_text=ANALYZE_LABEL[lang]).first.click()
         _settle(page, 2000)
-        shots.append(_shot(page, out_dir, f"{prefix}-05-analysis"))
+        shots.append(_shot(page, out_dir, f"{prefix}-09-analysis"))
     except Exception as exc:  # pragma: no cover - بيتسجل بس
         print(f"  ! لوحة التحليل اتخطت في {prefix}: {type(exc).__name__}: {exc}", flush=True)
 

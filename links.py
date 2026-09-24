@@ -8,16 +8,42 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 
-# ترتيب التبويبات في app.py، والمفتاح بتاع اسمها في i18n
+# ترتيب التبويبات في app.py، والمفتاح بتاع اسمها في i18n. الترتيب = ترتيب
+# الشغل الفعلي (اتفاق المالك 2026-09-24): السيناريو ← الأماكن ← الإكسسوار
+# (تابع للأماكن) ← الشخصيات ← الممثلين ← الملابس ← المشاهد ← اللقطات ←
+# التقارير = ما قبل الإنتاج، وبعدها الإنتاج (جدول التصوير).
 TABS = {
     "import": "tab_import",
     "locations": "tab_locations",
-    "characters": "tab_characters",
     "props": "tab_props",
+    "characters": "tab_characters",
+    "actors": "tab_actors",
+    "wardrobe": "tab_wardrobe",
     "scenes": "tab_scenes",
     "shots": "tab_breakdown",
     "reports": "tab_dashboard",
+    "schedule": "tab_schedule",
+    "post": "tab_post",
+    "team": "tab_team",
+    "settings": "tab_settings",
 }
+
+# مفتاح المرحلة فوق التبويبات: كل مرحلة بتعرض تبويباتها بس، والإعدادات في
+# الاتنين. أي رابط مباشر لتبويب بيفتح مرحلته لوحده (phase_of).
+PHASES = {
+    "pre": ["import", "locations", "props", "characters", "actors", "wardrobe",
+            "scenes", "shots", "reports", "team", "settings"],
+    "prod": ["schedule", "team", "settings"],
+    "post": ["post", "team", "settings"],
+}
+
+
+def phase_of(slug, current="pre"):
+    """المرحلة اللي فيها التبويب ده؛ الفريق والإعدادات في كل المراحل فبتفضل مكانها."""
+    homes = [p for p, slugs in PHASES.items() if slug in slugs]
+    if current in homes:
+        return current
+    return homes[0] if homes else "pre"
 
 
 def _first(value):
@@ -41,8 +67,20 @@ def parse(params):
     return project_id, tab
 
 
-def screen(base, project_id=None, tab=None):
-    """الرابط لشاشة: base هو عنوان التطبيق (مثلًا ‎/v1/ أو ‎../../)."""
+def item(params):
+    """H4: رقم العنصر اللي الرابط بيشاور عليه (‎&item=88‎)، أو None."""
+    raw = _first(params.get("item"))
+    try:
+        value = int(raw) if raw not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+    return value if value and value > 0 else None
+
+
+def screen(base, project_id=None, tab=None, item=None):
+    """الرابط لشاشة: base هو عنوان التطبيق (مثلًا ‎/v1/ أو ‎../../).
+
+    ‎item‎ (H4): عنصر واحد جوه التبويب — التبويب بيفتحه لوحده بدل ما اليوزر يدوّر."""
     query = {}
     if project_id is not None:
         query["project"] = int(project_id)
@@ -50,4 +88,6 @@ def screen(base, project_id=None, tab=None):
         if tab not in TABS:
             raise ValueError(f"unknown tab: {tab}")
         query["tab"] = tab
+    if item is not None and tab is not None:
+        query["item"] = int(item)
     return f"{base}?{urlencode(query)}" if query else base

@@ -20,9 +20,11 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from shots import REPO, AppUnderTest, _click_tab, _login, _settle  # noqa: E402
+import tempfile  # noqa: E402
 
-EXPANDER_TITLE = "التحليل خارج البرنامج"
+from shots import REPO, SAMPLE_SCRIPT, AppUnderTest, _click_tab, _login, _settle  # noqa: E402
+
+EXT_BUTTON = "التحليل خارج CimaFast"
 COPY_LABEL = "نسخ البرومبت"
 COPIED_LABEL = "اتنسخ"
 DOWNLOAD_LABEL = "نزّل البرومبت كملف"
@@ -47,14 +49,25 @@ def run(port, shot_dir):
         _login(page, app)
         _click_tab(page, "import", "ar")
 
-        header = page.get_by_text(EXPANDER_TITLE).first
-        check("the renamed section is on the import tab", header.count() > 0)
-        header.click()
-        _settle(page, 900)
+        # المالك 2026-09-24: مفيش شرح التحليل الخارجي قبل الرفع - تلات طرق بعد الرفع
+        before = page.locator("section[data-testid=stMain]").inner_text()
+        check("nothing about external analysis before the upload",
+              EXT_BUTTON not in before and "script.json" not in before)
+        tmp = tempfile.mkdtemp(prefix="cf-ext-")
+        path = os.path.join(tmp, "script.txt")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(SAMPLE_SCRIPT)
+        page.locator('input[type="file"]').first.set_input_files(path)
+        _settle(page, 1500)
+        main = page.locator("section[data-testid=stMain]").inner_text()
+        check("three options after the upload",
+              all(x in main for x in ("تحليل الملف", "CimaFast AI Inspector", EXT_BUTTON)), main[-300:])
+        page.get_by_role("button").filter(has_text=EXT_BUTTON).first.click()
+        _settle(page, 1200)
 
         body = page.locator("body").inner_text()
         check("the old wording is gone", "مبيحللوش كويس" not in body)
-        check("the four steps are shown", "script.json" in body)
+        check("the steps are shown", "script.json" in body)
         check("the download fallback is offered", DOWNLOAD_LABEL in body)
 
         frame = None

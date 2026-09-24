@@ -1,0 +1,34 @@
+[Unit]
+Description=CimaFast dramatic-structure report worker — /v1 preview only
+Documentation=file:/srv/cimafast-v1/dramaturgy_worker.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+# root because claude reads its credentials from /root/.claude (mode 0600);
+# the app user cannot. The worker never touches the database: the app
+# (user cimafast) saves the finished report itself.
+User=root
+Environment=HOME=/root
+Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Its own spool, lock and code. Nothing here is shared with production or with
+# the script-analysis workers (/opt/cimafast-ai/worker.py is not used at all).
+Environment=CIMAFAST_DRAMA_SPOOL=/var/lib/cimafast-v1/drama-jobs
+Environment=CIMAFAST_DRAMA_LOCKFILE=/run/cimafast-dramaturgy-v1.lock
+Environment=CIMAFAST_DRAMA_MODEL=sonnet
+# The app (user cimafast) writes inbox/, so the spool must stay cimafast-owned
+# even if it is wiped: recreate it before start, never as root-only dirs.
+ExecStartPre=/usr/bin/install -d -o cimafast -g cimafast -m 755 /var/lib/cimafast-v1/drama-jobs /var/lib/cimafast-v1/drama-jobs/inbox /var/lib/cimafast-v1/drama-jobs/status /var/lib/cimafast-v1/drama-jobs/outbox
+WorkingDirectory=/tmp
+ExecStart=/usr/bin/python3 /srv/cimafast-v1/dramaturgy_worker.py
+Restart=always
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

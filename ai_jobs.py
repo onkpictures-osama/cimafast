@@ -128,3 +128,15 @@ def status(job_id):
 
 def result(job_id):
     return spool.read_result(job_id)
+
+
+def started_at(job_id):
+    """وقت ما التحليل اتبعت (epoch) - للعدّاد اللي بيعد بالثانية على الشاشة،
+    عشان يفضل صح حتى بعد ريفريش. None لو الملف مش موجود."""
+    import json as _json
+    path = os.path.join(spool.INBOX, f"{job_id}.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return _json.load(fh).get("created_at")
+    except (OSError, ValueError):
+        return None

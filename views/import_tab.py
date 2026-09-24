@@ -1,7 +1,12 @@
 """تبويب import."""
 
 import ai_jobs
+import analysis_library
 import json
+import logging
+import uuid
+import re
+
 import streamlit as st
 import streamlit.components.v1 as st_components
 from ai_prompt import AI_JSON_PROMPT
@@ -13,6 +18,34 @@ from script_parser import apply_character_merges, apply_location_merges, extract
 from ui import fmt_day_night, fmt_int_ext, ltr, multiselect
 import audit
 import repo
+from views import dramaturgy_panel
+
+
+_log = logging.getLogger("cimafast.import")
+
+# الأخطاء اللي بنرمي لها رسالة بالعربي احنا بنفسنا (زي "فيه تحليل شغال
+# بالفعل") تعدّي للمستخدم زي ما هي. أي حاجة تانية — خصوصًا أخطاء نظام
+# التشغيل — لأ.
+_SAFE_TO_SHOW = (RuntimeError, ValueError, KeyError, TypeError)
+
+_ERR_TITLE = "مشكلة في السيرفر مش في ملفك"
+_ERR_BODY = "الملف وصل تمام بس مقدرناش نكمّل. جرّب تاني بعد شوية، ولو المشكلة فضلت ابعت الكود ده للدعم"
+
+
+def _user_error(exc, where):
+    """رسالة يفهمها مخرج بيرفع سيناريو، والخطأ الحقيقي يروح للوج.
+
+    كان `st.error(str(e))` بيطلّع نص نظام التشغيل الخام على الشاشة، مثلًا
+    "Read-only file system: '/var/lib/cimafast/ai-jobs/inbox/…tmp' [Errno 30]".
+    ده مبيقولش للمستخدم أي حاجة يعملها، وكمان بيكشف مسارات السيرفر.
+    بنسجّل التفاصيل كاملة في لوج الخدمة (journalctl) ونرجّع للمستخدم
+    رسالة واضحة + كود مرجعي يقوله للدعم.
+    """
+    ref = uuid.uuid4().hex[:8]
+    _log.exception("[%s] %s failed: %s: %s", ref, where, type(exc).__name__, exc)
+    if isinstance(exc, _SAFE_TO_SHOW) and str(exc).strip():
+        return str(exc)
+    return f"⚠️ {t(_ERR_TITLE)}\n\n{t(_ERR_BODY)}: `{ref}`"
 
 
 _ANALYSIS_RTL_CSS = """
@@ -72,9 +105,9 @@ def _render_copy_button(text, label, done_label):
     st_components.html(
         f"""
         <button id="cf-copy" style="width:100%;padding:0.55rem 1rem;cursor:pointer;
-            border-radius:0.5rem;border:1px solid rgba(212,175,55,0.45);
-            background:rgba(212,175,55,0.12);color:#e8c860;font-weight:600;
-            font-family:'Readex Pro',system-ui,sans-serif;font-size:0.95rem;">
+            border-radius:12px;border:1.5px solid #FECA05;
+            background:rgba(254,202,5,0.12);color:#FECA05;font-weight:600;
+            font-family:Inter,Cairo,system-ui,sans-serif;font-size:0.95rem;">
           {label}
         </button>
         <script>
@@ -213,127 +246,240 @@ def _render_analysis_dashboard(scenes):
         )
 
 
-def render(project_id):
-    st.subheader(tr("sub_import"))
-    st.caption(t(
-        "ارفع ملف السيناريو (.docx أو .txt)، والنظام هيحاول يتعرف على رقم كل مشهد، "
-        "داخلي/خارجي، النهار/الليل، المكان، والحوار، ويملى تبويب (السكريبت) تلقائيًا. "
-        "تقدر تراجع النتيجة وتعدل أو تضيف أي حاجة بعد كده. وفي حالة السكريبتات "
-        "الصعبة، تقدر ترفع ملف JSON جاهز من أي AI (شوف التفاصيل تحت)."
-    ))
-    st.caption(t(
-        "لأفضل نتيجة، اكتب كل مشهد في سطر بصيغة زي: "
-        "\"مشهد 1 - داخلي - نهار - غرفة المعيشة\"، والحوار في سطر منفصل بصيغة "
-        "\"اسم الشخصية: الكلام\"."
-    ))
+# ---------- المسلسل: الاستيراد بالحلقة (طلب المالك 2026-09-24) ----------
+# الحلقة بتتحدد **قبل** الرفع (شبكة بحالة كل حلقة)، والبرنامج عمره ما بيخمّن
+# رقم حلقة ويحطه لوحده: لو الملف أو اسمه بيقول حلقة تانية، بيسأل.
 
-    with st.expander(t("🤖 التحليل خارج البرنامج — حلّل السكريبت على أي AI وارجع بالنتيجة")):
-        st.markdown(t(
-            "لو السكريبت شكله معقد والتحليل اللي جوه البرنامج مش طالع كويس، حلّله بره "
-            "على أي AI في أربع خطوات:"
-        ))
-        st.markdown(t(
-            "**1.** دوس «📋 نسخ البرومبت» تحت.\n\n"
-            "**2.** افتح Claude أو ChatGPT أو Gemini، الصق البرومبت، وارفق معاه ملف "
-            "السكريبت (أو الصق نصه كامل بعد البرومبت).\n\n"
-            "**3.** احفظ الـ JSON اللي هيرجعلك في ملف اسمه `script.json`.\n\n"
-            "**4.** ارفع `script.json` من زرار رفع الملف تحت — هيتقري ويتستورد زي أي سكريبت."
-        ))
+_EP_IN_NAME = re.compile(r"(?:الحلقة|حلقة|حلقه|(?<![A-Za-z])(?:episode|ep))[\s_\-\.]*0*([0-9٠-٩]{1,3})",
+                         re.IGNORECASE)
+_AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
-        _render_copy_button(AI_JSON_PROMPT, t("📋 نسخ البرومبت"), t("✅ اتنسخ"))
-        st.download_button(
-            t("⬇️ أو نزّل البرومبت كملف"), AI_JSON_PROMPT,
-            file_name="cimafast_prompt.txt", mime="text/plain",
-            key="dl_prompt", use_container_width=True)
 
-        st.markdown(
-            f'<div class="cf-copy-hint">👇 {t("ده نص البرومبت كامل، لو حبيت تراجعه أو تنسخه يدويًا")}</div>',
-            unsafe_allow_html=True,
-        )
+def episode_from_filename(name):
+    """رقم الحلقة من اسم الملف ("الحلقة 07.docx"، "ep3.pdf")، أو None."""
+    m = _EP_IN_NAME.search(name or "")
+    return int(m.group(1).translate(_AR_DIGITS)) if m else None
+
+
+def _episode_key(project_id):
+    return f"import_episode_{project_id}"
+
+
+def _render_episode_picker(project_id):
+    """شبكة الحلقات بعدد مشاهد كل واحدة. بترجّع رقم الحلقة المختارة."""
+    overview = repo.episode_overview(project_id)
+    if not overview:
+        st.warning(t("المسلسل ده لسه مالوش حلقات. حدد عدد الحلقات من ⚙️ إعدادات المشروع."))
+        return None
+    numbers = [e["episode_number"] for e in overview]
+    counts = {e["episode_number"]: e["scenes"] for e in overview}
+    key = _episode_key(project_id)
+    if st.session_state.get(key) not in numbers:
+        # أول حلقة لسه مالهاش سكريبت - اللي غالبًا اليوزر جاي يرفعها
+        st.session_state[key] = next((n for n in numbers if not counts[n]), numbers[0])
+    done = sum(1 for n in numbers if counts[n])
+    st.markdown(f"**📺 {t('ارفع سكريبت أنهي حلقة؟')}** "
+                f"<span style='opacity:.7'>({ltr(done)} {t('من')} {ltr(len(numbers))} {t('حلقة ليها سكريبت')})</span>",
+                unsafe_allow_html=True)
+    st.pills(t("الحلقة"), numbers, key=key, label_visibility="collapsed",
+             format_func=lambda n: f"{n} {'✅' if counts[n] else '⬜'}")
+    chosen = st.session_state.get(key) or numbers[0]
+    n = counts.get(chosen, 0)
+    st.caption(f"✅ = {t('فيها سكريبت')} · ⬜ = {t('لسه')}  —  "
+               + (f"{t('الحلقة')} {ltr(chosen)}: {ltr(n)} {t('مشهد متسجل')}" if n
+                  else f"{t('الحلقة')} {ltr(chosen)}: {t('لسه مالهاش سكريبت')}"))
+    loose = repo.scenes_without_episode_count(project_id)
+    if loose:
+        st.caption(f"⚠️ {ltr(loose)} {t('مشهد في المشروع من غير حلقة (اتضافوا قبل كده) — حدد حلقتهم من تبويب المشاهد.')}")
+    return chosen
+
+
+def _series_assignment(project_id, scenes, chosen):
+    """بتقرر كل مشهد هيروح أنهي حلقة، وبتسأل لو فيه تعارض.
+
+    بترجّع (المشاهد بأرقام حلقاتها، جاهز؟، رقم الحلقة اللي هتتستبدل أو None)."""
+    file_eps = sorted({int(sc["episode_number"]) for sc in scenes if sc.get("episode_number") is not None})
+    loose = sum(1 for sc in scenes if sc.get("episode_number") is None)
+    st.markdown(f"**📺 {t('توزيع المشاهد على الحلقات')}**")
+
+    # ملف فيه كذا حلقة: كل مشهد بحلقته اللي في الملف
+    if len(file_eps) >= 2:
+        per = {n: sum(1 for sc in scenes if sc.get("episode_number") == n) for n in file_eps}
+        st.info(f"{t('الملف ده فيه')} {ltr(len(file_eps))} {t('حلقات')}: "
+                + "، ".join(f"{t('الحلقة')} {n} ({ltr(c)} {t('مشهد')})" for n, c in per.items())
+                + (f"\n\n{ltr(loose)} {t('مشهد من غير رقم حلقة هيتحطوا في الحلقة')} {ltr(chosen)}." if loose else ""))
+        out = [dict(sc, episode_number=sc["episode_number"] if sc.get("episode_number") is not None else chosen)
+               for sc in scenes]
+        return out, True, None
+
+    # حلقة واحدة: اللي اخترتها، إلا لو الملف أو اسمه بيقول غير كده
+    detected = file_eps[0] if file_eps else episode_from_filename(st.session_state.get("_import_src_name"))
+    target = chosen
+    if detected is not None and detected != chosen:
+        where = t("جوه الملف") if file_eps else t("في اسم الملف")
+        st.warning(f"{t('انت اخترت الحلقة')} {ltr(chosen)}، {t('بس')} {where} {t('مكتوب الحلقة')} {ltr(detected)}.")
+        pick = st.radio(t("المشاهد دي تبع أنهي حلقة؟"),
+                        [chosen, detected], index=None, horizontal=True,
+                        format_func=lambda n: f"{t('الحلقة')} {n}"
+                        + (f" ({t('اللي اخترتها')})" if n == chosen else f" ({t('اللي في الملف')})"),
+                        key=f"import_ep_conflict_{project_id}_{chosen}_{detected}")
+        if pick is None:
+            st.caption(t("اختار الحلقة الصح عشان تقدر تكمّل."))
+            return scenes, False, None
+        target = pick
+
+    existing = next((e["scenes"] for e in repo.episode_overview(project_id) if e["episode_number"] == target), 0)
+    replace = None
+    if existing:
+        mode = st.radio(
+            f"{t('الحلقة')} {ltr(target)} {t('فيها')} {ltr(existing)} {t('مشهد بالفعل')}:",
+            ["add", "replace"], horizontal=True, key=f"import_ep_mode_{project_id}_{target}",
+            format_func=lambda m: t("➕ ضيف الجديد بس (المكرر بيتخطى)") if m == "add"
+            else t("♻️ استبدل مشاهد الحلقة كلها"))
+        if mode == "replace":
+            st.error(f"⚠️ {t('الاستبدال بيمسح')} {ltr(existing)} {t('مشهد من الحلقة')} {ltr(target)} "
+                     f"{t('بلقطاتهم وروابطهم وجدولتهم نهائيًا، وبعدين يستورد الملف الجديد.')}")
+            if not st.checkbox(t("متأكد — استبدل"), key=f"import_ep_replace_ok_{project_id}_{target}"):
+                return scenes, False, None
+            replace = target
+    else:
+        st.caption(f"{t('كل المشاهد')} ({ltr(len(scenes))}) {t('هتتحط في الحلقة')} {ltr(target)}.")
+    return [dict(sc, episode_number=target) for sc in scenes], True, replace
+
+
+def _start_ai(md, project_id, filename, known):
+    """بيبعت التحليل للطابور على طول - من غير شاشة تقدير وتأكيد."""
+    try:
+        _n, _cost, ceiling = ai_jobs.estimate(md)
+        st.session_state.pop("_ai_load_attempted", None)
+        st.session_state.pop("_ai_pending", None)
+        st.session_state["ai_job_id"] = ai_jobs.start(md, project_id, filename, known_characters=known,
+                                                      max_cost_usd=ceiling)
+        # F3: تشغيل التحليل بيكلّف فلوس — بيتسجّل كحدث استخدام بسقفه
+        audit.event("ai", target="script_analysis", project_id=project_id,
+                    detail={"file": filename, "ceiling_usd": ceiling, "job_id": st.session_state["ai_job_id"]})
+        st.rerun()
+    except Exception as e:  # noqa: BLE001
+        st.error(_user_error(e, "ai start"))
+
+
+def _live_timer(started):
+    """عدّاد بيعد بالثانية على جهاز اليوزر (JavaScript) - مش مع كل تحديث من
+    السيرفر، فمابيبطّأش حاجة. من غير أي حرف "أصغر من" في السكريبت: st.html
+    بيمسحه بصمت لو لقى حاجة شبه تاج HTML."""
+    start_ms = int((started or 0) * 1000)
+    st.html(
+        f'<div class="cf-ai-timer" style="font-size:1.05rem;font-weight:700;direction:ltr;text-align:start">'
+        f'⏱ <span id="cf-ai-timer">00:00</span></div>'
+        "<script>(function(){"
+        f"var s={start_ms}||Date.now();"
+        "var pad=function(n){return (n+100+'').slice(1);};"
+        "var tick=function(){var el=document.getElementById('cf-ai-timer');if(!el)return;"
+        "var d=Math.max(0,Math.floor((Date.now()-s)/1000));"
+        "el.textContent=pad(Math.floor(d/60))+':'+pad(d%60);};"
+        "tick();if(window.__cfAiTimer)clearInterval(window.__cfAiTimer);"
+        "window.__cfAiTimer=setInterval(tick,1000);})();</script>",
+        unsafe_allow_javascript=True)
+
+
+def _render_external_steps():
+    """🌐 التحليل خارج CimaFast: البرومبت + 3 خطوات، والنتيجة (ملف JSON)
+    بتترفع من نفس خانة الرفع فوق."""
+    st.markdown(t(
+        "**1.** دوس «📋 نسخ البرومبت».\n\n"
+        "**2.** افتح Claude أو ChatGPT أو Gemini، الصق البرومبت، وارفق معاه نفس ملف السيناريو.\n\n"
+        "**3.** احفظ الـ JSON اللي رجعلك في ملف `script.json` وارفعه من خانة الرفع فوق، ودوس «🔍 تحليل الملف»."))
+    _render_copy_button(AI_JSON_PROMPT, t("📋 نسخ البرومبت"), t("✅ اتنسخ"))
+    st.download_button(t("⬇️ أو نزّل البرومبت كملف"), AI_JSON_PROMPT, file_name="cimafast_prompt.txt",
+                       mime="text/plain", key="dl_prompt", use_container_width=True)
+    with st.expander(t("شوف نص البرومبت")):
         st.code(AI_JSON_PROMPT, language="text")
 
-    uploaded_file = st.file_uploader(t("اختر ملف السكريبت"), type=["docx", "txt", "pdf", "json"], key="script_upload")
+
+def render(project_id):
+    st.subheader(tr("sub_import"))
+    st.caption(t("ارفع ملف السيناريو، واختار طريقة التحليل — والمشاهد والأماكن والشخصيات بتتملى لوحدها "
+                 "وتراجعها قبل ما تتضاف."))
+
+    _project = repo.project_by_id(project_id)[0]
+    _series = repo.is_series(_project)
+    _chosen_episode = None
+    if _series:
+        with st.container(border=True, key="cf_import_episodes"):
+            _chosen_episode = _render_episode_picker(project_id)
+    _upload_label = (f"{t('اختر ملف سكريبت الحلقة')} {_chosen_episode}" if _chosen_episode
+                     else t("اختر ملف السكريبت"))
+    uploaded_file = st.file_uploader(_upload_label, type=["docx", "txt", "pdf", "json"], key="script_upload")
+    if uploaded_file is not None:
+        # اسم الملف بيتفضل بعد التحليل (الـ AI بياخد دقايق) عشان فحص "الحلقة الكام"
+        st.session_state["_import_src_name"] = uploaded_file.name
 
     _known = [r["name"] for r in repo.character_names_of_project(project_id)]
     _ai_active = ai_jobs.active_job(project_id)
 
-    _c_fast, _c_ai = st.columns(2)
-    with _c_fast:
-        _run_fast = uploaded_file is not None and st.button(
-            t("🔍 تحليل الملف"), use_container_width=True,
-            help=t("تحليل سريع ومجاني على الجهاز، من غير ذكاء اصطناعي."))
-    with _c_ai:
-        _run_ai = uploaded_file is not None and st.button(
-            t("🤖 تحليل بالذكاء الاصطناعي"), use_container_width=True,
-            disabled=bool(_ai_active),
-            help=t("تحليل أعمق بـ Opus. بيستغرق دقايق وبيكلف فلوس."))
+    # بعد الرفع بس: تلات طرق جنب بعض، كل واحدة بتودّي لنتيجة على طول (المالك
+    # 2026-09-24) - من غير خطوة "تقدير" قبل الذكاء الاصطناعي، ومن غير شرح
+    # التحليل الخارجي فوق الرفع (كان بيشتت أول شاشة اليوزر بيشوفها).
+    _run_fast = _run_ai = False
+    if uploaded_file is not None:
+        _c_fast, _c_ai, _c_ext = st.columns(3)
+        with _c_fast:
+            _run_fast = st.button(f"🔍 {t('تحليل الملف')}", use_container_width=True, key="imp_fast",
+                                  help=t("سريع ومجاني، على الجهاز من غير ذكاء اصطناعي — أحسن للسيناريوهات المنظمة."))
+            st.caption(t("سريع · مجاني"))
+        with _c_ai:
+            _run_ai = st.button(f"🤖 {t('CimaFast AI Inspector')}", use_container_width=True, key="imp_ai",
+                                type="primary", disabled=bool(_ai_active),
+                                help=t("تحليل عميق بالذكاء الاصطناعي — بيبدأ على طول وبياخد دقايق."))
+            st.caption(t("الأدق · بياخد دقايق"))
+        with _c_ext:
+            if st.button(f"🌐 {t('التحليل خارج CimaFast')}", use_container_width=True, key="imp_ext",
+                         help=t("حلّل على Claude أو ChatGPT أو Gemini بنفسك وارجع بالنتيجة.")):
+                st.session_state["_imp_ext_open"] = not st.session_state.get("_imp_ext_open", False)
+            st.caption(t("على أي AI بره البرنامج"))
+        if st.session_state.get("_imp_ext_open"):
+            with st.container(border=True, key="cf_import_external"):
+                _render_external_steps()
 
     if _run_fast:
         try:
             st.session_state["parsed_script"] = parse_script(
                 uploaded_file.name, uploaded_file.getvalue(), known_characters=_known)
         except Exception as e:
-            st.error(f"{t('حصل خطأ أثناء تحليل الملف:')} {e}")
+            st.error(f"{t('حصل خطأ أثناء تحليل الملف:')} {_user_error(e, 'fast parse')}")
 
-    # --- تحليل الذكاء الاصطناعي: تقدير -> تأكيد -> طابور ------------------
+    # --- CimaFast AI Inspector: بيبدأ على طول ------------------------------------
+    # التقدير (عدد المشاهد والتكلفة) كان خطوة لوحده قبل "ابدأ التحليل" وأرقامه
+    # تقريبية - اتشال (المالك 2026-09-24). السقف بيتحسب ويتبعت للـ worker زي
+    # ما هو. الحاجة الوحيدة اللي بتوقف: ملف مش شكله سيناريو خالص، لأن الـ AI
+    # ساعتها هيضطر يخترع مشاهد (ممنوع نخترع بيانات).
     if _run_ai:
         try:
             _lines = extract_lines(uploaded_file.name, uploaded_file.getvalue())
             _md, _stats = to_markdown(_lines)
             _conf, _ev = looks_like_screenplay(_lines)
-            st.session_state["_ai_pending"] = {
-                "md": _md, "stats": _stats, "filename": uploaded_file.name,
-                "confidence": _conf, "evidence": _ev}
+            if _conf < 0.3:
+                st.session_state["_ai_pending"] = {"md": _md, "filename": uploaded_file.name, "evidence": _ev}
+            else:
+                _start_ai(_md, project_id, uploaded_file.name, _known)
         except Exception as e:
-            st.error(f"{t('حصل خطأ أثناء قراءة الملف:')} {e}")
+            st.error(f"{t('حصل خطأ أثناء قراءة الملف:')} {_user_error(e, 'ai read')}")
 
     _pending = st.session_state.get("_ai_pending")
     if _pending and not _ai_active:
-        _n, _cost, _ceiling = ai_jobs.estimate(_pending["md"])
-        _st = _pending["stats"]
-        st.info(
-            f"{t('عدد المشاهد المكتشفة')}: **{_n}** · "
-            f"{t('تكلفة تقديرية')}: **${_cost}** ({t('بحد أقصى')} ${_ceiling})\n\n"
-            f"{t('تم تنضيف الملف قبل الإرسال')}: {_st['raw_chars']:,} → "
-            f"{_st['md_chars']:,} {t('حرف')}"
-            + (f" ({_st['saved_pct']}% {t('أقل')})" if _st['saved_pct'] > 0 else ""))
-        # لو المستند مش شكله سيناريو، الـ AI مش هيقدر يقول "مش عارف" — الـ
-        # schema بتفرض عليه يرجّع مشاهد، فهيخترعها. بنحذّر قبل الصرف.
-        _conf = _pending.get("confidence", 1.0)
         _ev = _pending.get("evidence", {})
-        if _conf < 0.3:
-            st.error(
-                f"⚠️ {t('الملف ده مش شكله سيناريو.')}\n\n"
-                f"{t('مفيش فيه عناوين مشاهد')} ({_ev.get('scene_headers', 0)}) "
-                f"{t('ولا داخلي/خارجي')} ({_ev.get('int_ext', 0)}) "
-                f"{t('ولا سطور حوار')} ({_ev.get('dialogue_lines', 0)}).\n\n"
-                f"{t('لو كملت، الذكاء الاصطناعي هيضطر يخترع مشاهد وأرقام مش موجودة في الملف.')}")
-        elif _conf < 0.6:
-            st.warning(
-                f"⚠️ {t('أدلة قليلة إن ده سيناريو')} "
-                f"({t('عناوين مشاهد')}: {_ev.get('scene_headers', 0)}, "
-                f"{t('حوار')}: {_ev.get('dialogue_lines', 0)}). "
-                f"{t('راجع النتيجة كويس قبل الاستيراد.')}")
+        st.error(
+            f"⚠️ {t('الملف ده مش شكله سيناريو.')}\n\n"
+            f"{t('مفيش فيه عناوين مشاهد')} ({_ev.get('scene_headers', 0)}) "
+            f"{t('ولا داخلي/خارجي')} ({_ev.get('int_ext', 0)}) "
+            f"{t('ولا سطور حوار')} ({_ev.get('dialogue_lines', 0)}).\n\n"
+            f"{t('لو كملت، الذكاء الاصطناعي هيضطر يخترع مشاهد وأرقام مش موجودة في الملف.')}")
         _ok, _no = st.columns(2)
-        with _ok:
-            _go_label = t("✅ ابدأ التحليل") if _conf >= 0.3 else t("⚠️ كمّل بالرغم من كده")
-            if st.button(_go_label, use_container_width=True, key="_ai_go"):
-                try:
-                    st.session_state.pop("_ai_load_attempted", None)
-                    st.session_state["ai_job_id"] = ai_jobs.start(
-                        _pending["md"], project_id, _pending["filename"],
-                        known_characters=_known, max_cost_usd=_ceiling)
-                    # F3: تشغيل التحليل بيكلّف فلوس — بيتسجّل كحدث استخدام بسقفه
-                    audit.event("ai", target="script_analysis", project_id=project_id,
-                                detail={"file": _pending["filename"], "ceiling_usd": _ceiling})
-                    st.session_state.pop("_ai_pending", None)
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
-        with _no:
-            if st.button(t("إلغاء"), use_container_width=True, key="_ai_no"):
-                st.session_state.pop("_ai_pending", None)
-                st.rerun()
+        if _ok.button(t("⚠️ كمّل بالرغم من كده"), use_container_width=True, key="_ai_go"):
+            _start_ai(_pending["md"], project_id, _pending["filename"], _known)
+        if _no.button(t("إلغاء"), use_container_width=True, key="_ai_no"):
+            st.session_state.pop("_ai_pending", None)
+            st.rerun()
 
     # لو التاب اتقفل والتحليل لسه شغال، نرجّع نتابعه بدل ما يضيع
     if _ai_active and not st.session_state.get("ai_job_id"):
@@ -370,7 +516,14 @@ def render(project_id):
                     st.session_state["_ai_load_attempted"] = True
                     st.rerun(scope="app")
             elif state == "failed":
-                st.error(f"[ ❌ ] {t('التحليل فشل')} — {detail}{extra}")
+                # detail جاي من الـ worker وممكن يكون نص استثناء بايثون خام.
+                # بنعرض سطر مفهوم، والتفاصيل التقنية تحت في expander لمين
+                # يحتاجها، مش كعنوان الرسالة.
+                st.error(f"[ ❌ ] {t('التحليل فشل')}{extra} — "
+                         f"{t('مقدرناش نكمّل التحليل. ملفك زي ما هو، تقدر تجرّب تاني.')}")
+                if detail:
+                    with st.expander(t("تفاصيل تقنية")):
+                        st.code(detail, language="text")
                 if st.session_state.get("_ai_last_seen_state") != "failed":
                     st.session_state["_ai_last_seen_state"] = "failed"
                     st.rerun(scope="app")
@@ -379,6 +532,8 @@ def render(project_id):
             else:
                 st.info(f"[ ⏳ ] {t('في الطابور')} — {detail}")
 
+        if _state not in ai_jobs.TERMINAL:
+            _live_timer(ai_jobs.started_at(_job))
         _ai_progress()
 
         if _state == "done" and not st.session_state.get("ai_parsed_script"):
@@ -391,10 +546,17 @@ def render(project_id):
                     _parsed_ai["warnings"] = list(_res.get("warnings", [])) + \
                         list(_parsed_ai.get("warnings", []))
                     _parsed_ai["meta"] = _res.get("meta", {})
+                    # مكتبة التحليلات: التحليل بيتحفظ على الحساب لوحده، بره المشروع،
+                    # عشان لو ده المشروع الغلط يتستورد بعدين في الصح. عمره ما بيوقّع الشاشة.
+                    _saved = analysis_library.save_job(
+                        _job, fallback_owner=st.session_state.get("_auth_user"),
+                        fallback_company=st.session_state.get("_cf_company"))
+                    _parsed_ai["library_id"] = _saved
                     st.session_state["ai_parsed_script"] = _parsed_ai
                     st.rerun()
                 except Exception as e:
-                    st.error(f"{t('نتيجة الذكاء الاصطناعي مش مقروءة:')} {e}")
+                    st.error(f"{t('نتيجة الذكاء الاصطناعي مش مقروءة:')} "
+                             f"{_user_error(e, 'ai result parse')}")
             else:
                 st.error(t("التحليل خلص بس ملف النتيجة مش موجود. جرّب تاني."))
         if _state in ai_jobs.TERMINAL:
@@ -421,10 +583,28 @@ def render(project_id):
         _analysis_rtl_css()
         with st.container(key="cf_analysis"):
             _render_analysis_dashboard(st.session_state["last_analysis"])
+    if not parsed:
+        # بعد الاستيراد (أو في زيارة تانية) التقرير يفضل متاح على آخر تحليل
+        # اتعمل من المشروع ده في المكتبة، مش بس وقت ما النتيجة على الشاشة
+        _drama_entry = (dramaturgy_panel.jobs.entry_for_project(st.session_state.get("_auth_user"), project_id)
+                        if dramaturgy_panel.jobs.available() else None)
+        if _drama_entry:
+            with st.container(border=True, key="cf_drama_import"):
+                dramaturgy_panel.render(st.session_state.get("_auth_user"), _drama_entry, key="import")
     if parsed:
         scenes = parsed["scenes"]
         for w in parsed["warnings"]:
             st.warning(w)
+        if parsed.get("library_id"):
+            # التحليل بقى محفوظ على الحساب — لو ده المشروع الغلط، مفيش حاجة ضاعت
+            st.markdown(
+                f'<div class="cf-lib-saved">📚 {t("التحليل ده اتحفظ في مكتبة التحليلات بتاعتك — لو ده مش المشروع الصح، استورده من هناك في أي مشروع تاني.")} '
+                f'<a href="?page=library" target="_self">{t("افتح المكتبة")}</a></div>',
+                unsafe_allow_html=True)
+            # تقرير البناء الدرامي: بدوسة بس (بيكلّف)، وبيتحفظ على نفس التحليل في المكتبة
+            with st.container(border=True, key="cf_drama_import"):
+                dramaturgy_panel.render(st.session_state.get("_auth_user"),
+                                        parsed["library_id"], key="import")
 
         st.success(f"{t('تم التعرف على')} {len(scenes)} {t('مشهد في الملف. راجعهم وعدّل أي حاجة غلط قبل التأكيد:')}")
         excluded_scene_indices = set()
@@ -549,11 +729,22 @@ def render(project_id):
         if excluded_scene_indices:
             st.caption(f"{t('هيتستبعد')} {len(excluded_scene_indices)} {t('مشهد من الاستيراد حسب اختيارك فوق.')}")
 
+        _ep_ready, _ep_replace = True, None
+        if _series and _chosen_episode:
+            st.markdown("---")
+            with st.container(border=True, key="cf_import_ep_assign"):
+                preview_scenes, _ep_ready, _ep_replace = _series_assignment(
+                    project_id, preview_scenes, _chosen_episode)
+
         col_a, col_b = st.columns(2)
         with col_a:
-            if st.button(t("🔵 تأكيد وإضافة كل المشاهد للمشروع")):
+            if st.button(t("🔵 تأكيد وإضافة كل المشاهد للمشروع"), disabled=not _ep_ready):
                 scenes_to_import = apply_character_merges(preview_scenes, merge_map)
                 scenes_to_import = apply_location_merges(scenes_to_import, location_merge_map)
+                if _ep_replace is not None:
+                    with audit.action("episode_replace", "scenes", project_id=project_id,
+                                      summary=f"استبدال سكريبت الحلقة {_ep_replace}"):
+                        repo.delete_episode_scenes(project_id, _ep_replace)
                 # F3: استيراد فيه ١٤٣ مشهد بيكتب آلاف الصفوف. الصف الواحد ده
                 # بيقول مين استورد وإمتى وكام مشهد — والتفاصيل في البيانات نفسها.
                 with audit.action("import_script", "scenes", project_id=project_id) as _act:
