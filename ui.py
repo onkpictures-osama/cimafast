@@ -346,9 +346,13 @@ def guarded_delete(delete_fn, params, friendly_error):
 
 def open_tab_by_slug(slug):
     """بيفتح تبويب معيّن (من رابط أو زرار) — ومرحلته معاه. لازم يتنده قبل ما
-    مفتاح المرحلة والتبويبات يتبنوا في الـ run ده."""
+    مفتاح المرحلة والتبويبات يتبنوا في الـ run ده. الفريق والإعدادات صفحات
+    لوحدها (PROJECT_PAGES) فبتتفتح كصفحة، حتى من رابط قديم ‎?tab=team‎."""
     import links
     from i18n import tr
+    if slug in PROJECT_PAGES:
+        st.query_params["page"] = slug
+        return
     phase = links.phase_of(slug, st.session_state.get("_cf_phase", "pre"))
     st.session_state["_cf_phase"] = phase
     st.session_state[f"main_tabs_{phase}"] = tr(links.TABS[slug])
@@ -444,6 +448,9 @@ def close_sidebar_now():
 # "اختار لـ..." (?pick=<id> - زي اختيار ممثل لشخصية). تغيير الـ query params
 # مابيعملش reload للصفحة، فالجلسة والشريط بيفضلوا زي ما هم.
 LIBRARY_PAGES = ("actors", "locations_lib", "library")
+# صفحات المشروع اللي بتتفتح من الشريط الجانبي (👥 فريق العمل، ⚙️ الإعدادات) -
+# مش تبويبات جنب المشاهد واللقطات (المالك 2026-09-24): مكان واحد لكل حاجة.
+PROJECT_PAGES = ("team", "settings")
 
 
 def open_page(page, **params):

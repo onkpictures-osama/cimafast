@@ -55,8 +55,7 @@ def run(port, shot_dir):
         _phase(page, "ما بعد الإنتاج")
         _no_exception(page, "post phase")
         tabs = [x.strip() for x in page.get_by_role("tab").all_inner_texts()]
-        check("post phase shows post + crew + settings",
-              len(tabs) == 3 and "ما بعد الإنتاج" in tabs[0] and "فريق العمل" in tabs[1], str(tabs))
+        check("post phase shows only the post tab", len(tabs) == 1 and "ما بعد الإنتاج" in tabs[0], str(tabs))
         check("post bar starts at 0%", "ما بعد الإنتاج 0%" in _bar(page), _bar(page))
         check("bar has one segment per department",
               page.locator(".cf-progress-seg").count() == 7, str(page.locator(".cf-progress-seg").count()))

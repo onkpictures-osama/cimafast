@@ -28,18 +28,19 @@ TABS = {
     "settings": "tab_settings",
 }
 
-# مفتاح المرحلة فوق التبويبات: كل مرحلة بتعرض تبويباتها بس، والإعدادات في
-# الاتنين. أي رابط مباشر لتبويب بيفتح مرحلته لوحده (phase_of).
+# مفتاح المرحلة فوق التبويبات: كل مرحلة بتعرض تبويباتها بس. أي رابط مباشر لتبويب بيفتح مرحلته لوحده (phase_of).
+# الفريق والإعدادات مش في أي مرحلة: صفحات لوحدها من الشريط الجانبي
+# (ui.PROJECT_PAGES)، ولسه في TABS عشان الروابط القديمة ‎?tab=settings‎ تشتغل.
 PHASES = {
     "pre": ["import", "locations", "props", "characters", "actors", "wardrobe",
-            "scenes", "shots", "reports", "team", "settings"],
-    "prod": ["schedule", "team", "settings"],
-    "post": ["post", "team", "settings"],
+            "scenes", "shots", "reports"],
+    "prod": ["schedule"],
+    "post": ["post"],
 }
 
 
 def phase_of(slug, current="pre"):
-    """المرحلة اللي فيها التبويب ده؛ الفريق والإعدادات في كل المراحل فبتفضل مكانها."""
+    """المرحلة اللي فيها التبويب ده (لو التبويب في أكتر من مرحلة، بتفضل مكانها)."""
     homes = [p for p, slugs in PHASES.items() if slug in slugs]
     if current in homes:
         return current

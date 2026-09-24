@@ -59,8 +59,8 @@ def run(port, shot_dir):
         check("sidebar shows the manager's role", "مدير المشروع" in sb)
         check("sidebar has the crew button", "فريق العمل" in sb)
         boss.locator(".st-key-sb_open_team button:visible").first.click(); _settle(boss, 2200)
-        sel = boss.locator('[role="tab"][aria-selected="true"]').first.inner_text()
-        check("crew button opens the crew page", "فريق العمل" in sel, sel)
+        sel = boss.locator("section[data-testid=stMain] h3").first.inner_text()
+        check("crew button opens the crew page", "فريق العمل" in sel and boss.get_by_role("tab").count() == 0, sel)
         check("…and closes the sidebar", not _sidebar_open(boss))
         _no_exception(boss, "crew page")
 

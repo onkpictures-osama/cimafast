@@ -13,7 +13,8 @@ from database import init_db, FIELD_HELP
 import theme
 
 from i18n import t, tr
-from ui import (LIBRARY_PAGES, close_sidebar_now, go_to, ltr, nav_link as _nav_link, open_page,
+from ui import (LIBRARY_PAGES, PROJECT_PAGES, close_page, close_sidebar_now, ltr,
+                nav_link as _nav_link, open_page,
                 open_tab_by_slug, phase_tabs, request_close_sidebar)
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.new_project
@@ -550,6 +551,7 @@ if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_sta
             st.toast(t("الرابط ده لمشروع مش متاح لحسابك."), icon="🔒")
     if _link_tab:
         open_tab_by_slug(_link_tab)
+        _page = st.query_params.get("page")      # ‎?tab=team‎ القديم = صفحة الفريق
 # H4: ‎&item=‎ من تنبيه — المشهد اللي اتغيّر بيتفتح لوحده في تبويب المشاهد.
 # بيتشال من الرابط بعد ما يتقري، عشان rerun بعد كده مايرجّعش التركيز عليه.
 _link_item = links.item(st.query_params)
@@ -685,14 +687,8 @@ if _wanted in project_by_id:
     st.session_state["project_selector"] = _wanted
 if st.session_state.get("project_selector") not in project_by_id:
     st.session_state.pop("project_selector", None)
-# ⚙️ جنب اسم المشروع بتفتح تبويب "إعدادات المشروع" على طول (تعديل/حذف
-# المشروع، الفريق، الحلقات) - طلب المالك 2026-09-23 لما دوّر على الحذف
-# وملقاهوش. الكولباك بيتنفذ قبل الـ run الجاي، فالتبويب بيتفتح قبل ما
-# التبويبات (‎main_tabs_<المرحلة>‎) تتبني.
-def _open_settings_tab():
-    go_to("settings")
-
-
+# ⚙️ جنب اسم المشروع بتفتح صفحة "إعدادات المشروع" على طول (تعديل/حذف
+# المشروع، الحلقات) - طلب المالك 2026-09-23 لما دوّر على الحذف وملقاهوش.
 _sb_proj_row = _sb_projects.container(
     horizontal=True, vertical_alignment="bottom", gap="small", wrap=False, key="cf_sb_proj_row")
 # تغيير المشروع = صفحة تانية: الشريط الجانبي بيتقفل (طلب المالك 2026-09-24)
@@ -701,7 +697,8 @@ project_id = _sb_proj_row.selectbox(tr("current_project_label"), list(project_by
                                     key="project_selector", on_change=request_close_sidebar)
 _sb_proj_row.button("", icon=":material/settings:", key="sb_open_settings",
                     help=t("إعدادات المشروع: تعديل، حذف، الفريق، الحلقات"),
-                    on_click=_open_settings_tab)
+                    on_click=open_page, args=("settings",),
+                    type="primary" if _page == "settings" else "secondary")
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
 # مساحة العمل والدور والباقة من المشروع نفسه (مش من اختيار "مساحة عمل")
@@ -720,10 +717,10 @@ _sb_projects.markdown(
     % (html.escape(tr("role_label")), html.escape(t(_ctx["job"]))),
     unsafe_allow_html=True,
 )
-# 👥 فريق العمل: تحت المشروع على طول، بيودّي لصفحة الفريق (ui.go_to)
+# 👥 فريق العمل: تحت المشروع على طول، بيفتح صفحة الفريق (ui.open_page)
 _team_n = len(accounts.project_team_view(_current_user, project_id)["people"])
 _sb_projects.button(f"👥 {t('فريق العمل')} ({_team_n})", key="sb_open_team", use_container_width=True,
-                    on_click=go_to, args=("team",))
+                    on_click=open_page, args=("team",), type="primary" if _page == "team" else "secondary")
 
 # صفحة مكتبة مفتوحة (?page=): بتتعرض بدل تبويبات المشروع، والشريط كامل جنبها
 if _page in LIBRARY_PAGES:
@@ -745,6 +742,27 @@ if st.session_state.get("parsed_script_project_id") != project_id:
                "last_analysis", "_ai_pending", "_which_analysis"):
         st.session_state.pop(_k, None)
     st.session_state["parsed_script_project_id"] = project_id
+
+# F2: لو مشاهد داس على زرار تعديل، طبقة البيانات بترفض وهنا بنوريله رسالة
+# مفهومة بدل traceback. الشاشة نفسها بتكمل عادي في الـ rerun الجاي.
+def _render(view, **kwargs):
+    try:
+        view.render(**kwargs)
+    except permissions.Denied as exc:
+        st.warning(t(str(exc)))
+
+
+# 👥 الفريق و⚙️ الإعدادات: صفحة لوحدها بدل مراحل المشروع وتبويباتها
+if _page in PROJECT_PAGES:
+    st.button(f"↩ {t('رجوع للمشروع')}", key="cf_page_back", on_click=close_page)
+    if _page == "team":
+        _render(views.team, project=project, project_id=project_id, current_user=_current_user)
+    else:
+        st.subheader(f"{tr('tab_settings')} — {project['name']}")
+        _render(views.project_settings, project_id=project_id, current_user=_current_user,
+                company_id=company_id, role=_role, tier=_tier, board_url=_board_url)
+    close_sidebar_now()
+    st.stop()
 
 _caption_line = (
     f"{t(project['project_type'])} · {ltr(project['default_resolution'])} · "
@@ -796,15 +814,6 @@ if st.session_state.get("_remembered") != (project_id, _open_tab):
 
 # ---------------- التبويبات ----------------
 # كل تبويب في views/<اسم>.py. الترتيب هنا هو ترتيب st.tabs فوق.
-# F2: لو مشاهد داس على زرار تعديل، طبقة البيانات بترفض وهنا بنوريله رسالة
-# مفهومة بدل traceback. التبويب نفسه بيكمل عادي في الـ rerun الجاي.
-def _render(view, **kwargs):
-    try:
-        view.render(**kwargs)
-    except permissions.Denied as exc:
-        st.warning(t(str(exc)))
-
-
 if _is_open("import"):
     with _tabs["import"]:
         if permissions.can(_role, "run_ai"):
@@ -841,13 +850,6 @@ if _is_open("schedule"):
 if _is_open("post"):
     with _tabs["post"]:
         _render(views.post, project=project, project_id=project_id, current_user=_current_user)
-if _is_open("team"):
-    with _tabs["team"]:
-        _render(views.team, project=project, project_id=project_id, current_user=_current_user)
-if _is_open("settings"):
-    with _tabs["settings"]:
-        _render(views.project_settings, project_id=project_id, current_user=_current_user,
-               company_id=company_id, role=_role, tier=_tier, board_url=_board_url)
 
 # أي زرار طلب ننتقل لصفحة (ترس الإعدادات، إنشاء مشروع، تغيير المشروع...):
 # الشريط الجانبي يتقفل بعد ما الصفحة الجديدة تترسم - ui.go_to

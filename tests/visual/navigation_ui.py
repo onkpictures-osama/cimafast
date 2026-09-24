@@ -59,7 +59,11 @@ def run(port, width):
         # 1) ترس الإعدادات
         _open_sidebar(page)
         page.locator('.st-key-sb_open_settings button:visible').first.click(); _settle(page, 2200)
-        check(f"{tag} ⚙️ opens Project Settings", "إعدادات المشروع" in _selected_tab(page), _selected_tab(page))
+        _main = page.locator("section[data-testid=stMain]")
+        check(f"{tag} ⚙️ opens the Project Settings page (not a tab)",
+              "إعدادات المشروع" in _main.locator("h3").first.inner_text() and page.get_by_role("tab").count() == 0,
+              _main.locator("h3").first.inner_text())
+        check(f"{tag} settings page has a way back", _main.get_by_role("button").filter(has_text="رجوع للمشروع").count() == 1)
         check(f"{tag} ⚙️ closes the sidebar", not _sidebar_open(page))
         body = page.locator("section[data-testid=stMain]").inner_text()
         check(f"{tag} no shooting-schedule link inside settings", "جدول التصوير" not in body)
@@ -78,6 +82,8 @@ def run(port, width):
         form_open = page.evaluate("""() => [...document.querySelectorAll('[data-testid=stSidebar] details')]
             .some(d => d.open && d.querySelector('summary').innerText.includes('إنشاء مشروع'))""")
         check(f"{tag} the create form comes back closed", not form_open)
+        check(f"{tag} tabs have no crew/settings duplicates",
+              not any("فريق العمل" in x or "إعدادات" in x for x in page.get_by_role("tab").all_inner_texts()))
 
         # 3) تغيير المشروع
         _open_sidebar(page)
