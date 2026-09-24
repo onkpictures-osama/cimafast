@@ -59,7 +59,7 @@
     <section class="card admin-only" hidden>
       <h2>إضافة شخص للفريق</h2>
       <form id="add" class="grid">
-        <label class="field"><span>اسم المستخدم (إنجليزي)</span><input name="username" dir="ltr" required pattern="[A-Za-z0-9._\-]+"></label>
+        <label class="field"><span>اسم المستخدم (إنجليزي)</span><input name="username" dir="ltr" required pattern="[A-Za-z0-9._\-]+" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"></label>
         <label class="field"><span>الاسم</span><input name="display_name"></label>
         <label class="field"><span>المسمى الوظيفي</span><input name="job_title" placeholder="مدير تصوير، منتج منفذ…"></label>
         <label class="field"><span>الإيميل</span><input name="email" type="email" dir="ltr"></label>
@@ -89,8 +89,8 @@
     <section class="card">
       <h2>حسابي — تغيير كلمة السر</h2>
       <form id="my-password" class="grid">
-        <label class="field"><span>كلمة السر الحالية</span><input name="old" type="password" autocomplete="current-password" required></label>
-        <label class="field"><span>كلمة السر الجديدة (١٠ حروف على الأقل)</span><input name="new" type="password" autocomplete="new-password" minlength="10" required></label>
+        <label class="field"><span>كلمة السر الحالية</span><input name="old" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>
+        <label class="field"><span>كلمة السر الجديدة (١٠ حروف على الأقل)</span><input name="new" type="password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" minlength="10" required></label>
         <button class="btn">تغيير</button>
       </form>
     </section>

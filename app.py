@@ -133,6 +133,12 @@ def _render_login_screen():
             if attempts > 2:
                 time.sleep(min(attempts - 2, 4) * 0.5)
             st.error("اسم المستخدم أو كلمة السر غلط / Wrong username or password")
+            # كلمة السر بتفرق بين الكبير والصغير - أشهر سبب إن الموبايل كبّر
+            # أول حرف لوحده. اسم المستخدم مش بيفرق (auth.normalize_username).
+            st.caption("💡 كلمة السر بتفرق بين الحروف الكبيرة والصغيرة — اتأكد إن أول حرف "
+                       "ماتكتبش Capital لوحده، ودوس 👁 عشان تشوف اللي كتبته. / "
+                       "Passwords are case-sensitive — check your phone didn't capitalise the first "
+                       "letter; tap 👁 to see what you typed.")
 
 
 def _check_login():

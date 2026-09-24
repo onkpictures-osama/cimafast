@@ -103,9 +103,34 @@ def _document_attrs(st, lang):
         "var mf=document.createElement('link');mf.rel='manifest';"
         "mf.href='app/static/manifest.webmanifest';"
         "document.head.appendChild(mf);}"
+        + _NO_AUTOCAPS_JS +
         "})();</script>",
         unsafe_allow_javascript=True,
     )
+
+
+# كيبورد الموبايل بيكبّر أول حرف في أي خانة نص لوحده (وساعات بيصحّح الكلمة)،
+# ومنها خانة الدخول - وعلى بعض الكيبوردات خانة كلمة السر كمان، فـ "Password1"
+# مش "password1" والدخول بيفشل من غير ما اليوزر ياخد باله (بلاغ المالك
+# 2026-09-24). اسم المستخدم أصلًا مش حساس للحروف (auth.normalize_username)،
+# بس كلمة السر لازم تفضل حساسة - فالحل إن الكيبورد مايغيّرش حاجة من الأول.
+# Streamlit مابيطلعش الخصائص دي، وبيبني الخانات من جديد مع كل rerun، فـ
+# MutationObserver بيحطها على أي خانة تظهر. من غير أي حرف "أصغر من" في الكود:
+# st.html بيمسح السكريبت كله بصمت لو لقى حاجة شبه تاج HTML.
+_NO_AUTOCAPS_JS = (
+    "if(!window.__cfNoCaps){window.__cfNoCaps=1;"
+    "var fix=function(){"
+    "document.querySelectorAll('div[class*=st-key-_login_username] input,input[type=password]')"
+    ".forEach(function(i){if(i.dataset.cfNoCaps)return;i.dataset.cfNoCaps='1';"
+    "i.setAttribute('autocapitalize','none');i.setAttribute('autocorrect','off');"
+    "i.setAttribute('spellcheck','false');"
+    # Streamlit بيحط autocomplete=new-password على كل خانة سر، فمدير كلمات
+    # السر كان بيعرض "كلمة سر جديدة" بدل ما يملى المحفوظة في شاشة الدخول
+    "if(i.type==='password'){if(i.closest('div[class*=st-key-_login_password]'))"
+    "i.setAttribute('autocomplete','current-password');}"
+    "else{i.setAttribute('autocomplete','username');}});};"
+    "fix();new MutationObserver(fix).observe(document.body,{childList:true,subtree:true});}"
+)
 
 
 def inject_login(st, variant=CLASSIC):
