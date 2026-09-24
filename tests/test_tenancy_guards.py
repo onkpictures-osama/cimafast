@@ -96,7 +96,8 @@ SCOPED_TABLES = {
 # جداول الربط: مالهاش بيانات خاصة بيها، بس ربط صف بصف من مشروع تاني هو نفسه
 # تسريب. هنا حتى الـ INSERT لازم يتأكد إن الطرفين في المشروع.
 LINK_TABLES = {"scene_characters", "scene_props", "shot_characters", "shot_props",
-               "scene_character_looks"}   # P10: مشهد × شخصية × غيار
+               "scene_character_looks",   # P10: مشهد × شخصية × غيار
+               "location_venue_booking"}  # مكتبة المواقع: مكان في المشروع × موقع حقيقي
 
 _UPDATE_DELETE_RE = re.compile(r"\b(?:UPDATE|DELETE\s+FROM)\s+([a-z_]+)", re.IGNORECASE)
 _INSERT_RE = re.compile(r"\bINSERT\s+(?:OR\s+IGNORE\s+)?INTO\s+([a-z_]+)", re.IGNORECASE)

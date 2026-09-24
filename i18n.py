@@ -854,6 +854,47 @@ TRANSLATIONS = {
     "قريب هنا: الكول شيت، والتقارير اليومية، وباقي أقسام إدارة التصوير.":
         "Coming here: call sheets, daily reports and the rest of production management.",
 
+    # مكتبة مواقع التصوير (2026-09-24)
+    "بتدوّر على موقع لـ": "Finding a location for", "محتاج": "needs", "رجوع للأماكن": "Back to locations",
+    "اكتب اللي محتاجه: أوضة نوم، نادي، محطة مترو، كافيه...": "Type what you need: bedroom, club, metro station, café...",
+    "لسه مفيش مواقع في المكتبة — ضيف أول موقع من «📸 موقع جديد» تحت.":
+        "No locations in the library yet — add the first one from «📸 New location» below.",
+    "مفيش مواقع بالبحث ده — جرّب كلمة تانية.": "No locations match — try another word.",
+    "مساحة": "spaces", "بيغطي": "Covers", "منشور على المنصة": "Published on the platform", "افتح": "Open",
+    "الموقع ده مش متاح": "This location isn't available", "رجوع لقايمة المواقع": "Back to the list",
+    "الموقع على الخريطة": "On the map", "الكهربا": "Power", "الركنة": "Parking", "الدوشة": "Noise",
+    "أقصى طاقم": "Max crew", "التصاريح": "Permits", "العنوان": "Address", "صاحب المكان": "Owner",
+    "التليفون": "Phone", "السعر في اليوم": "Price per day",
+    "العنوان والتواصل والسعر بيبانوا بعد ما ترشّح الموقع لمكان في مشروعك.":
+        "Address, contact and price show once you shortlist this location for a place in your project.",
+    "المساحات اللي جواه": "Spaces inside", "المساحة": "Space", "ينفع كـ": "Can play", "د/خ": "INT/EXT",
+    "لسه مفيش مساحات متسجلة للموقع ده.": "No spaces recorded for this location yet.",
+    "لـ": "For", "رشّح للمكان ده": "Shortlist for this place", "احجزه للمكان ده": "Book it for this place",
+    "اسم الموقع": "Location name", "مثال: فيلا المعادي": "e.g. Maadi villa", "المدينة": "City",
+    "المنطقة": "Area", "رابط الخريطة": "Map link", "الصق رابط Google Maps": "Paste a Google Maps link",
+    "وصف": "Description", "معلومات عملية وتواصل (اختياري)": "Practical info & contact (optional)",
+    "كهربا المكان / محتاج مولد": "Mains / needs a generator",
+    "الخانات دي بتبان لفريقك بس، وللي يرشّح الموقع بعد كده:": "Only your team sees these, and anyone who later shortlists the location:",
+    "موقع جديد (سكاوتنج)": "New location (scouting)",
+    "من الموبايل: صوّر المكان، اكتب اسمه ونوعه، واختار المساحات اللي جواه — والموقع بيبقى في مكتبة فريقك على طول.":
+        "From your phone: take a photo, name it, pick its type and the spaces inside — it goes straight into your team's library.",
+    "صورة": "Photo", "إضافة الموقع": "Add location", "اسم الموقع مطلوب": "Location name is required",
+    "اتضاف الموقع للمكتبة": "Location added to the library", "تعديل الموقع ومساحاته": "Edit location & spaces",
+    "انشره على المنصة (يبان لكل الفرق — من غير العنوان والتواصل والسعر)":
+        "Publish on the platform (visible to all teams — without address, contact or price)",
+    "صورة جديدة": "New photo",
+    "المساحة دي تنفع تمثّل إيه؟ مثلًا: أوضة ولاد، عيادة، مكتب محامي": "What can this space play? e.g. kids' room, clinic, lawyer's office",
+    "حفظ المساحات": "Save spaces", "امسح الموقع من المكتبة": "Delete location from the library",
+    "اختار من مكتبة المواقع": "Choose from the locations library", "محجوز": "booked",
+    "المكان ده محجوز له موقع تاني بالفعل. الغي الحجز ده الأول لو عايز تغيّره.":
+        "This place already has another location booked. Cancel that booking first to change it.",
+    "شقة": "Apartment", "فيلا": "Villa", "عمارة": "Building", "بيت ريفي": "Country house", "كافيه": "Café",
+    "مطعم": "Restaurant", "نادي": "Club", "مستشفى": "Hospital", "مدرسة": "School", "محل": "Shop",
+    "مصنع/مخزن": "Factory/warehouse", "فندق": "Hotel", "شارع": "Street", "محطة مترو": "Metro station",
+    "شاطئ": "Beach", "صحرا": "Desert", "استوديو": "Studio", "أوضة نوم": "Bedroom", "مطبخ": "Kitchen",
+    "صالة": "Living room", "حمام": "Bathroom", "بلكونة": "Balcony", "جنينة": "Garden", "سطح": "Roof",
+    "سلم/مدخل": "Stairs/entrance", "جراج": "Garage", "صالة أفراح": "Wedding hall", "قاعة": "Hall",
+
     # شاشة الاستيراد المبسطة (2026-09-24)
     "ارفع ملف السيناريو، واختار طريقة التحليل — والمشاهد والأماكن والشخصيات بتتملى لوحدها وتراجعها قبل ما تتضاف.":
         "Upload the screenplay and pick how to analyse it — scenes, locations and characters fill in for you to review before they're added.",

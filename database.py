@@ -465,6 +465,63 @@ def init_db():
         -- دعوة لفريق مشروع (المالك 2026-09-24): لينك بيتبعت (واتساب/نسخ)،
         -- اللي بيفتحه يدخل أو يعمل حساب ويلاقي المشروع. التوكن نفسه مش متخزن
         -- - الـ hash بتاعه بس - فتسريب القاعدة مايديش لينكات شغالة.
+        -- مكتبة مواقع التصوير (المالك 2026-09-24): موقع حقيقي (شقة، فيلا، نادي،
+        -- محطة مترو...) بمساحاته اللي جواه، وكل مساحة "ينفع كـ" إيه. بتاع مساحة
+        -- العمل اللي ضافته (السكاوتنج شغل فريقك) - وممكن ينتشر للمنصة (discoverable).
+        -- العنوان بالظبط وتليفون صاحبه والسعر حساسين: لصاحب المساحة ولأي فريق
+        -- رشّحه أو حجزه بس.
+        CREATE TABLE IF NOT EXISTS venues (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            venue_type TEXT,
+            city TEXT,
+            area TEXT,
+            description TEXT,
+            maps_url TEXT,
+            photo_path TEXT,
+            photo_updated_at TEXT,
+            address TEXT,
+            contact_name TEXT,
+            contact_phone TEXT,
+            price_per_day REAL,
+            power TEXT,
+            parking TEXT,
+            noise TEXT,
+            max_crew INTEGER,
+            permits TEXT,
+            owner_company_id INTEGER,
+            discoverable INTEGER DEFAULT 0,
+            created_by TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS venue_spaces (
+            id SERIAL PRIMARY KEY,
+            venue_id INTEGER NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            space_type TEXT,
+            suitable_for TEXT,
+            int_ext TEXT,
+            photo_path TEXT,
+            notes TEXT
+        );
+
+        -- مكان في المشروع (شقة نادية أو ديكور جواها) ← موقع حقيقي: ترشيح أو
+        -- حجز، والديكور بيتربط بالمساحة اللي هتقوم بدوره (space_id).
+        CREATE TABLE IF NOT EXISTS location_venue_booking (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            venue_id INTEGER NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+            space_id INTEGER,
+            status TEXT NOT NULL DEFAULT 'shortlisted',
+            note TEXT,
+            created_by TEXT,
+            created_at TEXT,
+            booked_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS project_invites (
             id SERIAL PRIMARY KEY,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -895,6 +952,67 @@ def init_db():
             UNIQUE(company_id, user_id)
         );
 
+        -- مكتبة مواقع التصوير (المالك 2026-09-24): موقع حقيقي (شقة، فيلا، نادي،
+        -- محطة مترو...) بمساحاته اللي جواه، وكل مساحة "ينفع كـ" إيه. بتاع مساحة
+        -- العمل اللي ضافته (السكاوتنج شغل فريقك) - وممكن ينتشر للمنصة (discoverable).
+        -- العنوان بالظبط وتليفون صاحبه والسعر حساسين: لصاحب المساحة ولأي فريق
+        -- رشّحه أو حجزه بس.
+        CREATE TABLE IF NOT EXISTS venues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            venue_type TEXT,
+            city TEXT,
+            area TEXT,
+            description TEXT,
+            maps_url TEXT,
+            photo_path TEXT,
+            photo_updated_at TEXT,
+            address TEXT,
+            contact_name TEXT,
+            contact_phone TEXT,
+            price_per_day REAL,
+            power TEXT,
+            parking TEXT,
+            noise TEXT,
+            max_crew INTEGER,
+            permits TEXT,
+            owner_company_id INTEGER,
+            discoverable INTEGER DEFAULT 0,
+            created_by TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS venue_spaces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            venue_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            space_type TEXT,
+            suitable_for TEXT,
+            int_ext TEXT,
+            photo_path TEXT,
+            notes TEXT,
+            FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE
+        );
+
+        -- مكان في المشروع (شقة نادية أو ديكور جواها) ← موقع حقيقي: ترشيح أو
+        -- حجز، والديكور بيتربط بالمساحة اللي هتقوم بدوره (space_id).
+        CREATE TABLE IF NOT EXISTS location_venue_booking (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            location_id INTEGER NOT NULL,
+            venue_id INTEGER NOT NULL,
+            space_id INTEGER,
+            status TEXT NOT NULL DEFAULT 'shortlisted',
+            note TEXT,
+            created_by TEXT,
+            created_at TEXT,
+            booked_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE,
+            FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE
+        );
+
         -- دعوات فريق المشروع - نفس الشرح في نسخة Postgres فوق
         CREATE TABLE IF NOT EXISTS project_invites (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1185,6 +1303,10 @@ _INDEXES = [
     ("idx_projects_company", "projects (company_id)"),
     ("idx_props_location", "props (location_id)"),
     ("idx_project_members_user", "project_members (user_id)"),
+    ("idx_venues_company", "venues (owner_company_id)"),
+    ("idx_venue_spaces_venue", "venue_spaces (venue_id)"),
+    ("idx_venue_booking_project", "location_venue_booking (project_id)"),
+    ("idx_venue_booking_location", "location_venue_booking (location_id)"),
     # قايمة خزانة المواهب بتفلتر بـ discoverable، وصف الكاستينج بيتقري
     # بالممثل/بالمشروع/بالشخصية - نفس منطق شركة المشاريع فوق.
     ("idx_actors_discoverable", "actors (discoverable)"),

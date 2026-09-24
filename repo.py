@@ -19,7 +19,7 @@ from contextlib import contextmanager
 import audit
 import permissions
 from database import DEFAULT_LOOK_NAME, IntegrityError, _adapt_query, fetch_all, get_connection, run_query, scene_label
-from search import normalize
+from search import matches, normalize
 
 NIGHT_VALUES = {"ليل"}              # فجر وغروب بيتصوروا في يوم النهار عادةً
 
@@ -1783,3 +1783,288 @@ def props_summary(project_id):
                SUM(CASE WHEN COALESCE(status, 'مطلوب') = 'مطلوب' THEN 1 ELSE 0 END) AS needed
         FROM props WHERE project_id=?""", (project_id,))[0]
     return {"count": r["n"] or 0, "cost": r["cost"] or 0, "needed": r["needed"] or 0}
+
+
+# --- مكتبة مواقع التصوير (المالك 2026-09-24) -------------------------------------
+# موقع حقيقي (venues) بمساحاته (venue_spaces)، ومكان المشروع بيترشح/يتحجز له
+# موقع (location_venue_booking) - نفس فكرة الممثل والشخصية. الموقع بتاع مساحة
+# العمل اللي ضافته، وبيبان للكل لو اتنشر (discoverable). العنوان والتواصل
+# والسعر بيتفتحوا لصاحبه ولأي فريق رشّحه أو حجزه بس.
+
+VENUE_TYPES = ["شقة", "فيلا", "عمارة", "بيت ريفي", "مكتب", "كافيه", "مطعم", "نادي", "مستشفى", "مدرسة",
+               "محل", "مصنع/مخزن", "فندق", "شارع", "محطة مترو", "شاطئ", "صحرا", "استوديو", "أخرى"]
+SPACE_TYPES = ["أوضة نوم", "مطبخ", "صالة", "حمام", "مكتب", "بلكونة", "جنينة", "سطح", "سلم/مدخل",
+               "جراج", "صالة أفراح", "قاعة", "كافيه", "مطعم", "محل", "شارع", "أخرى"]
+VENUE_BOOKING_STATUSES = {"shortlisted": "مرشح", "booked": "محجوز"}
+
+# مرادفات: "أوضة نوم" = "غرفة نوم" = bedroom... للبحث وللترتيب بالأنسب
+_PLACE_CONCEPTS = {
+    "bedroom": ("اوضة نوم", "اوضه نوم", "غرفة نوم", "غرفه نوم", "bedroom", "نوم"),
+    "kitchen": ("مطبخ", "kitchen"),
+    "bathroom": ("حمام", "توالت", "تواليت", "bathroom"),
+    "living": ("صالة", "صاله", "ليفينج", "ريسبشن", "انتريه", "صالون", "living"),
+    "office": ("مكتب", "office"),
+    "garden": ("جنينة", "جنينه", "حديقة", "حديقه", "garden"),
+    "roof": ("سطح", "روف", "roof"),
+    "balcony": ("بلكونة", "بلكونه", "شرفة", "شرفه", "balcony"),
+    "stairs": ("سلم", "مدخل", "staircase"),
+    "street": ("شارع", "حارة", "حاره", "street"),
+    "cafe": ("كافيه", "قهوة", "قهوه", "مقهي", "cafe"),
+    "restaurant": ("مطعم", "restaurant"),
+    "club": ("نادي", "جيم", "gym", "club"),
+    "metro": ("مترو", "metro"),
+    "hospital": ("مستشفي", "عيادة", "عياده", "hospital"),
+    "school": ("مدرسة", "مدرسه", "فصل", "school"),
+    "shop": ("محل", "سوبر ماركت", "shop"),
+    "hotel": ("فندق", "hotel"),
+    "beach": ("بحر", "شاطئ", "كورنيش", "beach"),
+    "desert": ("صحرا", "صحراء", "desert"),
+    "villa": ("فيلا", "villa"),
+    "apartment": ("شقة", "شقه", "apartment"),
+    "garage": ("جراج", "garage"),
+    "hall": ("قاعة", "قاعه", "صالة افراح", "hall"),
+}
+
+
+_AR_PREFIXES = ("وال", "بال", "فال", "كال", "لل", "ال")
+
+
+def _place_tokens(text):
+    """كلمات كاملة من غير "ال" وأخواتها: "أوضة النوم" ← "اوضة نوم". الكلمة
+    كاملة مش جزء منها - عشان "نادية" ماتبقاش "نادي"."""
+    out = []
+    for w in normalize(text).split():
+        for p in _AR_PREFIXES:
+            if w.startswith(p) and len(w) - len(p) >= 3:
+                w = w[len(p):]
+                break
+        out.append(w)
+    return " ".join(out)
+
+
+_CONCEPT_TOKENS = {k: tuple(_place_tokens(w) for w in words) for k, words in _PLACE_CONCEPTS.items()}
+
+
+def place_concepts(*texts):
+    """المعاني اللي في النص ("أوضة النوم بتاعة نادية" ← {bedroom})."""
+    blob = " " + " ".join(_place_tokens(x) for x in texts if x) + " "
+    return {k for k, words in _CONCEPT_TOKENS.items() if any(f" {w} " in blob for w in words)}
+
+
+_VENUE_SENSITIVE = ("address", "contact_name", "contact_phone", "price_per_day")
+_VENUE_FIELDS = ("name", "venue_type", "city", "area", "description", "maps_url", "address", "contact_name",
+                 "contact_phone", "price_per_day", "power", "parking", "noise", "max_crew", "permits")
+
+
+def venues_visible_to(company_id, query=""):
+    """مواقع مساحة العمل دي + المنشورة للمنصة، ومعاها مساحاتها. البحث بالنص
+    وبالمعنى (غرفة نوم تلاقي أوضة نوم)."""
+    rows = fetch_all("SELECT * FROM venues WHERE owner_company_id=? OR COALESCE(discoverable, 0)=1 "
+                     "ORDER BY name, id", (company_id,))
+    spaces = {}
+    if rows:
+        ids = [r["id"] for r in rows]
+        for sp in fetch_all(f"SELECT * FROM venue_spaces WHERE venue_id IN ({','.join('?' * len(ids))}) "
+                            "ORDER BY id", tuple(ids)):
+            spaces.setdefault(sp["venue_id"], []).append(sp)
+    out = []
+    want = place_concepts(query) if query else set()
+    for r in rows:
+        v = dict(r, spaces=spaces.get(r["id"], []))
+        texts = [v["name"], v["venue_type"], v["city"], v["area"], v["description"]] + \
+            [x for sp in v["spaces"] for x in (sp["name"], sp["space_type"], sp["suitable_for"])]
+        v["concepts"] = place_concepts(*texts)
+        if query and not (matches(query, *texts) or (want and want <= v["concepts"])):
+            continue
+        out.append(v)
+    return out
+
+
+def venue_for(venue_id, company_id):
+    """الموقع لو مساحة العمل دي تقدر تشوفه، ومعاه مساحاته، وإلا None."""
+    return next((v for v in venues_visible_to(company_id) if v["id"] == venue_id), None)
+
+
+def venue_unlocked(venue_id, company_id):
+    """البيانات الحساسة: لصاحب الموقع، أو لمساحة عمل رشّحته/حجزته في مشروع عندها."""
+    return bool(fetch_all("""
+        SELECT 1 FROM venues WHERE id=? AND owner_company_id=?
+        UNION ALL
+        SELECT 1 FROM location_venue_booking b JOIN projects p ON p.id = b.project_id
+        WHERE b.venue_id=? AND p.company_id=? LIMIT 1""", (venue_id, company_id, venue_id, company_id)))
+
+
+def public_venue(v, company_id):
+    """نسخة للعرض: الحقول الحساسة بتتشال لو مش مفتوحة."""
+    if venue_unlocked(v["id"], company_id):
+        return v
+    return {k: (None if k in _VENUE_SENSITIVE else val) for k, val in v.items()}
+
+
+def _venue_values(values):
+    out = []
+    for f in _VENUE_FIELDS:
+        v = values.get(f)
+        if isinstance(v, str):
+            v = v.strip() or None
+        if f in ("price_per_day",) and v not in (None, ""):
+            try:
+                v = float(v)
+            except (TypeError, ValueError):
+                v = None
+        if f == "max_crew" and v not in (None, ""):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                v = None
+        out.append(v)
+    return tuple(out)
+
+
+def add_venue(values, company_id, created_by, discoverable=False):
+    if not (values.get("name") or "").strip():
+        raise ValueError("اسم الموقع مطلوب")
+    now = _now_iso()
+    return run_query(f"INSERT INTO venues ({', '.join(_VENUE_FIELDS)}, owner_company_id, discoverable, "
+                     f"created_by, created_at, updated_at) VALUES ({', '.join('?' * len(_VENUE_FIELDS))}, ?, ?, ?, ?, ?)",
+                     _venue_values(values) + (company_id, 1 if discoverable else 0, created_by, now, now))
+
+
+def update_venue(venue_id, values, company_id, discoverable=None):
+    """التعديل لصاحب الموقع بس (الشرط جوه الجملة)."""
+    sets = ", ".join(f"{f}=?" for f in _VENUE_FIELDS)
+    params = _venue_values(values)
+    extra = ""
+    if discoverable is not None:
+        extra = ", discoverable=?"
+        params += (1 if discoverable else 0,)
+    return run_query(f"UPDATE venues SET {sets}{extra}, updated_at=? WHERE id=? AND owner_company_id=?",
+                     params + (_now_iso(), venue_id, company_id))
+
+
+def set_venue_photo(venue_id, company_id, photo_path):
+    now = _now_iso()
+    return run_query("UPDATE venues SET photo_path=?, photo_updated_at=?, updated_at=? WHERE id=? AND owner_company_id=?",
+                     (photo_path, now, now, venue_id, company_id))
+
+
+def delete_venue(venue_id, company_id):
+    return run_query("DELETE FROM venues WHERE id=? AND owner_company_id=?", (venue_id, company_id))
+
+
+def save_venue_spaces(venue_id, company_id, rows):
+    """مساحات الموقع زي الجدول على الشاشة - بالـ id عشان ربط الديكورات بيها
+    يفضل. لصاحب الموقع بس. بيرجّع عدد المساحات."""
+    if not fetch_all("SELECT 1 FROM venues WHERE id=? AND owner_company_id=?", (venue_id, company_id)):
+        return 0
+    current = {r["id"] for r in fetch_all("SELECT id FROM venue_spaces WHERE venue_id=?", (venue_id,))}
+    kept, n = set(), 0
+    with _tx() as ex:
+        for r in rows:
+            name = (r.get("name") or "").strip() if isinstance(r.get("name"), str) else ""
+            if not name:
+                continue
+            vals = tuple((r.get(f).strip() or None) if isinstance(r.get(f), str) else None
+                         for f in ("space_type", "suitable_for", "int_ext", "notes"))
+            sid = r.get("_id")
+            sid = int(sid) if sid not in (None, "") and sid == sid else None
+            if sid in current:
+                ex("UPDATE venue_spaces SET name=?, space_type=?, suitable_for=?, int_ext=?, notes=? "
+                   "WHERE id=? AND venue_id=?", (name,) + vals + (sid, venue_id))
+                kept.add(sid)
+            else:
+                ex("INSERT INTO venue_spaces (venue_id, name, space_type, suitable_for, int_ext, notes) "
+                   "VALUES (?, ?, ?, ?, ?, ?)", (venue_id, name) + vals)
+            n += 1
+        for sid in current - kept:
+            ex("DELETE FROM venue_spaces WHERE id=? AND venue_id=?", (sid, venue_id))
+    return n
+
+
+class AlreadyBookedError(IntegrityError):
+    """المكان ده محجوز له موقع تاني - لازم يتلغي الأول."""
+    user_message = "المكان ده محجوز له موقع تاني بالفعل. الغي الحجز ده الأول لو عايز تغيّره."
+
+    def __init__(self):
+        super().__init__(self.user_message)
+
+
+def book_venue(project_id, location_id, venue_id, status, note, created_by):
+    """يرشّح أو يحجز موقع حقيقي لمكان في المشروع. صف واحد لكل (مكان، موقع)،
+    والحجز مايرجعش ترشيح. المكان لازم يبقى في المشروع، والموقع لازم مساحة
+    عمل المشروع تقدر تشوفه."""
+    if status not in VENUE_BOOKING_STATUSES:
+        raise ValueError(status)
+    proj = fetch_all("SELECT company_id FROM projects WHERE id=?", (project_id,))
+    if not proj or not fetch_all("SELECT 1 FROM locations WHERE id=? AND project_id=?", (location_id, project_id)):
+        return None
+    if not venue_for(venue_id, proj[0]["company_id"]):
+        return None
+    if status == "booked" and fetch_all(
+            "SELECT 1 FROM location_venue_booking WHERE project_id=? AND location_id=? AND status='booked' "
+            "AND venue_id != ?", (project_id, location_id, venue_id)):
+        raise AlreadyBookedError()
+    now = _now_iso()
+    existing = fetch_all("SELECT id, status FROM location_venue_booking WHERE project_id=? AND location_id=? "
+                         "AND venue_id=?", (project_id, location_id, venue_id))
+    if existing:
+        if existing[0]["status"] == "booked" and status == "shortlisted":
+            return existing[0]["id"]
+        run_query("UPDATE location_venue_booking SET status=?, note=COALESCE(NULLIF(?, ''), note), booked_at=? "
+                  "WHERE id=? AND project_id=?", (status, note, now if status == "booked" else None,
+                                                  existing[0]["id"], project_id))
+        return existing[0]["id"]
+    return run_query(
+        "INSERT INTO location_venue_booking (project_id, location_id, venue_id, status, note, created_by, "
+        "created_at, booked_at) SELECT ?, ?, ?, ?, ?, ?, ?, ? "
+        "WHERE EXISTS (SELECT 1 FROM locations WHERE id=? AND project_id=?)",
+        (project_id, location_id, venue_id, status, note, created_by, now, now if status == "booked" else None,
+         location_id, project_id))
+
+
+def remove_venue_booking(project_id, booking_id):
+    return run_query("DELETE FROM location_venue_booking WHERE id=? AND project_id=?", (booking_id, project_id))
+
+
+def venue_bookings(project_id):
+    """location_id → {"booked": row أو None, "shortlist": [rows]} - اسم الموقع معاه."""
+    out = {}
+    for r in fetch_all("""
+        SELECT b.id, b.location_id, b.venue_id, b.status, b.note, v.name AS venue_name, v.city, v.photo_path
+        FROM location_venue_booking b JOIN venues v ON v.id = b.venue_id
+        WHERE b.project_id = ? ORDER BY b.created_at, b.id""", (project_id,)):
+        slot = out.setdefault(r["location_id"], {"booked": None, "shortlist": []})
+        if r["status"] == "booked":
+            slot["booked"] = r
+        else:
+            slot["shortlist"].append(r)
+    return out
+
+
+def location_needs(project_id, location_id):
+    """اللي المكان محتاجه من موقع حقيقي: المكان نفسه وديكوراته (أسماءهم) ←
+    [(الاسم، المعاني)]. شقة نادية + أوضة النوم + المطبخ..."""
+    locs = fetch_all("SELECT id, name, parent_location_id FROM locations WHERE project_id=?", (project_id,))
+    me = next((l for l in locs if l["id"] == location_id), None)
+    if not me:
+        return []
+    # لو المكان ليه ديكورات، هي اللي محتاجين نلاقيلها مساحات (أوضة نوم، مطبخ...)؛
+    # نوع المبنى نفسه (شقة/فيلا) مش شرط - فيلا تنفع تمثّل شقة. من غير
+    # ديكورات، المكان نفسه هو المطلوب.
+    kids = [l for l in locs if l["parent_location_id"] == location_id]
+    return [(l["name"], place_concepts(l["name"])) for l in (kids or [me])]
+
+
+def rank_venues_for(project_id, location_id, company_id):
+    """المواقع مترتبة بالأنسب للمكان ده: بتغطي كام حاجة من اللي محتاجه
+    (المكان وديكوراته)، وبعدها نفس مدينة المكان. كل واحد معاه covered/total."""
+    needs = [n for n in location_needs(project_id, location_id) if n[1]]
+    loc = fetch_all("SELECT name FROM locations WHERE id=?", (location_id,))
+    city = city_of(loc[0]["name"]) if loc else None
+    ranked = []
+    for v in venues_visible_to(company_id):
+        covered = [name for name, c in needs if c & v["concepts"]]
+        same_city = bool(city and v.get("city") and normalize(city) in normalize(v["city"]))
+        ranked.append(dict(v, covered=covered, total=len(needs), same_city=same_city))
+    ranked.sort(key=lambda v: (-len(v["covered"]), not v["same_city"], v["name"]))
+    return ranked

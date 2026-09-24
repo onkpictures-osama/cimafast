@@ -63,6 +63,8 @@ def render(project_id):
 
     st.divider()
 
+    # الموقع الحقيقي المحجوز/المرشح لكل مكان (مكتبة مواقع التصوير)
+    _bookings = repo.venue_bookings(project_id)
     children_by_parent = {}
     for l in locations:
         if l["parent_location_id"]:
@@ -72,9 +74,13 @@ def render(project_id):
         # كسول: محتوى الـ expander بيتنفذ بس وهو مفتوح. من غير كده كل فورم تعديل
         # لكل عنصر مقفول كان بيتبني مع كل ضغطة في أي مكان في البرنامج (556 فورم،
         # 16 ثانية لكل rerun على الإنتاج).
-        _lazy_exp = st.expander(f"{indent}📍 {l['name']}", key=f"exp_loc_{l['id']}", on_change="rerun")
+        _b = _bookings.get(l["id"]) or {}
+        _venue = f" — 🏠 {_b['booked']['venue_name']}" if _b.get("booked") else (
+            f" — ⭐ {len(_b['shortlist'])} {t('مرشح')}" if _b.get("shortlist") else "")
+        _lazy_exp = st.expander(f"{indent}📍 {l['name']}{_venue}", key=f"exp_loc_{l['id']}", on_change="rerun")
         with _lazy_exp:
             if _lazy_exp.open:
+                _render_venue_slot(project_id, l, _b)
                 # اللينك أول حاجة في المكان: اللي بيدوّر عليه بيبقى واقف في
                 # الشارع. زرار واحد: لو فيه لينك محفوظ بيسأل تفتح ولا تعدل،
                 # ولو لسه مفيش بيطلب اللينك على طول.
@@ -252,3 +258,20 @@ def render(project_id):
             _loc_shown += 1
     if _loc_q:
         library_result_count(_loc_shown, len(top_level_locations))
+
+
+def _render_venue_slot(project_id, l, booking):
+    """الموقع الحقيقي للمكان ده: المحجوز والمرشحين، وزرار يفتح مكتبة مواقع
+    التصوير في وضع "بتدوّر لـ ده" (المالك 2026-09-24)."""
+    from ui import open_page
+    booked, shortlist = booking.get("booked"), booking.get("shortlist", [])
+    for row, badge in ([(booked, "✅")] if booked else []) + [(r, "⭐") for r in shortlist]:
+        c1, c2 = st.columns([5, 1], vertical_alignment="center")
+        c1.markdown(f"{badge} **{row['venue_name']}**" + (f" · {row['city']}" if row.get("city") else "")
+                    + f" — {t('محجوز') if badge == '✅' else t('مرشح')}")
+        if c2.button(t("إلغاء"), key=f"vbook_rm_{row['id']}", use_container_width=True):
+            repo.remove_venue_booking(project_id, row["id"])
+            st.rerun()
+    st.button(f"🔎 {t('اختار من مكتبة المواقع')}", key=f"loc_pick_venue_{l['id']}", type="primary",
+              on_click=open_page, args=("locations_lib",), kwargs={"pick": l["id"]})
+    st.markdown('<hr class="cf-soft-sep">', unsafe_allow_html=True)
