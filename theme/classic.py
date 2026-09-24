@@ -315,6 +315,9 @@ MAIN_CSS = r'''
     }
     .cf-progress-seg--done { background: var(--cf-info); }
     .cf-progress-seg--current { background: var(--cf-accent); }
+    .cf-progress-bar--dense { gap: 2px; }
+    .cf-progress-seg { position: relative; overflow: hidden; }
+    .cf-progress-fill { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--cf-accent); border-radius: 2px; }
     .cf-progress-text { font-size: 0.9rem; color: rgba(255, 255, 255, 0.78); }
     .cf-progress-text strong { color: var(--cf-text); font-weight: 600; }
     .cf-copy-hint {

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -69,7 +70,7 @@ def run(port, shot_dir):
         if shot_dir:
             page.screenshot(path=os.path.join(shot_dir, "props-places.png"), full_page=True)
 
-        page.locator("button").filter(has_text="الإنتاج").last.click(); _settle(page, 1800)
+        page.locator("button").filter(has_text=re.compile(r"(?<!بعد )(?<!قبل )الإنتاج\s*$")).first.click(); _settle(page, 1800)
         _no_exception(page, "production phase")
         tabs = _tabs(page)
         check("production phase shows schedule + crew + settings",

@@ -23,6 +23,7 @@ TABS = {
     "shots": "tab_breakdown",
     "reports": "tab_dashboard",
     "schedule": "tab_schedule",
+    "post": "tab_post",
     "team": "tab_team",
     "settings": "tab_settings",
 }
@@ -33,14 +34,16 @@ PHASES = {
     "pre": ["import", "locations", "props", "characters", "actors", "wardrobe",
             "scenes", "shots", "reports", "team", "settings"],
     "prod": ["schedule", "team", "settings"],
+    "post": ["post", "team", "settings"],
 }
 
 
 def phase_of(slug, current="pre"):
-    """المرحلة اللي فيها التبويب ده؛ الإعدادات موجودة في الاتنين فبتفضل مكانها."""
-    if slug in PHASES["pre"] and slug in PHASES["prod"]:
-        return current if current in PHASES else "pre"
-    return "prod" if slug in PHASES["prod"] else "pre"
+    """المرحلة اللي فيها التبويب ده؛ الفريق والإعدادات في كل المراحل فبتفضل مكانها."""
+    homes = [p for p, slugs in PHASES.items() if slug in slugs]
+    if current in homes:
+        return current
+    return homes[0] if homes else "pre"
 
 
 def _first(value):

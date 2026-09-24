@@ -226,9 +226,78 @@ def remember_screen(username, project_id, tab, when):
 
 def shooting_days(project_id):
     return fetch_all(
-        "SELECT id, day_number, shoot_date, notes FROM shooting_days WHERE project_id=? ORDER BY day_number, id",
+        "SELECT id, day_number, shoot_date, notes, COALESCE(shot_done,0) AS shot_done FROM shooting_days "
+        "WHERE project_id=? ORDER BY day_number, id",
         (project_id,),
     )
+
+
+def set_day_shot(project_id, day_id, done, when=None):
+    """مرحلة الإنتاج: اليوم ده اتصور (أو رجّعه لسه ماتصورش)."""
+    with _tx() as ex:
+        ex("UPDATE shooting_days SET shot_done=?, shot_done_at=? WHERE id=? AND project_id=?",
+           (1 if done else 0, (when or dt.datetime.now().isoformat(timespec="seconds")) if done else None,
+            day_id, project_id))
+
+
+def production_progress(project_id):
+    """شريط التقدّم في مرحلة الإنتاج: أيام اتصورت من كل الأيام، ومشاهد الأيام دي."""
+    rows = fetch_all("""
+        SELECT
+          (SELECT COUNT(*) FROM shooting_days WHERE project_id=?) AS days,
+          (SELECT COUNT(*) FROM shooting_days WHERE project_id=? AND COALESCE(shot_done,0)=1) AS days_shot,
+          (SELECT COUNT(*) FROM scenes WHERE project_id=?) AS scenes,
+          (SELECT COUNT(DISTINCT x.scene_id) FROM shooting_day_scenes x JOIN shooting_days d ON d.id=x.day_id
+             WHERE d.project_id=? AND COALESCE(d.shot_done,0)=1) AS scenes_shot
+    """, (project_id,) * 4)
+    return dict(rows[0])
+
+
+# --- ما بعد الإنتاج ------------------------------------------------------------------
+
+_POST_FIELDS = ("status", "progress", "vendor_name", "vendor_contact", "vendor_location",
+                "preview_url", "preview_url2", "due_date", "notes")
+
+
+def post_departments(project_id):
+    return fetch_all("SELECT * FROM post_departments WHERE project_id=? ORDER BY id", (project_id,))
+
+
+def save_post_department(project_id, dept_key, updated_by=None, **fields):
+    """بيحفظ قسم (بيعمله لو أول مرة). الحقول الناقصة بتفضل زي ما هي."""
+    import post_production
+    if dept_key not in post_production.DEPT_KEYS:
+        raise ValueError(f"unknown post department {dept_key!r}")
+    if "status" in fields and fields["status"] not in post_production.STATUS_KEYS:
+        raise ValueError(f"unknown post status {fields['status']!r}")
+    if "progress" in fields:
+        fields["progress"] = max(0, min(100, int(fields["progress"] or 0)))
+    now = dt.datetime.now().isoformat(timespec="seconds")
+    current = fetch_all("SELECT * FROM post_departments WHERE project_id=? AND dept_key=?", (project_id, dept_key))
+    row = dict(current[0]) if current else {"status": "not_started", "progress": 0}
+    row.update({k: v for k, v in fields.items() if k in _POST_FIELDS})
+    with _tx() as ex:
+        ex("INSERT OR IGNORE INTO post_departments (project_id, dept_key, status, progress, updated_at) "
+           "VALUES (?, ?, 'not_started', 0, ?)", (project_id, dept_key, now))
+        ex("UPDATE post_departments SET status=?, progress=?, vendor_name=?, vendor_contact=?, "
+           "vendor_location=?, preview_url=?, preview_url2=?, due_date=?, notes=?, updated_at=?, updated_by=? "
+           "WHERE project_id=? AND dept_key=?",
+           tuple((row.get(k) or None) if k not in ("status", "progress") else row.get(k) for k in _POST_FIELDS)
+           + (now, updated_by, project_id, dept_key))
+
+
+def post_comments(project_id, dept_key):
+    return fetch_all("SELECT id, author, body, created_at FROM post_comments WHERE project_id=? AND dept_key=? "
+                     "ORDER BY id", (project_id, dept_key))
+
+
+def add_post_comment(project_id, dept_key, author, body):
+    body = (body or "").strip()
+    if not body:
+        return
+    with _tx() as ex:
+        ex("INSERT INTO post_comments (project_id, dept_key, author, body, created_at) VALUES (?, ?, ?, ?, ?)",
+           (project_id, dept_key, author, body, dt.datetime.now().isoformat(timespec="seconds")))
 
 
 def board(project_id):
@@ -272,7 +341,7 @@ def delete_day(project_id, day_id):
 def _renumber_days(project_id):
     with _tx() as ex:
         for i, d in enumerate(shooting_days(project_id), start=1):
-            ex("UPDATE shooting_days SET day_number=? WHERE id=?", (i, d["id"]))
+            ex("UPDATE shooting_days SET day_number=? WHERE id=? AND project_id=?", (i, d["id"], project_id))
 
 
 def update_day(project_id, day_id, shoot_date=None, notes=None):
@@ -307,7 +376,8 @@ def save_layout(project_id, layout):
         ex("DELETE FROM shooting_day_scenes WHERE day_id IN "
            "(SELECT id FROM shooting_days WHERE project_id=?)", (project_id,))
         for number, entry in enumerate(layout, start=1):
-            ex("UPDATE shooting_days SET day_number=? WHERE id=?", (number, entry["day_id"]))
+            ex("UPDATE shooting_days SET day_number=? WHERE id=? AND project_id=?",
+               (number, entry["day_id"], project_id))
             for pos, sid in enumerate(entry.get("scene_ids", [])):
                 ex("INSERT INTO shooting_day_scenes (day_id, scene_id, position) VALUES (?, ?, ?)",
                    (entry["day_id"], sid, pos))

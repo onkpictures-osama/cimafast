@@ -1238,3 +1238,42 @@ def build_dramatic_structure_word(report, script_name, lang="ar"):
     buf = BytesIO()
     document.save(buf)
     return buf.getvalue()
+
+
+POST_REPORT_COLUMNS = [
+    ("number", "م", 5),
+    ("department", "القسم", 26),
+    ("status", "الحالة", 14),
+    ("progress", "الإنجاز", 10),
+    ("vendor", "الاستوديو / المسؤول", 24),
+    ("contact", "التواصل", 20),
+    ("due_date", "التسليم", 12),
+    ("updated", "آخر تحديث", 16),
+    ("notes", "ملاحظات", 36),
+]
+
+
+def build_post_report_excel(project, project_id, fetch_all):
+    """تقرير ما بعد الإنتاج: سطر لكل قسم بحالته ونسبته، وآخر سطر الإجمالي.
+    القسم الشغّال اللي ماتحدّثش من أسبوع بيتعلّم عليه ⚠️ في آخر تحديث."""
+    import post_production
+    rows_db = fetch_all("SELECT * FROM post_departments WHERE project_id=?", (project_id,))
+    s = post_production.summary([dict(r) for r in rows_db])
+    rows = []
+    for idx, i in enumerate(s["items"], start=1):
+        r = i["row"]
+        rows.append({
+            "number": idx,
+            "department": i["name"],
+            "status": post_production.status(r.get("status"))[2],
+            "progress": f"{i['progress']}%",
+            "vendor": " — ".join(x for x in (r.get("vendor_name"), r.get("vendor_location")) if x),
+            "contact": r.get("vendor_contact") or "",
+            "due_date": r.get("due_date") or "",
+            "updated": ("⚠️ " if i["stale"] else "") + ((r.get("updated_at") or "")[:10]),
+            "notes": r.get("notes") or "",
+        })
+    rows.append({"number": "", "department": "الإجمالي", "status": f"{s['approved']} من {s['total']} معتمد",
+                 "progress": f"{s['overall']}%", "vendor": "", "contact": "", "due_date": "", "updated": "",
+                 "notes": ""})
+    return _build_generic_excel("ما بعد الإنتاج", "تقرير ما بعد الإنتاج", project, POST_REPORT_COLUMNS, rows)

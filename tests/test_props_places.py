@@ -82,6 +82,10 @@ def test_tab_order_and_phases():
     assert links.phase_of("schedule") == "prod" and links.phase_of("props") == "pre"
     assert links.phase_of("settings", "prod") == "prod" and links.phase_of("settings", "pre") == "pre"
     assert all(s in links.TABS for p in links.PHASES.values() for s in p)
+    # ما بعد الإنتاج: مرحلة تالتة، والفريق والإعدادات فيها برضو
+    assert links.PHASES["post"] == ["post", "team", "settings"]
+    assert links.phase_of("post") == "post" and links.phase_of("team", "post") == "post"
+    assert links.phase_of("settings", "post") == "post" and links.phase_of("schedule", "post") == "prod"
 
 
 @test

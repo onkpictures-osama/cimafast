@@ -20,7 +20,7 @@ import views.new_project
 import views.team
 import views.library_pages
 import views.invite
-import views.schedule
+import views.schedule, views.post, views.progress_bar
 import views.wardrobe
 import project_types
 import views.project_settings
@@ -767,57 +767,10 @@ _scene_count = repo.count_scenes(project_id)[0]["c"]
 _shot_count = repo.count_shots(project_id)[0]["c"]
 _confirmed_count = repo.count_confirmed_shots(project_id)[0]["c"]
 
-_stage_defs = [
-    ("🎬", tr("stage_project")),
-    ("📍", tr("stage_locations_chars")),
-    ("📝", tr("stage_scenes")),
-    ("🎥", tr("stage_shots")),
-    ("🔍", tr("stage_review")),
-]
-_done_flags = [
-    True,
-    _loc_count > 0 and _char_count > 0,
-    _scene_count > 0,
-    _shot_count > 0,
-    _shot_count > 0 and _confirmed_count == _shot_count,
-]
-_current_idx = next((i for i, d in enumerate(_done_flags) if not d), len(_done_flags) - 1)
-
-_scenes_with_shots = repo.count_scenes_with_shots(project_id)[0]["c"]
-_all_done = all(_done_flags)
-
-# سطر تقدّم واحد بدل خمس كروت. الكروت كانت بتاخد ~90px فوق كل تبويب وبتكرر
-# نفس التقسيمة اللي التبويبات تحتها عاملاها بأسامي تانية — تنقل مزدوج.
-# السطر بيقول المرحلة الحالية وإيه اللي فاضل فيها بالأرقام.
-if _all_done:
-    _progress_detail = t("كل اللقطات اتراجعت واتأكدت")
-elif _current_idx == 1:
-    _progress_detail = f"{ltr(_loc_count)} {t('مكان')} · {ltr(_char_count)} {t('شخصية')}"
-elif _current_idx == 2:
-    _progress_detail = t("لسه مفيش مشاهد — ابدأ من «إضافة سيناريو»")
-elif _current_idx == 3:
-    _progress_detail = (f"{ltr(_scenes_with_shots)} {t('من')} {ltr(_scene_count)} "
-                        f"{t('مشهد ليهم لقطات')}")
-else:
-    _progress_detail = (f"{ltr(_confirmed_count)} {t('من')} {ltr(_shot_count)} "
-                        f"{t('لقطة اتراجعت')}")
-
-_segments = "".join(
-    f'<span class="cf-progress-seg cf-progress-seg--'
-    f'{"done" if _d else ("current" if _i == _current_idx else "pending")}" '
-    f'title="{_lbl}"></span>'
-    for _i, ((_icon, _lbl), _d) in enumerate(zip(_stage_defs, _done_flags))
-)
-_step_no = len(_stage_defs) if _all_done else _current_idx + 1
-st.markdown(
-    f'<div class="cf-progress" dir="{_dir}">'
-    f'<div class="cf-progress-bar" aria-hidden="true">{_segments}</div>'
-    f'<div class="cf-progress-text"><strong>{t("الخطوة")} {ltr(_step_no)} {t("من")} '
-    f'{ltr(len(_stage_defs))} · {_stage_defs[min(_step_no, len(_stage_defs)) - 1][1]}</strong>'
-    f' — {_progress_detail}</div>'
-    f'</div>',
-    unsafe_allow_html=True,
-)
+# سطر تقدّم واحد بيتبع المرحلة المفتوحة (views/progress_bar.py)
+views.progress_bar.render(_dir, project_id, {"locations": _loc_count, "characters": _char_count,
+                                             "scenes": _scene_count, "shots": _shot_count,
+                                             "confirmed": _confirmed_count})
 
 # on_change="rerun": التبويب المفتوح بس هو اللي بيتبني (tab.open)، بدل السبعة في
 # كل ضغطة — ومعرفة التبويب المفتوح بتخلّي شريط العنوان رابط للشاشة دي بالظبط.
@@ -885,6 +838,9 @@ if _is_open("reports"):
 if _is_open("schedule"):
     with _tabs["schedule"]:
         _render(views.schedule, project=project, project_id=project_id, board_url=_board_url)
+if _is_open("post"):
+    with _tabs["post"]:
+        _render(views.post, project=project, project_id=project_id, current_user=_current_user)
 if _is_open("team"):
     with _tabs["team"]:
         _render(views.team, project=project, project_id=project_id, current_user=_current_user)

@@ -69,6 +69,7 @@ ENTITY_LABELS = {
     "scene_props": "إكسسوارات المشاهد", "shot_characters": "شخصيات اللقطات",
     "shot_props": "إكسسوارات اللقطات", "reference_images": "الصور المرجعية",
     "camera_setups": "إعدادات الكاميرا",
+    "post_departments": "أقسام ما بعد الإنتاج", "post_comments": "تعليقات ما بعد الإنتاج",
 }
 
 EVENT_LABELS = {
@@ -82,14 +83,14 @@ TARGET_LABELS = {
     # تبويبات التطبيق
     "import": "إضافة سيناريو", "locations": "الأماكن", "characters": "الشخصيات",
     "props": "الإكسسوارات", "scenes": "المشاهد", "shots": "اللقطات",
-    "reports": "التقارير النهائية",
+    "reports": "التقارير النهائية", "schedule": "جدول التصوير", "post": "ما بعد الإنتاج",
     # شاشات الواجهة الجديدة
     "board": "جدول التصوير", "home": "الرئيسية", "team": "الفريق", "activity": "سجل النشاط",
     # ملفات التصدير
     "shot_list_excel": "تفريغ اللقطات (Excel)", "shot_list_word": "تفريغ اللقطات (Word)",
     "shot_list_pdf": "تفريغ اللقطات (PDF)", "characters_sheet_excel": "كشف الشخصيات",
     "general_breakdown_excel": "التفريغ العام", "locations_sheet_excel": "كشف أماكن التصوير",
-    "props_sheet_excel": "كشف الإكسسوار",
+    "props_sheet_excel": "كشف الإكسسوار", "post_report_excel": "تقرير ما بعد الإنتاج",
     # غير كده
     "script_analysis": "تحليل سيناريو", "streamlit": "التطبيق",
 }

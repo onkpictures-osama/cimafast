@@ -54,6 +54,7 @@ _ON_CONFLICT_TARGETS = {
     "scene_props": "(scene_id, prop_id)",
     "memberships": "(company_id, user_id)",
     "project_members": "(project_id, user_id)",
+    "post_departments": "(project_id, dept_key)",
 }
 _INSERT_IGNORE_RE = re.compile(r"INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)", re.IGNORECASE)
 
@@ -520,6 +521,37 @@ def init_db():
             created_by TEXT,
             created_at TEXT,
             booked_at TEXT
+        );
+
+        -- ما بعد الإنتاج (المالك 2026-09-24، بند PP1): قسم لكل شغلانة (مونتاج،
+        -- تلوين، موسيقى، تصميم صوت، دوبلاج وميكساج، مؤثرات بصرية، تترات
+        -- وماستر) بحالته ونسبة إنجازه والاستوديو/الفريلانسر ولينكات المعاينة.
+        -- الصف بيتعمل أول ما القسم يتحدّث - قبلها القسم "لم يبدأ".
+        CREATE TABLE IF NOT EXISTS post_departments (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            dept_key TEXT NOT NULL,
+            status TEXT DEFAULT 'not_started',
+            progress INTEGER DEFAULT 0,
+            vendor_name TEXT,
+            vendor_contact TEXT,
+            vendor_location TEXT,
+            preview_url TEXT,
+            preview_url2 TEXT,
+            due_date TEXT,
+            notes TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            UNIQUE(project_id, dept_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS post_comments (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            dept_key TEXT NOT NULL,
+            author TEXT,
+            body TEXT NOT NULL,
+            created_at TEXT
         );
 
         CREATE TABLE IF NOT EXISTS project_invites (
@@ -1013,6 +1045,39 @@ def init_db():
             FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE
         );
 
+        -- ما بعد الإنتاج (المالك 2026-09-24، بند PP1): قسم لكل شغلانة (مونتاج،
+        -- تلوين، موسيقى، تصميم صوت، دوبلاج وميكساج، مؤثرات بصرية، تترات
+        -- وماستر) بحالته ونسبة إنجازه والاستوديو/الفريلانسر ولينكات المعاينة.
+        -- الصف بيتعمل أول ما القسم يتحدّث - قبلها القسم "لم يبدأ".
+        CREATE TABLE IF NOT EXISTS post_departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            dept_key TEXT NOT NULL,
+            status TEXT DEFAULT 'not_started',
+            progress INTEGER DEFAULT 0,
+            vendor_name TEXT,
+            vendor_contact TEXT,
+            vendor_location TEXT,
+            preview_url TEXT,
+            preview_url2 TEXT,
+            due_date TEXT,
+            notes TEXT,
+            updated_at TEXT,
+            updated_by TEXT,
+            UNIQUE(project_id, dept_key),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS post_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            dept_key TEXT NOT NULL,
+            author TEXT,
+            body TEXT NOT NULL,
+            created_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
         -- دعوات فريق المشروع - نفس الشرح في نسخة Postgres فوق
         CREATE TABLE IF NOT EXISTS project_invites (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1167,6 +1232,11 @@ _MIGRATIONS = {
         # فريق المشروع (2026-09-24): اللي أنشأ المشروع = مدير المشروع. القديم
         # (NULL) مديره أدمن مساحة العمل اللي هو فيها.
         ("created_by", "TEXT"),
+    ],
+    # مرحلة الإنتاج: اليوم ده اتصور خلاص؟ - شريط التقدّم بيعد الأيام دي
+    "shooting_days": [
+        ("shot_done", "INTEGER DEFAULT 0"),
+        ("shot_done_at", "TEXT"),
     ],
     # دور كل واحد في المشروع (شغلانته: مدير تصوير، مونتير...) وصلاحيته فيه
     "project_members": [
