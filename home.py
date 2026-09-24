@@ -139,7 +139,7 @@ COVER_GRADIENTS = (
     "linear-gradient(135deg, #0F438A, #1B254B)",
     "linear-gradient(135deg, #1A2860, #212F70)",
 )
-TYPE_ICON = {"فيلم": "🎬", "مسلسل": "📺", "إعلان": "📣", "فيديو قصير": "🎞️"}
+TYPE_ICON = {"فيلم": "🎬", "مسلسل": "📺", "إعلان": "📣", "فيديو": "🎞️", "فيديو قصير": "🎞️"}
 
 
 def _cover(project_id, project_type, name):

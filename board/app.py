@@ -486,7 +486,7 @@ async def api_create_project(request: Request):
     except (TypeError, ValueError):
         return JSONResponse({"error": "company_id required"}, status_code=400)
     name = (b.get("name") or "").strip()
-    kind = b.get("project_type") or "فيلم"
+    kind = project_types.normalize_type(b.get("project_type") or "فيلم")
     if not name:
         return JSONResponse({"error": "اسم المشروع مطلوب"}, status_code=400)
     if kind not in project_types.TYPES:

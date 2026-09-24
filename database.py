@@ -966,6 +966,7 @@ def init_db():
     conn.commit()
     _migrate_schema(conn)
     _backfill_default_looks(conn)
+    _rename_project_types(conn)
     conn.close()
 
 
@@ -1206,9 +1207,18 @@ def _backfill_default_looks(conn):
     conn.commit()
 
 
+def _rename_project_types(conn):
+    """"فيديو قصير" ← "فيديو" (المالك 2026-09-24). بيتنده مع كل تشغيل ومش
+    بيعمل حاجة لو مفيش حاجة تتغيّر."""
+    cur = conn.cursor()
+    cur.execute(_adapt_query("UPDATE projects SET project_type = ? WHERE project_type = ?"),
+                ("فيديو", "فيديو قصير"))
+    conn.commit()
+
+
 # ---------- نصوص شرح الحقول (نظام field_definitions المبسط) ----------
 FIELD_HELP = {
-    "project_type": "نوع المشروع: فيلم طويل، مسلسل، إعلان، أو فيديو قصير. ده بيأثر على القيم الافتراضية زي المدة والنسبة.",
+    "project_type": "نوع المشروع: فيلم، مسلسل، إعلان، أو فيديو (ريلز، شورتس، يوتيوب...). ده بيأثر على القيم الافتراضية زي المدة والنسبة.",
     "default_resolution": "الدقة الافتراضية لكل مشاهد المشروع. تقدر تستثني مشهد معين بدقة مختلفة لاحقًا.",
     "default_orientation": "أفقي (سينما/تلفزيون) أو رأسي (سوشيال ميديا) أو مربع.",
     "int_ext": "داخلي (جوه مكان مغلق)، خارجي (في الهواء الطلق)، أو داخلي/خارجي (مكان جوه لكنه بيشوف بره زي بلكونة أو شباك محل أو عربية فيها زجاج).",

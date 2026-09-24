@@ -10,6 +10,7 @@ from i18n import t, tr
 from ui import nav_link, guarded_delete, mark_saved, safe_index, show_saved_badge
 import accounts
 import permissions
+import project_types
 import repo
 
 
@@ -127,8 +128,8 @@ def render(project_id, current_user, company_id, role, tier, board_url):
     st.subheader(tr("edit_delete_project"))
     e_proj_name = st.text_input(t("اسم المشروع"), value=project["name"], key=f"edit_proj_name_{project_id}")
     e_proj_type = st.selectbox(
-        t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"],
-        index=safe_index(["فيلم", "مسلسل", "إعلان", "فيديو قصير"], project["project_type"]),
+        t("نوع المشروع"), project_types.TYPES,
+        index=safe_index(project_types.TYPES, project_types.normalize_type(project["project_type"])),
         format_func=t,
         key=f"edit_proj_type_{project_id}",
     )

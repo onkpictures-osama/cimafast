@@ -208,7 +208,7 @@ TRANSLATIONS = {
     "بدون - مكان رئيسي": "None - main location", "اختياري": "optional",
     "💾 حفظ": "💾 Save", "💾 حفظ التعديل": "💾 Save Changes",
     "نهار": "Day", "ليل": "Night", "غروب": "Sunset", "فجر": "Dawn",
-    "فيلم": "Feature Film", "مسلسل": "Series", "إعلان": "Ad", "فيديو قصير": "Short Video",
+    "فيلم": "Feature Film", "مسلسل": "Series", "إعلان": "Ad", "فيديو": "Video", "فيديو قصير": "Video",
     "أفقي": "Horizontal", "رأسي": "Vertical", "مربع": "Square",
     # المشروع (الشريط الجانبي)
     "اسم المشروع": "Project Name", "نوع المشروع": "Project Type",
@@ -744,6 +744,7 @@ TRANSLATIONS = {
     "15 ث": "15s", "30 ث": "30s", "45 ث": "45s", "60 ث": "60s",
     "المنصة": "Platform",
     "ريلز": "Reels", "تيك توك": "TikTok", "يوتيوب شورتس": "YouTube Shorts", "يوتيوب": "YouTube",
+    "فيسبوك": "Facebook", "أخرى": "Other",
     "إعدادات فنية (الدقة، الاتجاه، النسبة)": "Technical settings (resolution, orientation, ratio)",
     "متظبطة لوحدها حسب نوع المشروع — افتحها بس لو عايز تغيّرها.":
         "Set automatically from the project type — open only to change them.",
