@@ -128,7 +128,7 @@
     try {
       await call("POST", "../api/companies/rename", { company_id: companyId(), name });
       companySel.selectedOptions[0].textContent = name;
-      say("اسم الشركة اتغيّر");
+      say("اسم مساحة العمل اتغيّر");
     } catch (e) { say(e.message, true); }
   });
 
@@ -144,7 +144,7 @@
         load();
       }
       if (r.temp_password) showSecret(d.admin_username, r.temp_password);
-      else say(`الشركة اتعملت، و${d.admin_username} مديرها بكلمة سره الحالية`);
+      else say(`مساحة العمل اتعملت، و${d.admin_username} مديرها بكلمة سره الحالية`);
     } catch (e) { say(e.message, true); }
   });
 

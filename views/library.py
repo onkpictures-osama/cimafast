@@ -51,7 +51,7 @@ def _upload(current_user, company_id, can_edit):
         if not can_edit:
             st.info(t("حسابك مشاهدة فقط — تقدر تتصفح وتنزّل التحليلات، بس مش تضيف."))
             return
-        st.caption(t("ملف اتنزّل من مكتبة CimaFast (من حسابك أو من حساب تاني) — بيتضاف لمكتبتك في الشركة دي.")
+        st.caption(t("ملف اتنزّل من مكتبة CimaFast (من حسابك أو من حساب تاني) — بيتضاف لمكتبتك في مساحة العمل دي.")
                    + " " + ltr(lib.FILE_SUFFIX))
         up = st.file_uploader(t("اختار الملف"), type=["json"], key="lib_upload")
         if up is not None and st.button(t("➕ ضيفه للمكتبة"), key="lib_upload_go", use_container_width=True):

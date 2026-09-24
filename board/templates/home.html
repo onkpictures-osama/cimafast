@@ -109,7 +109,7 @@
             <input name="episode_count" id="new-episodes" type="number" min="1" max="500" inputmode="numeric" placeholder="مثال: 30"></label>
           <label class="field"><span>اسم المشروع</span><input name="name" required placeholder="مثال: عروسة البحر"></label>
           {% if creatable|length > 1 %}
-          <label class="field"><span>الشركة</span>
+          <label class="field"><span>مساحة العمل</span>
             <select name="company_id">{% for c in creatable %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
           {% else %}<input type="hidden" name="company_id" value="{{ creatable[0].id }}">{% endif %}
           <button class="btn btn--primary">إنشاء وابدأ بالسيناريو</button>
@@ -142,7 +142,7 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="muted">{% if creatable %}ابدأ بمشروع جديد — الزرار فوق.{% else %}مفيش مشاريع في شركتك لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع.{% endif %}</p>
+        <p class="muted">{% if creatable %}ابدأ بمشروع جديد — الزرار فوق.{% else %}مفيش مشاريع في مساحة عملك لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع.{% endif %}</p>
         {% endif %}
       </section>
     </div>

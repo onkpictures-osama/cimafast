@@ -43,7 +43,7 @@ ROLE_LABELS = {
     "admin": "مدير المشروع", "producer": "منتج", "manager": "مدير إنتاج / مساعد مخرج أول",
     "department": "رئيس قسم", "viewer": "مشاهدة فقط", "operator": "مشغّل المنصة",
 }
-DEFAULT_COMPANY = "الشركة الافتراضية"
+DEFAULT_COMPANY = "مساحة العمل الافتراضية"
 
 # B5 ("بوابات الاشتراك"): نوع الاشتراك بيحدد قدرة الحساب على ضم فريق —
 # creator شغال لوحده دايمًا، studio بيضيف فريق صغير، enterprise بيضيف عدد
@@ -299,7 +299,7 @@ def delete_project(actor, project_id):
     """
     role = project_role(actor, project_id)
     if role is None:
-        raise AccessDenied("المشروع ده مش من مشاريع شركتك")
+        raise AccessDenied("المشروع ده مش من مشاريع مساحة عملك")
     if not permissions.can(role, "delete_project"):
         raise permissions.Denied("delete_project")
     import repo
@@ -333,10 +333,10 @@ def _require_manageable(actor, company_id, username):
 def rename_company(actor, company_id, name):
     _require_admin(actor, company_id)
     if not (name or "").strip():
-        raise ValueError("اسم الشركة مطلوب")
+        raise ValueError("اسم مساحة العمل مطلوب")
     old = _one("SELECT name FROM companies WHERE id=?", (company_id,))
     with audit.action("company_rename", "companies", entity_id=company_id,
-                      summary=f"تغيير اسم الشركة لـ «{name.strip()}»",
+                      summary=f"تغيير اسم مساحة العمل لـ «{name.strip()}»",
                       username=actor, company_id=company_id) as act:
         act.extra = {"من": (old or {}).get("name"), "لـ": name.strip()}
         with _tx() as ex:
@@ -344,7 +344,7 @@ def rename_company(actor, company_id, name):
 
 
 def set_subscription_tier(actor, company_id, tier):
-    """بتغيّر نوع الاشتراك — المشغّل بس، زي إنشاء الشركة، لحد ما يبقى فيه
+    """بتغيّر نوع الاشتراك — المشغّل بس، زي إنشاء مساحة العمل، لحد ما يبقى فيه
     نظام فوترة حقيقي بيحصّل الترقية فعليًا بدل ما تتحط يدوي."""
     u = user(actor)
     if not u or not u["is_operator"]:
@@ -467,15 +467,15 @@ def change_own_password(username, old_password, new_password):
 
 
 def create_company(actor, name, admin_username, admin_display_name=None, admin_email=None):
-    """شركة جديدة على المنصة وأول أدمن ليها — للمشغّل بس. بيرجّع كلمة سر الأدمن المؤقتة."""
+    """مساحة عمل جديدة على المنصة وأول أدمن ليها — للمشغّل بس. بيرجّع كلمة سر الأدمن المؤقتة."""
     u = user(actor)
     if not u or not u["is_operator"]:
-        raise AccessDenied("المشغّل بس يقدر يضيف شركة")
+        raise AccessDenied("المشغّل بس يقدر يضيف مساحة عمل")
     if not (name or "").strip():
-        raise ValueError("اسم الشركة مطلوب")
+        raise ValueError("اسم مساحة العمل مطلوب")
     # صف سجل واحد للشركة الجديدة (مش صف عام + صف بمعنى).
     with audit.action("company_create", "companies", username=actor,
-                      summary=f"شركة جديدة على المنصة: «{name.strip()}»") as act:
+                      summary=f"مساحة عمل جديدة على المنصة: «{name.strip()}»") as act:
         with _tx() as ex:
             ex("INSERT INTO companies (name, active, created_at) VALUES (?, 1, ?)",
                (name.strip(), _now()))

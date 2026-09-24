@@ -54,13 +54,13 @@ ACTION_LABELS = {
     "login": "دخول", "logout": "خروج", "login_failed": "محاولة دخول فاشلة",
     "password_change": "تغيير كلمة السر", "password_reset": "تصفير كلمة السر",
     "member_add": "إضافة عضو", "member_remove": "شيل عضو", "role_change": "تغيير دور",
-    "company_create": "إنشاء شركة", "company_rename": "تغيير اسم الشركة",
+    "company_create": "إنشاء مساحة عمل", "company_rename": "تغيير اسم مساحة العمل",
     "project_create": "إنشاء مشروع", "import_script": "استيراد سيناريو",
     "schedule_save": "حفظ جدول التصوير", "schedule_suggest": "اقتراح جدول تصوير",
 }
 
 ENTITY_LABELS = {
-    "auth": "الدخول", "users": "الحسابات", "memberships": "العضوية", "companies": "الشركات",
+    "auth": "الدخول", "users": "الحسابات", "memberships": "العضوية", "companies": "مساحات العمل",
     "projects": "المشاريع", "scenes": "المشاهد", "locations": "الأماكن",
     "location_variants": "حالات الأماكن", "characters": "الشخصيات",
     "character_looks": "لوكات الشخصيات", "props": "الإكسسوارات", "shots": "اللقطات",

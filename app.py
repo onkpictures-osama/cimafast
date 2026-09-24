@@ -531,7 +531,7 @@ _current_user = st.session_state.get("_auth_user")
 # حساب (أو المشغّل)، بيختار واحد.
 _my_companies = accounts.companies_for(_current_user or "")
 if not _my_companies:
-    _sb_projects.error(t("حسابك مش مربوط بأي شركة. كلّم مدير المشروع بتاعك."))
+    _sb_projects.error(t("حسابك مش مربوط بأي مساحة عمل. كلّم مدير المشروع بتاعك."))
     st.stop()
 # H2: رابط مباشر (?project=&tab=) من الصفحة الرئيسية أو تنبيه أو بوست. بيتطبّق
 # مرة واحدة لما يوصل؛ بعد كده اليوزر حر يتنقّل، وشريط العنوان بيتبعه (تحت).
@@ -560,7 +560,7 @@ if _link_item is not None:
 
 if len(_my_companies) > 1:
     _company_names = {c["name"]: c for c in _my_companies}
-    _company = _company_names[_sb_projects.selectbox(t("الحساب"), list(_company_names), key="company_selector")]
+    _company = _company_names[_sb_projects.selectbox(t("مساحة العمل"), list(_company_names), key="company_selector")]
 else:
     _company = _my_companies[0]
 company_id = _company["id"]
@@ -691,7 +691,7 @@ if not projects:
     if permissions.can(_role, "create_project"):
         _sb_projects.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
     else:
-        _sb_projects.info(t("مفيش مشاريع في الشركة دي لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع."))
+        _sb_projects.info(t("مفيش مشاريع في مساحة العمل دي لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع."))
     st.stop()
 
 _wanted = st.session_state.pop("_link_project_name", None)

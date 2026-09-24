@@ -19,7 +19,7 @@
     </div>
     {% if companies %}
     <label class="field">
-      <span>الشركة</span>
+      <span>مساحة العمل</span>
       <select id="company">
         {% for c in companies %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
       </select>
@@ -45,7 +45,7 @@
         <h2>أعضاء المشروع</h2>
         {% if can_view_audit %}<a class="btn" href="../activity/">🧾 سجل النشاط</a>{% endif %}
         <form id="rename" class="inline admin-only" hidden>
-          <input name="name" placeholder="اسم الشركة" aria-label="اسم الشركة" required>
+          <input name="name" placeholder="اسم مساحة العمل" aria-label="اسم مساحة العمل" required>
           <button class="btn">تغيير الاسم</button>
         </form>
       </div>
@@ -69,19 +69,19 @@
       </form>
     </section>
     {% else %}
-    <section class="card"><p>حسابك مش مربوط بأي شركة. كلّم مدير المشروع بتاعك.</p></section>
+    <section class="card"><p>حسابك مش مربوط بأي مساحة عمل. كلّم مدير المشروع بتاعك.</p></section>
     {% endif %}
 
     {% if is_operator %}
     <section class="card">
-      <h2>شركة جديدة على المنصة</h2>
-      <p class="muted">للمشغّل بس. الشركة بتبدأ فاضية، وأول مستخدم فيها بيبقى مديرها.</p>
+      <h2>مساحة عمل جديدة على المنصة</h2>
+      <p class="muted">للمشغّل بس. مساحة العمل بتبدأ فاضية، وأول مستخدم فيها بيبقى مديرها.</p>
       <form id="new-company" class="grid">
-        <label class="field"><span>اسم الشركة</span><input name="name" required></label>
+        <label class="field"><span>اسم مساحة العمل</span><input name="name" required></label>
         <label class="field"><span>مستخدم المدير (إنجليزي)</span><input name="admin_username" dir="ltr" required pattern="[A-Za-z0-9._\-]+"></label>
         <label class="field"><span>اسم المدير</span><input name="admin_display_name"></label>
         <label class="field"><span>إيميل المدير</span><input name="admin_email" type="email" dir="ltr"></label>
-        <button class="btn btn--primary">إنشاء الشركة</button>
+        <button class="btn btn--primary">إنشاء مساحة العمل</button>
       </form>
     </section>
     {% endif %}

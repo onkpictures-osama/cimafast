@@ -268,7 +268,7 @@ def _render_search_and_list(company_id):
 
     shown_hidden = [a for a in hidden_own if _matches(query, a)]
     if shown_hidden:
-        st.markdown(f"**{t('بروفايلات شركتك المخفية من البحث')}**")
+        st.markdown(f"**{t('بروفايلات فريقك المخفية من البحث')}**")
         for a in shown_hidden:
             _actor_row(a)
 
@@ -384,7 +384,7 @@ def _render_sensitive_section(actor, company_id):
 
     st.markdown(f"**{t('بيانات القياس والكاستينج')}**")
     if not unlocked and not always_public:
-        st.info(t("البيانات دي بتفضل مخفية لحد ما شركتك ترشّح أو تتعاقد مع الممثل/ة ده لدور في أحد مشاريعك."))
+        st.info(t("البيانات دي بتفضل مخفية لحد ما فريقك يرشّح أو يتعاقد مع الممثل/ة ده لدور في أحد مشاريعك."))
     elif not unlocked:
         st.caption(t("جزء من البيانات دي ظاهر لأن الممثل/ة اختار يبينه للكل — الباقي محتاج ترشيح أول."))
 
@@ -467,7 +467,7 @@ def _render_casting_section(actor, project_id):
                           t("معرفش أسجّل التعاقد ده.")):
             st.toast(t("تم تعيين الممثل/ة للشخصية"), icon="✅")
             st.rerun()
-    st.caption(t("الترشيح بيفتح لشركتك بيانات القياس والتواصل، ومتسجّل باسمك."))
+    st.caption(t("الترشيح بيفتح لفريقك بيانات القياس والتواصل، ومتسجّل باسمك."))
 
 
 def _render_edit_section(actor, company_id):
@@ -706,7 +706,7 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
         do_short = b1.form_submit_button(f"⭐ {t('رشّح')}", use_container_width=True)
         do_cast = b2.form_submit_button(f"✅ {t('تعاقد')}", use_container_width=True)
     if not (do_short or do_cast):
-        st.caption(t("الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بشركتك (مش ظاهر لشركات تانية) — تقدر تكمّل بياناته من هناك."))
+        st.caption(t("الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بفريقك (مش ظاهر لفرق تانية) — تقدر تكمّل بياناته من هناك."))
         return
     if picked is None:
         st.warning(t("اختار ممثل/ة الأول"))

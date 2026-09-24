@@ -27,7 +27,7 @@ UI_TEXT = {
     "sub_import": {"ar": "استيراد السكريبت من ملف Word أو نصي أو JSON", "en": "Import script from Word, text, or JSON"},
     "sub_locations": {"ar": "مكتبة الأماكن", "en": "Locations Library"},
     "sub_characters": {"ar": "مكتبة الشخصيات", "en": "Characters Library"},
-    "sub_actors": {"ar": "بحث الكاستينج عبر كل شركات المنصة", "en": "Casting search across every company on the platform"},
+    "sub_actors": {"ar": "بحث الكاستينج في المنصة كلها", "en": "Casting search across the whole platform"},
     "sub_wardrobe": {"ar": "غيارات كل شخصية، مين لابس أنهي غيار في كل مشهد، وقطع كل غيار وتجهيزها",
                      "en": "Each character's changes, who wears which change in every scene, and every piece and its readiness"},
     "sub_props": {"ar": "مكتبة الإكسسوارات", "en": "Props Library"},
@@ -69,8 +69,8 @@ TRANSLATIONS = {
     "⬆️ ارفع ملف تحليل من CimaFast": "⬆️ Upload a CimaFast analysis file",
     "حسابك مشاهدة فقط — تقدر تتصفح وتنزّل التحليلات، بس مش تضيف.":
         "Your account is view-only — you can browse and download analyses, but not add them.",
-    "ملف اتنزّل من مكتبة CimaFast (من حسابك أو من حساب تاني) — بيتضاف لمكتبتك في الشركة دي.":
-        "A file downloaded from a CimaFast library (yours or another account's) — it is added to your library in this company.",
+    "ملف اتنزّل من مكتبة CimaFast (من حسابك أو من حساب تاني) — بيتضاف لمكتبتك في مساحة العمل دي.":
+        "A file downloaded from a CimaFast library (yours or another account's) — it is added to your library in this workspace.",
     "اختار الملف": "Choose the file",
     "➕ ضيفه للمكتبة": "➕ Add to the library",
     "اتضاف للمكتبة.": "Added to the library.",
@@ -141,6 +141,7 @@ TRANSLATIONS = {
     "حسابك مش عضو في المشروع ده.": "Your account isn't a member of this project.",
     "المشروع ده مش متاح لحسابك.": "This project isn't available to your account.",
     "الشركة": "Company",
+    "مساحة العمل": "Workspace",
     "الحساب": "Account",
     "خروج": "Log out",
     "دورك في المشروع ده": "Your role on this project",
@@ -157,16 +158,16 @@ TRANSLATIONS = {
     "مشغّل المنصة": "Platform Operator",
     "الرابط ده لمشروع مش متاح لحسابك.": "That link is for a project your account cannot open.",
     "مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.": "View only — you can browse and export, but not edit.",
-    "مفيش مشاريع في الشركة دي لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع.": "This company has no projects yet. The project manager or a producer creates projects.",
+    "مفيش مشاريع في مساحة العمل دي لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع.": "This workspace has no projects yet. The project manager or a producer creates projects.",
     "استيراد السكريبت وتحليله لأعضاء الفريق اللي عندهم صلاحية تعديل. حسابك مشاهدة فقط.": "Importing and analysing scripts is for team members who can edit. Your account is view only.",
-    "حسابك مشاهدة فقط في الشركة دي — مينفعش تعدّل. كلّم مدير المشروع لو محتاج صلاحية تعديل.": "Your account is view only in this company — you can't edit. Ask the project manager if you need edit access.",
+    "حسابك مشاهدة فقط في مساحة العمل دي — مينفعش تعدّل. كلّم مدير المشروع لو محتاج صلاحية تعديل.": "Your account is view only in this workspace — you can't edit. Ask the project manager if you need edit access.",
     "حسابك مشاهدة فقط — مينفعش تشغّل تحليل أو توليد صور.": "Your account is view only — you can't run analysis or generate images.",
     "إنشاء مشروع جديد لمدير المشروع أو المنتج أو مدير الإنتاج بس.": "Only the project manager, a producer or a production manager can create a project.",
     "حذف مشروع لمدير المشروع بس.": "Only the project manager can delete a project.",
     "إدارة الفريق لمدير المشروع بس.": "Only the project manager can manage the team.",
     "سجل النشاط": "Activity log",
     "سجل النشاط لمدير المشروع بس.": "Only the project manager can see the activity log.",
-    "حسابك مش مربوط بأي شركة. كلّم مدير المشروع بتاعك.": "Your account is not linked to any company. Contact your project manager.",
+    "حسابك مش مربوط بأي مساحة عمل. كلّم مدير المشروع بتاعك.": "Your account is not linked to any workspace. Contact your project manager.",
     "جدول التصوير": "Shooting schedule",
     "مفيش حاجة ناقصة — كل المشاهد ليها لقطات وشخصيات، وكل حاجة ليها صورة ومتراجعة.": "Nothing missing — every scene has shots and characters, and everything has an image and is reviewed.",
     "إيه اللي لسه ناقص": "What's still missing",
@@ -610,8 +611,8 @@ TRANSLATIONS = {
     "آخر تحديث للصورة": "Photo last updated",
     "أعمال سابقة": "Past work",
     "بيانات القياس والكاستينج": "Measurements & casting details",
-    "البيانات دي بتفضل مخفية لحد ما شركتك ترشّح أو تتعاقد مع الممثل/ة ده لدور في أحد مشاريعك.":
-        "These stay hidden until your company shortlists or casts this actor for a role in one of your projects.",
+    "البيانات دي بتفضل مخفية لحد ما فريقك يرشّح أو يتعاقد مع الممثل/ة ده لدور في أحد مشاريعك.":
+        "These stay hidden until your team shortlists or casts this actor for a role in one of your projects.",
     "جزء من البيانات دي ظاهر لأن الممثل/ة اختار يبينه للكل — الباقي محتاج ترشيح أول.":
         "Some of this is visible because the actor chose to make it public — the rest needs a shortlist first.",
     "سم": "cm", "كجم": "kg",
@@ -633,7 +634,7 @@ TRANSLATIONS = {
     "المقاسات (لإدارة الأزياء)": "Measurements (for wardrobe)",
     "التواصل": "Contact", "الخصوصية": "Privacy",
     "بيانات تظهر للكل من غير ترشيح (اختياري)": "Details shown to everyone without a shortlist (optional)",
-    "بروفايلات شركتك المخفية من البحث": "Your company's profiles hidden from search",
+    "بروفايلات فريقك المخفية من البحث": "Your team's profiles hidden from search",
     "تجريبي": "demo",
     "الصورة محتاجة تحديث": "photo needs an update",
     "مفيش صورة لسه": "No photo yet",
@@ -650,8 +651,8 @@ TRANSLATIONS = {
     "معرفش أسجّل التعاقد ده.": "Couldn't record this casting.",
     "الشخصية دي متعاقد لها ممثل/ة تاني بالفعل. شيل التعاقد ده الأول لو عايز تغيّره.":
         "This character is already cast with another actor. Remove that casting first if you want to change it.",
-    "الترشيح بيفتح لشركتك بيانات القياس والتواصل، ومتسجّل باسمك.":
-        "Shortlisting unlocks measurements and contact details for your company, and is recorded under your name.",
+    "الترشيح بيفتح لفريقك بيانات القياس والتواصل، ومتسجّل باسمك.":
+        "Shortlisting unlocks measurements and contact details for your team, and is recorded under your name.",
     "تعديل البروفايل": "Edit profile",
     "حفظ التعديل": "Save changes",
     "تم حفظ التعديل": "Changes saved",
@@ -800,8 +801,8 @@ TRANSLATIONS = {
     "اكتب أول الاسم...": "Type the start of a name...",
     "الاسم (لو جديد/ة)": "Name (if new)",
     "رقم التواصل (اختياري)": "Contact number (optional)",
-    "الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بشركتك (مش ظاهر لشركات تانية) — تقدر تكمّل بياناته من هناك.":
-        "A new actor is saved to the Talent Vault as a profile private to your company (hidden from other companies) — complete it there.",
+    "الممثل/ة الجديد/ة بيتحفظ في خزانة المواهب كبروفايل خاص بفريقك (مش ظاهر لفرق تانية) — تقدر تكمّل بياناته من هناك.":
+        "A new actor is saved to the Talent Vault as a profile private to your team (hidden from other teams) — complete it there.",
     "اختار ممثل/ة الأول": "Choose an actor first",
     "اكتب اسم الممثل/ة الجديد/ة": "Type the new actor's name",
     "مرشح": "shortlisted",
