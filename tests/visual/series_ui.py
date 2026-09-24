@@ -65,14 +65,10 @@ def stage(page, shot_dir):
     _settle(page, 2000)
     _no_exception(page, "create series")
 
-    # المشروع الجديد: اختاره من القايمة
-    sel = sb.locator('[data-testid="stSelectbox"]').filter(has_text="المشروع الحالي").first
-    sel.locator("input").click()
-    _settle(page, 400)
-    page.get_by_role("option").filter(has_text="مسلسل الاختبار").first.click()
-    _settle(page, 2000)
+    # المشروع الجديد بيتفتح لوحده على «إضافة سيناريو» والشريط بيتقفل
+    # (ui.go_to - المالك 2026-09-24) - مش محتاج نختاره من القايمة
+    check("new series opens by itself", page.locator("h2").filter(has_text="مسلسل الاختبار").count() > 0)
 
-    _tab(page, "إضافة سيناريو")
     _no_exception(page, "import tab")
     grid = page.locator(".st-key-cf_import_episodes")
     check("episode grid shows 8 episodes", grid.count() and "0 من 8" in grid.inner_text().replace("⁦", "").replace("⁩", ""),
