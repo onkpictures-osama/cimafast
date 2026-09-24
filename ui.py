@@ -5,6 +5,8 @@
 import image_gen
 import os
 import re
+import html
+
 import streamlit as st
 from database import IntegrityError
 import uuid
@@ -364,3 +366,69 @@ def phase_tabs():
     tabs = dict(zip(slugs, st.tabs([tr(links.TABS[s]) for s in slugs], key=f"main_tabs_{phase}",
                                    on_change="rerun")))
     return tabs, next((slug for slug, tab in tabs.items() if tab.open), slugs[0])
+
+
+
+def nav_link(label, href, title=None, icon_only=False):
+    """لينك بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا بيفتح تاب
+    جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب.
+
+    ‎st.markdown‎ عادي مش ‎st.sidebar.markdown‎ عمدًا: بيترسم في أي حاوية
+    (عمود، شريط جانبي...) اللي بينادي عليها من جواها، مش الشريط الجانبي
+    دايمًا.
+
+    ‎title‎: لما اللينك يبقى أيقونة لوحدها من غير كلام (زي 🏠 بعد تعديل
+    2026-09-23)، الأيقونة مش اسم يقراه قارئ الشاشة. فبنحط الكلمة في
+    ‎aria-label‎ (الاسم المنطوق) و‎title‎ (تلميح الماوس) - الكلمة اتشالت من
+    الشاشة بس، مش من الوصول."""
+    attrs = ""
+    if title:
+        esc = html.escape(title, quote=True)
+        attrs = f' title="{esc}" aria-label="{esc}"'
+    cls = "cf-navlink cf-navlink--icon" if icon_only else "cf-navlink"
+    st.markdown(
+        f'<a class="{cls}" href="{html.escape(href, quote=True)}" target="_self"{attrs}>{html.escape(label)}</a>',
+        unsafe_allow_html=True)
+
+
+# --- التنقّل: الشريط الجانبي بيتقفل لما ننتقل لصفحة (طلب المالك 2026-09-24) ---
+# "لما بندوس على ترس الإعدادات ... الـ Side bar المفروض يقفل ونروح" - وكمان بعد
+# إنشاء مشروع، تغيير المشروع أو مساحة العمل، وأي زرار بيودّي لصفحة تانية.
+# Streamlit مالوش API يقفل الشريط، فبنعلّم إن الـ run الجاي لازم يقفله،
+# والسكريبت بيدوس زرار القفل بتاع Streamlit نفسه (الشريط بيتقفل بنفس حركته
+# العادية، ويتفتح تاني من نفس الزرار). من غير أي حرف "أصغر من" في السكريبت:
+# st.html بيمسحه بصمت لو لقى حاجة شبه تاج HTML.
+
+_CLOSE_KEY = "_cf_close_sidebar"
+# data-n: رقم جديد مع كل طلب. من غيره، طلبين ورا بعض (الترس وبعده إنشاء
+# مشروع) بيطلعوا نفس العنصر بالظبط في نفس المكان، فـ Streamlit مابيعيدش
+# رسمه والسكريبت مابيتنفذش تاني.
+_CLOSE_JS = (
+    "<script data-n=\"%d\">(function(){var n=0;var iv=setInterval(function(){n++;"
+    "var sb=document.querySelector('section[data-testid=stSidebar]');"
+    "if(sb&&sb.getAttribute('aria-expanded')==='true'){"
+    "var b=document.querySelector('[data-testid=stSidebarCollapseButton] button')"
+    "||document.querySelector('[data-testid=stSidebarCollapseButton]');"
+    "if(b){b.click();clearInterval(iv);}}"
+    "else if(sb){clearInterval(iv);}"
+    "if(n>40)clearInterval(iv);},100);})();</script>"
+)
+
+
+def request_close_sidebar():
+    """الـ run الجاي يقفل الشريط الجانبي (للكولباك وon_change)."""
+    st.session_state[_CLOSE_KEY] = True
+
+
+def go_to(slug):
+    """يفتح تبويب (ومرحلته) ويقفل الشريط - لأي زرار بيودّي لصفحة جوه المشروع."""
+    open_tab_by_slug(slug)
+    request_close_sidebar()
+
+
+def close_sidebar_now():
+    """بيتنده مرة في كل run: لو فيه طلب قفل، بيبعت السكريبت مرة واحدة."""
+    if st.session_state.pop(_CLOSE_KEY, False):
+        n = st.session_state.get("_cf_close_n", 0) + 1
+        st.session_state["_cf_close_n"] = n
+        st.html(_CLOSE_JS % n, unsafe_allow_javascript=True)

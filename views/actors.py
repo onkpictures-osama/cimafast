@@ -26,7 +26,7 @@ from database import (ACTOR_CASTING_STATUS_LABELS, ACTOR_CATEGORY_OPTIONS,
                       ACTOR_SENSITIVE_FIELDS, FIELD_HELP, GENDER_OPTIONS)
 from i18n import t, tr
 from search import normalize
-from ui import IMAGE_TYPES, guarded_delete, image_abs_path, ltr, multiselect, save_uploaded_image
+from ui import IMAGE_TYPES, go_to, guarded_delete, image_abs_path, ltr, multiselect, save_uploaded_image
 
 # قفز بالحرف الأول: عربي هو الافتراضي (المنتج عربي أولًا)، إنجليزي بس لما
 # الواجهة إنجليزي - مش لاتيني وبعدين ترقيع RTL (production، 2026-09-23).
@@ -607,6 +607,11 @@ def render_credits(items, show_unrecognised=False):
 _NEW_ACTOR = "__new__"
 
 
+def _open_actor_profile(actor_id):
+    st.session_state[_SELECTED_KEY] = actor_id
+    go_to("actors")
+
+
 def _fmt_date(value):
     return value or "—"
 
@@ -634,10 +639,9 @@ def render_character_casting(project_id, company_id, ch, cast_entry):
         badge = "✅" if status == "cast" else "⭐"
         c_name.markdown(f"{badge} **{person['name']}** — {t(ACTOR_CASTING_STATUS_LABELS[status])}"
                         + (f" · {person['role_note']}" if person.get("role_note") else ""))
-        if c_open.button(t("البروفايل"), key=f"chcast_open_{char_id}_{person['casting_id']}",
-                         use_container_width=True):
-            st.session_state[_SELECTED_KEY] = person["actor_id"]
-            st.toast(t("افتح تبويب «الممثلين» تلاقي البروفايل مفتوح"), icon="🎭")
+        # بيودّي للبروفايل على طول (تبويب الممثلين) بدل رسالة "روح افتحه"
+        c_open.button(t("البروفايل"), key=f"chcast_open_{char_id}_{person['casting_id']}",
+                      use_container_width=True, on_click=_open_actor_profile, args=(person["actor_id"],))
         if status == "shortlisted" and not actor:
             if c_rm.button(f"✅ {t('تعاقد')}", key=f"chcast_promote_{char_id}_{person['casting_id']}",
                            disabled=not writable, use_container_width=True):

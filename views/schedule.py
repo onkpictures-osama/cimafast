@@ -10,7 +10,7 @@ import streamlit as st
 
 import repo
 from i18n import t, tr
-from ui import ltr
+from ui import ltr, nav_link
 
 
 def render(project, project_id, board_url):
@@ -27,8 +27,8 @@ def render(project, project_id, board_url):
     elif scheduled < scenes:
         st.caption(f"⚠️ {ltr(scenes - scheduled)} {t('مشهد لسه مش في أي يوم تصوير.')}")
     if board_url:
-        st.link_button(f"🗓️ {t('افتح جدول التصوير')}", f"{board_url}?project={project_id}",
-                       type="primary", use_container_width=True)
+        # نفس التاب (مش تاب جديد) - الرجوع بزرار الرجوع في المتصفح
+        nav_link(f"🗓️ {t('افتح جدول التصوير')}", f"{board_url}?project={project_id}")
     else:
         st.caption(t("شاشة جدول التصوير مش متاحة في التشغيلة دي."))
 

@@ -12,6 +12,7 @@ import streamlit as st
 import accounts
 from database import FIELD_HELP
 from i18n import t
+from ui import go_to
 
 from project_types import PLATFORMS, TYPE_ICONS, TYPES, technical_defaults
 
@@ -93,5 +94,9 @@ def render(current_user, company_id):
     for old_key in [x for x in st.session_state if str(x).startswith("new_proj_")]:
         st.session_state.pop(old_key, None)
     st.session_state["_new_proj_nonce"] = n + 1
+    # المشروع الجديد بيتفتح على طول على «إضافة سيناريو» والشريط بيتقفل -
+    # قبل كده كنت بتفضل على المشروع القديم والشريط مفتوح (المالك 2026-09-24)
+    st.session_state["_link_project_name"] = new_name.strip()
+    go_to("import")
     st.toast(t("تم إنشاء المشروع"), icon="✅")
     return True

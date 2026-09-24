@@ -13,7 +13,8 @@ from database import init_db, FIELD_HELP
 import theme
 
 from i18n import t, tr
-from ui import ltr, open_tab_by_slug, phase_tabs
+from ui import (close_sidebar_now, go_to, ltr, nav_link as _nav_link, open_tab_by_slug, phase_tabs,
+                request_close_sidebar)
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.new_project
 import views.schedule
@@ -195,28 +196,6 @@ def _logout():
     for key in ("_authenticated", "_auth_user", "_login_attempts", "_cf_role"):
         st.session_state.pop(key, None)
     st.session_state["_just_logged_out"] = True
-
-
-def _nav_link(label, href, title=None, icon_only=False):
-    """لينك بشكل زرار، بيفتح في نفس التاب. st.link_button دايمًا بيفتح تاب
-    جديد، وده بيبعتر الرئيسية والتطبيق والجدول على كذا تاب.
-
-    ‎st.markdown‎ عادي مش ‎st.sidebar.markdown‎ عمدًا: بيترسم في أي حاوية
-    (عمود، شريط جانبي...) اللي بينادي عليها من جواها، مش الشريط الجانبي
-    دايمًا.
-
-    ‎title‎: لما اللينك يبقى أيقونة لوحدها من غير كلام (زي 🏠 بعد تعديل
-    2026-09-23)، الأيقونة مش اسم يقراه قارئ الشاشة. فبنحط الكلمة في
-    ‎aria-label‎ (الاسم المنطوق) و‎title‎ (تلميح الماوس) - الكلمة اتشالت من
-    الشاشة بس، مش من الوصول."""
-    attrs = ""
-    if title:
-        esc = html.escape(title, quote=True)
-        attrs = f' title="{esc}" aria-label="{esc}"'
-    cls = "cf-navlink cf-navlink--icon" if icon_only else "cf-navlink"
-    st.markdown(
-        f'<a class="{cls}" href="{html.escape(href, quote=True)}" target="_self"{attrs}>{html.escape(label)}</a>',
-        unsafe_allow_html=True)
 
 
 def _session_role():
@@ -561,7 +540,8 @@ if _link_item is not None:
 
 if len(_my_companies) > 1:
     _company_names = {c["name"]: c for c in _my_companies}
-    _company = _company_names[_sb_projects.selectbox(t("مساحة العمل"), list(_company_names), key="company_selector")]
+    _company = _company_names[_sb_projects.selectbox(t("مساحة العمل"), list(_company_names), key="company_selector",
+                                                     on_change=request_close_sidebar)]
 else:
     _company = _my_companies[0]
 company_id = _company["id"]
@@ -583,7 +563,9 @@ projects = accounts.projects_for(_current_user, company_id)
 project_names = {p["name"]: p["id"] for p in projects}
 
 if permissions.can(_role, "create_project"):
-    with _sb_projects.expander(tr("new_project")):
+    # المفتاح بيتغيّر بعد كل إنشاء (_new_proj_nonce): الفورم بيرجع مقفول بدل ما
+    # يفضل مفتوح بعد ما المشروع الجديد اتفتح (المالك 2026-09-24)
+    with _sb_projects.expander(tr("new_project"), key=f"new_proj_exp_{st.session_state.get('_new_proj_nonce', 0)}"):
         # النوع أول اختيار، وكل نوع ليه أسئلته (المسلسل: عدد الحلقات) -
         # views/new_project.py
         if views.new_project.render(_current_user, company_id):
@@ -706,12 +688,14 @@ if _wanted in project_names:
 # وملقاهوش. الكولباك بيتنفذ قبل الـ run الجاي، فالتبويب بيتفتح قبل ما
 # التبويبات (‎main_tabs_<المرحلة>‎) تتبني.
 def _open_settings_tab():
-    open_tab_by_slug("settings")
+    go_to("settings")
 
 
 _sb_proj_row = _sb_projects.container(
     horizontal=True, vertical_alignment="bottom", gap="small", wrap=False, key="cf_sb_proj_row")
-selected_project_name = _sb_proj_row.selectbox(tr("current_project_label"), list(project_names.keys()), key="project_selector")
+# تغيير المشروع = صفحة تانية: الشريط الجانبي بيتقفل (طلب المالك 2026-09-24)
+selected_project_name = _sb_proj_row.selectbox(tr("current_project_label"), list(project_names.keys()),
+                                               key="project_selector", on_change=request_close_sidebar)
 _sb_proj_row.button("", icon=":material/settings:", key="sb_open_settings",
                     help=t("إعدادات المشروع: تعديل، حذف، الفريق، الحلقات"),
                     on_click=_open_settings_tab)
@@ -889,3 +873,7 @@ if _is_open("settings"):
     with _tabs["settings"]:
         _render(views.project_settings, project_id=project_id, current_user=_current_user,
                company_id=company_id, role=_role, tier=_tier, board_url=_board_url)
+
+# أي زرار طلب ننتقل لصفحة (ترس الإعدادات، إنشاء مشروع، تغيير المشروع...):
+# الشريط الجانبي يتقفل بعد ما الصفحة الجديدة تترسم - ui.go_to
+close_sidebar_now()

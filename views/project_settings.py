@@ -7,7 +7,7 @@
 
 import streamlit as st
 from i18n import t, tr
-from ui import guarded_delete, mark_saved, safe_index, show_saved_badge
+from ui import nav_link, guarded_delete, mark_saved, safe_index, show_saved_badge
 import accounts
 import permissions
 import repo
@@ -19,16 +19,17 @@ def render(project_id, current_user, company_id, role, tier, board_url):
 
     # لينكات الفريق وجدول التصوير — كانت في الشريط الجانبي، بقت هنا لأنها
     # تفاصيل خاصة بإدارة المشروع/الشركة، مش تنقّل عام.
+    # جدول التصوير اتنقل لمرحلة الإنتاج (تبويب لوحده) - مش هنا. واللينكات
+    # بتفتح في نفس التاب (nav_link) بدل تاب جديد يسيب القديمة وراه.
     if board_url:
-        st.link_button(f"🗓️ {t('جدول التصوير')}", f"{board_url}?project={project_id}")
         # B5: إدارة الفريق مش متاحة لاشتراك Creator خالص — شغال لوحده دايمًا.
         if accounts.TIER_ALLOWS_TEAM.get(tier, True):
             team_label = t("إدارة الفريق") if role in ("admin", "operator") else t("الفريق وحسابي")
-            st.link_button(f"👥 {team_label}", f"{board_url}team/")
+            nav_link(f"👥 {team_label}", f"{board_url}team/")
         elif role in ("admin", "operator"):
             st.caption(t("إدارة الفريق مش متاحة في باقة Creator — شغال لوحدك. رقّي الاشتراك لـ Studio أو Enterprise عشان تضيف فريق."))
         if permissions.can(role, "view_audit"):
-            st.link_button(f"🧾 {t('سجل النشاط')}", f"{board_url}activity/?company_id={company_id}")
+            nav_link(f"🧾 {t('سجل النشاط')}", f"{board_url}activity/?company_id={company_id}")
         st.divider()
 
     # (أ) أعضاء المشروع: مين يشوف المشروع ده من أعضاء مساحة العمل - للمدير بس
