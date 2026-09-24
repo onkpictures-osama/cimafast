@@ -507,7 +507,7 @@ def parse_file(data):
 def _require_edit(username, company_id):
     role = accounts.role_in(username, company_id) if company_id is not None else None
     if role is None:
-        raise LibraryError("حسابك مش عضو في الشركة دي.")
+        raise LibraryError("حسابك مش عضو في المشروع ده.")
     if not permissions.can(role, "edit"):
         raise permissions.Denied("edit")
     return role

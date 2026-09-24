@@ -63,7 +63,7 @@
     } else {
       roleCell.textContent = labels[m.role] || m.role;
     }
-    td(active ? when(m.last_login_at) : "اتشال من الشركة");
+    td(active ? when(m.last_login_at) : "اتشال من المشروع");
     if (isAdmin) {
       const cell = td("");
       if (m.username !== me) {
@@ -76,8 +76,8 @@
             try { const r = await call("POST", `../api/team/members/${encodeURIComponent(m.username)}/reset`, { company_id: companyId() }); showSecret(m.username, r.temp_password); }
             catch (e) { say(e.message, true); }
           });
-          btn("شيل من الشركة", "btn--danger", async () => {
-            if (!confirm(`تشيل ${m.username} من الشركة؟ هيبطل يشوف مشاريعها. تقدر ترجّعه بعدين.`)) return;
+          btn("شيل من المشروع", "btn--danger", async () => {
+            if (!confirm(`تشيل ${m.username} من المشروع؟ هيبطل يشوف المشاريع. تقدر ترجّعه بعدين.`)) return;
             try { await call("DELETE", `../api/team/members/${encodeURIComponent(m.username)}`, { company_id: companyId() }); say("اتشال"); load(); }
             catch (e) { say(e.message, true); }
           });
@@ -117,7 +117,7 @@
       const r = await call("POST", "../api/team/members", { ...d, company_id: companyId() });
       ev.target.reset();
       if (r.temp_password) showSecret(d.username, r.temp_password);
-      else say(`${d.username} عنده حساب بالفعل — اتضاف للشركة بكلمة سره الحالية`);
+      else say(`${d.username} عنده حساب بالفعل — اتضاف للمشروع بكلمة سره الحالية`);
       load();
     } catch (e) { say(e.message, true); }
   });

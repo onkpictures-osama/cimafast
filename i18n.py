@@ -135,7 +135,7 @@ TRANSLATIONS = {
     "بيانات التشغيل (meta) في الملف مش مكتوبة صح.": "The run details (meta) in the file are malformed.",
     "مقدرناش نقرا ولا مشهد من الملف.": "We couldn't read any scene from the file.",
     "التقارير في الملف مش مكتوبة صح.": "The reports in the file are malformed.",
-    "حسابك مش عضو في الشركة دي.": "Your account isn't a member of this company.",
+    "حسابك مش عضو في المشروع ده.": "Your account isn't a member of this project.",
     "المشروع ده مش متاح لحسابك.": "This project isn't available to your account.",
     "الشركة": "Company",
     "الحساب": "Account",

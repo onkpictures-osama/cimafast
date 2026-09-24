@@ -269,7 +269,7 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
     import json
     role = role_in(actor, company_id)
     if role is None:
-        raise AccessDenied("مش عضو في الشركة دي")
+        raise AccessDenied("مش عضو في المشروع ده")
     if not permissions.can(role, "create_project"):
         raise permissions.Denied("create_project")
     from database import run_query
@@ -324,7 +324,7 @@ def _require_manageable(actor, company_id, username):
     target = user(username)
     if not target or not _one("SELECT 1 AS ok FROM memberships WHERE company_id=? AND user_id=?",
                               (company_id, target["id"])):
-        raise AccessDenied("المستخدم ده مش عضو في الشركة دي")
+        raise AccessDenied("المستخدم ده مش عضو في المشروع ده")
     if target["is_operator"] and not user(actor)["is_operator"]:
         raise AccessDenied("حساب مشغّل المنصة مايتعدّلش من هنا")
     return target
@@ -362,7 +362,7 @@ def set_subscription_tier(actor, company_id, tier):
 
 def members(actor, company_id):
     if role_in(actor, company_id) is None:
-        raise AccessDenied("مش عضو في الشركة دي")
+        raise AccessDenied("مش عضو في المشروع ده")
     return fetch_all("""
         SELECT u.username, u.display_name, u.email, u.job_title, u.active AS user_active,
                u.last_login_at, m.role, m.active FROM memberships m JOIN users u ON u.id = m.user_id
