@@ -718,7 +718,7 @@ def props_of_project(*params):
 
 
 def add_prop(*params):
-    return run_query('INSERT INTO props (project_id, name, continuity_sensitive, character_id) VALUES (?,?,?,?)', params)
+    return run_query('INSERT INTO props (project_id, name, character_id) VALUES (?,?,?)', params)
 
 
 def delete_prop(project_id, *params):
@@ -726,7 +726,7 @@ def delete_prop(project_id, *params):
 
 
 def update_prop(project_id, *params):
-    return run_query('UPDATE props SET name=?, continuity_sensitive=?, character_id=? WHERE id=? AND project_id=?',
+    return run_query('UPDATE props SET name=?, character_id=? WHERE id=? AND project_id=?',
                      params + (project_id,))
 
 
@@ -1674,7 +1674,7 @@ def prop_scene_counts(project_id):
         WHERE p.project_id = ? GROUP BY sp.prop_id""", (project_id,))}
 
 
-_PROP_FIELDS = ("name", "quantity", "source", "cost", "status", "continuity_sensitive", "notes")
+_PROP_FIELDS = ("name", "quantity", "source", "cost", "status", "notes")
 
 
 def _clean_prop(r):
@@ -1693,8 +1693,6 @@ def _clean_prop(r):
                 v = float(v) if v not in (None, "") else None
             except (TypeError, ValueError):
                 v = None
-        elif f == "continuity_sensitive":
-            v = 1 if v else 0
         elif isinstance(v, str):
             v = v.strip() or None
         vals[f] = v
@@ -1726,7 +1724,7 @@ def save_props_for(project_id, rows, location_id=None, character_id=None):
             pid = int(pid) if pid not in (None, "") and pid == pid else None
             cols = list(_PROP_FIELDS)     # نفس ترتيب الأعمدة في الجملة تحت
             if pid in current:
-                ex("UPDATE props SET name=?, quantity=?, source=?, cost=?, status=?, continuity_sensitive=?, "
+                ex("UPDATE props SET name=?, quantity=?, source=?, cost=?, status=?, "
                    "notes=? WHERE id=? AND project_id=?", tuple(vals[c] for c in cols) + (pid, project_id))
                 kept.add(pid)
             else:

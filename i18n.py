@@ -485,15 +485,8 @@ TRANSLATIONS = {
     "شخصيات جديدة:": "New characters:",
     "أماكن جديدة:": "New locations:",
     "إكسسوارات جديدة:": "New props:",
-    "أي حاجة بيمسكها أو بيستخدمها أي شخصية أو ليها دور في حدث المشهد (سكينة، تليفون، شنطة، سلاح...). "
-    "تقدر تربط الإكسسوار بشخصية معينة (زي مسدس البطل)، وتعلّم عليه لو حساس للراكورد (يعني لازم يفضل في "
-    "نفس الحالة بين اللقطات المتتالية).":
-        "Anything a character holds or uses, or that plays a role in the scene's action (a knife, phone, "
-        "bag, weapon...). You can link a prop to a specific character (like the hero's gun), and mark it "
-        "as continuity-sensitive (meaning it must stay in the same state across consecutive shots).",
     "اسم الإكسسوار": "Prop Name",
     "مثال: سكينة عم جابر": "e.g. Am Gaber's knife",
-    "حساس للراكورد؟ (لازم يفضل في نفس الحالة بين اللقطات)": "Continuity-sensitive? (must stay consistent across shots)",
     "مرتبط بشخصية (اختياري)": "Linked to a character (optional)",
     "إضافة إكسسوار": "Add Prop",
     "اسم الإكسسوار مينفعش يبقى فاضي": "Prop name can't be empty",
@@ -817,12 +810,13 @@ TRANSLATIONS = {
     "الإكسسوار": "Prop",
     "الكمية": "Qty",
     "الحالة": "Status",
-    "راكور": "Continuity",
     "مطلوب": "Needed", "اتجاب": "Acquired", "اترص في المكان": "Dressed on set",
     "من المكان نفسه": "From the location", "من المخزن": "From stock", "تصنيع": "Made",
     "تكلفة القطعة الواحدة — الإجمالي × الكمية": "Cost per piece — total × quantity",
-    "حساس للراكور: لازم يفضل في نفس الحالة والمكان بين اللقطات":
-        "Continuity-sensitive: must stay in the same state and place between shots",
+    "عدد النسخ المطلوبة من نفس القطعة (زي أكتر من نسخة من خطاب هيتقطع في أكتر من تيك)":
+        "Number of copies needed of the same piece (e.g. several copies of a letter that gets torn in multiple takes)",
+    "أي تفاصيل تانية - زي عدد النسخ الاحتياطية أو حالة خاصة للقطعة":
+        "Any other details - like backup copies or a special condition for the piece",
     "عدد المشاهد اللي القطعة متسجلة فيها": "Number of scenes this prop is recorded in",
     "لسه مفيش أماكن في المشروع. الإكسسوار بيترص في الأماكن — ضيف الأماكن من تبويب «الأماكن» أو استورد السيناريو.":
         "No locations yet. Props are dressed into locations — add locations in the Locations tab or import the script.",

@@ -109,8 +109,7 @@ def test_place_props_is_scoped_to_the_project():
 
 @test
 def test_saving_a_location_table_keeps_ids_and_scene_links():
-    rows = [{"_id": CLOCK, "name": "ساعة منبه نحاس", "quantity": 2, "cost": 150, "status": "اتجاب",
-             "continuity_sensitive": True},
+    rows = [{"_id": CLOCK, "name": "ساعة منبه نحاس", "quantity": 2, "cost": 150, "status": "اتجاب"},
             {"_id": None, "name": "أباجورة", "source": "إيجار", "cost": float("nan")},
             {"_id": None, "name": "   "}]
     assert repo.save_props_for(P, rows, location_id=BEDROOM) == 2

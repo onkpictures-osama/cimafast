@@ -612,7 +612,8 @@ PROPS_SHEET_COLUMNS = [
     ("number", "الرقم", 8),
     ("name", "الإكسسوار", 24),
     ("owner_character", "تابع لشخصية", 22),
-    ("continuity", "حساس للاستمرارية", 16),
+    ("quantity", "الكمية", 10),
+    ("notes", "ملاحظات", 24),
     ("scene_count", "عدد المشاهد", 12),
     ("scene_numbers", "ارقام المشاهد", 30),
 ]
@@ -620,8 +621,9 @@ PROPS_SHEET_COLUMNS = [
 
 def build_props_sheet_excel(project, project_id, fetch_all):
     """كشف الإكسسوار: ورقة واحدة لكل إكسسوار، بعدد وأرقام المشاهد اللي
-    ظاهر فيها (من ربط scene_props)، والشخصية التابع لها لو محدد، وعلامة
-    لو الإكسسوار حساس للاستمرارية (يحتاج انتباه خاص وقت التصوير)."""
+    ظاهر فيها (من ربط scene_props)، والشخصية التابع لها لو محدد، والكمية
+    المطلوبة من نفس القطعة (زي كام نسخة من خطاب هيتقطع في أكتر من تيك)
+    وملاحظاتها."""
     props = fetch_all(
         "SELECT * FROM props WHERE project_id=? ORDER BY id", (project_id,)
     )
@@ -641,7 +643,8 @@ def build_props_sheet_excel(project, project_id, fetch_all):
             "number": idx,
             "name": prop["name"],
             "owner_character": character_name_by_id.get(prop["character_id"], ""),
-            "continuity": "نعم" if prop["continuity_sensitive"] else "",
+            "quantity": prop["quantity"] or 1,
+            "notes": prop["notes"] or "",
             "scene_count": len(scene_numbers),
             "scene_numbers": "، ".join(str(n) for n in scene_numbers),
         })

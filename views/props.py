@@ -41,7 +41,7 @@ def _money(v):
 
 
 _COLS = {"name": "الإكسسوار", "quantity": "الكمية", "source": "المصدر", "cost": "التكلفة",
-         "status": "الحالة", "continuity_sensitive": "راكور", "notes": "ملاحظات"}
+         "status": "الحالة", "notes": "ملاحظات"}
 
 
 def render(project_id):
@@ -81,26 +81,26 @@ def _table(project_id, props, key, scene_counts):
     df = pd.DataFrame([{
         "_id": p["id"], _COLS["name"]: p["name"], _COLS["quantity"]: p["quantity"] or 1,
         _COLS["source"]: p["source"], _COLS["cost"]: p["cost"], _COLS["status"]: p["status"] or repo.PROP_STATUSES[0],
-        _COLS["continuity_sensitive"]: bool(p["continuity_sensitive"]), _COLS["notes"]: p["notes"],
+        _COLS["notes"]: p["notes"],
         t("مشاهد"): scene_counts.get(p["id"], 0),
     } for p in props], columns=["_id"] + list(_COLS.values()) + [t("مشاهد")])
     df[_COLS["cost"]] = pd.to_numeric(df[_COLS["cost"]], errors="coerce")
     df[_COLS["quantity"]] = pd.to_numeric(df[_COLS["quantity"]], errors="coerce")
-    df[_COLS["continuity_sensitive"]] = df[_COLS["continuity_sensitive"]].fillna(False).astype(bool)
     return st.data_editor(
         df, key=key, num_rows="dynamic", hide_index=True, use_container_width=True, disabled=not _can_edit(),
         column_order=_rtl(list(_COLS.values()) + [t("مشاهد")]),
         column_config={
             _COLS["name"]: st.column_config.TextColumn(required=True, width="medium"),
-            _COLS["quantity"]: st.column_config.NumberColumn(min_value=1, step=1, default=1, width="small"),
+            _COLS["quantity"]: st.column_config.NumberColumn(
+                min_value=1, step=1, default=1, width="small",
+                help=t("عدد النسخ المطلوبة من نفس القطعة (زي أكتر من نسخة من خطاب هيتقطع في أكتر من تيك)")),
             _COLS["source"]: st.column_config.SelectboxColumn(options=repo.PROP_SOURCES, width="small"),
             _COLS["cost"]: st.column_config.NumberColumn(min_value=0, step=50, format="%.0f", width="small",
                                                         help=t("تكلفة القطعة الواحدة — الإجمالي × الكمية")),
             _COLS["status"]: st.column_config.SelectboxColumn(options=repo.PROP_STATUSES, width="small",
                                                              default=repo.PROP_STATUSES[0]),
-            _COLS["continuity_sensitive"]: st.column_config.CheckboxColumn(
-                width="small", help=t("حساس للراكور: لازم يفضل في نفس الحالة والمكان بين اللقطات")),
-            _COLS["notes"]: st.column_config.TextColumn(width="small"),
+            _COLS["notes"]: st.column_config.TextColumn(
+                width="small", help=t("أي تفاصيل تانية - زي عدد النسخ الاحتياطية أو حالة خاصة للقطعة")),
             t("مشاهد"): st.column_config.NumberColumn(disabled=True, width="small",
                                                       help=t("عدد المشاهد اللي القطعة متسجلة فيها")),
         })
