@@ -9,6 +9,28 @@ from ui import _loc_display, bump_version, fmt_day_night, fmt_int_ext, library_r
 import repo
 
 
+def _group_table_badge(sc):
+    """بادچ مختصر لعمود "مجاميع" في جدول المشاهد - نظرة واحدة على كل
+    المشاهد بتوضح مين لسه محتاج مراجعة (❔) ومين اتأكد إنه مفيهوش (✅) أو
+    فيه وعدده تقريبًا (👥)."""
+    hg = sc["has_background_group"]
+    if hg == 1:
+        hc = (sc["background_group_headcount"] or "").strip()
+        return f"👥 {hc}" if hc else "👥"
+    if hg == 0:
+        return "✅"
+    return "❔"
+
+
+def _group_popover_label(sc):
+    hg = sc["has_background_group"]
+    if hg == 1:
+        return f"👥 {t('مجاميع')}"
+    if hg == 0:
+        return f"✅ {t('مفيش مجاميع')}"
+    return f"❔ {t('فيه مجاميع؟')}"
+
+
 def render(project, project_id, _is_ar):
     st.subheader(tr("sub_scenes"))
 
@@ -121,6 +143,7 @@ def render(project, project_id, _is_ar):
             t("التوقيت"): fmt_day_night(sc["day_night"] or "غير محدد"),
             t("المكان"): _loc_display(id_to_loc_label.get(sc["location_variant_id"])) or "—",
             t("الشخصيات"): len(_chars_by_scene.get(sc["id"], [])),
+            t("مجاميع"): _group_table_badge(sc),
             t("أرقام الكاست"): "، ".join(str(c["num"]) for c in _cast_by_scene.get(sc["id"], [])
                                         if c["num"]) or "—",
             t("اللقطات"): _shots_by_scene.get(sc["id"], 0),
@@ -182,6 +205,39 @@ def render(project, project_id, _is_ar):
                                      expanded=bool(_focused))
         with _lazy_exp:
             if _lazy_exp.open:
+                # زرار مستقل بره فورم التعديل الكبير (زي بادچ لينك الموقع في
+                # locations.py) - عشان حقول العدد واللبس والفعل تظهر لحظيًا
+                # أول ما تختار "أيوه فيه" من غير ما تستنى submit الفورم
+                # التاني، وتتحفظ فورًا لوحدها.
+                with st.popover(_group_popover_label(sc)):
+                    st.caption(t("المشهد ده فيه ناس في الخلفية (مجاميع/كومبارس) - مش شخصية باسمها - ولا لأ؟"))
+                    _grp_has = st.radio(
+                        t("مجاميع/كومبارس"), [False, True],
+                        index=1 if sc["has_background_group"] == 1 else 0,
+                        format_func=lambda v: t("أيوه فيه") if v else t("لأ، مفيش"),
+                        key=f"grp_choice_{sc['id']}", label_visibility="collapsed", horizontal=True,
+                    )
+                    _grp_headcount = _grp_wardrobe = _grp_action = ""
+                    if _grp_has:
+                        _grp_headcount = st.text_input(
+                            t("العدد التقريبي"), value=sc["background_group_headcount"] or "",
+                            placeholder=t("مثال: 10-15 أو حوالي 30"), key=f"grp_headcount_{sc['id']}")
+                        _grp_wardrobe = st.text_input(
+                            t("وصف ملابسهم"), value=sc["background_group_wardrobe"] or "",
+                            placeholder=t("مثال: يونيفورم عمال، جلاليب، بدل رسمية"), key=f"grp_wardrobe_{sc['id']}")
+                        _grp_action = st.text_area(
+                            t("بيعملوا إيه في المشهد"), value=sc["background_group_action"] or "",
+                            placeholder=t("مثال: بيمشوا في الخلفية، بيهتفوا، بيشتغلوا"),
+                            key=f"grp_action_{sc['id']}", height=80)
+                    if st.button(t("💾 حفظ"), key=f"grp_save_{sc['id']}"):
+                        repo.update_scene_background(
+                            project_id, sc["id"], 1 if _grp_has else 0,
+                            _grp_headcount.strip() or None, _grp_wardrobe.strip() or None,
+                            _grp_action.strip() or None,
+                        )
+                        mark_saved(f"scene_grp_{sc['id']}")
+                        st.rerun()
+                    show_saved_badge(f"scene_grp_{sc['id']}")
                 with st.form(f"edit_scene_{sc['id']}"):
                     col1, col2, col3 = st.columns(3)
                     with col1:

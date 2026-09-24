@@ -419,6 +419,17 @@ TRANSLATIONS = {
     "حذف": "Delete", "مشهد مختار (وكل لقطاتهم)": "selected scene(s) (and all their shots)",
     "تم حذف المشاهد المختارة": "Selected scenes deleted",
     "تم تعديل المشهد": "Scene updated", "تم حذف المشهد": "Scene deleted",
+    # مجاميع/كومبارس الخلفية
+    "مجاميع": "Background extras", "مفيش مجاميع": "No extras", "فيه مجاميع؟": "Extras?",
+    "مجاميع/كومبارس": "Background extras",
+    "المشهد ده فيه ناس في الخلفية (مجاميع/كومبارس) - مش شخصية باسمها - ولا لأ؟":
+        "Does this scene have people in the background (extras) - not a named character - or not?",
+    "أيوه فيه": "Yes, there are", "لأ، مفيش": "No, there aren't",
+    "العدد التقريبي": "Approximate headcount", "مثال: 10-15 أو حوالي 30": "e.g. 10-15 or about 30",
+    "وصف ملابسهم": "What they're wearing",
+    "مثال: يونيفورم عمال، جلاليب، بدل رسمية": "e.g. worker uniforms, galabeyas, formal suits",
+    "بيعملوا إيه في المشهد": "What they're doing in the scene",
+    "مثال: بيمشوا في الخلفية، بيهتفوا، بيشتغلوا": "e.g. walking in the background, chanting, working",
     # التفريغ
     "لازم تضيف مشهد واحد على الأقل من تبويب السكريبت أولًا": "You need to add at least one scene from the Script tab first",
     "اختر المشهد": "Choose scene", "رقم اللقطة": "Shot Number", "حجم الكادر": "Shot Size",
@@ -910,6 +921,8 @@ TRANSLATIONS = {
         "This analysis has no scenes, so no dramatic-structure report can be made.",
     "مقدرناش نعمل التقرير المرة دي. التحليل نفسه زي ما هو، جرّب تاني بعد شوية.":
         "We couldn't make the report this time. The analysis itself is untouched; try again shortly.",
+    "التقرير وقف قبل ما يخلص لأنه وصل سقف المصروف (اتصرف ${spent:.2f}). التحليل نفسه زي ما هو.":
+        "The report stopped partway because it hit the spending cap (spent ${spent:.2f}). The analysis itself is untouched.",
     "رد الذكاء الاصطناعي مش JSON سليم — التقرير ده مايتحفظش، جرّب تاني.":
         "The AI reply wasn't valid JSON, so this report wasn't saved. Try again.",
     "رد الذكاء الاصطناعي جاله شكل غير متوقع ومش قادرين نقرا التقرير منه.":

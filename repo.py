@@ -835,6 +835,16 @@ def update_scene(project_id, *params):
                      'location_variant_id=?, notes=? WHERE id=? AND project_id=?', params + (project_id,))
 
 
+def update_scene_background(project_id, scene_id, has_group, headcount, wardrobe, action):
+    """حفظ زرار "مجاميع/كومبارس" لوحده، بره فورم تعديل المشهد الكبير - عشان
+    يتحفظ فورًا أول ما اليوزر يجاوب أيوه/لأ من غير ما يستنى submit الفورم
+    التاني (نفس فكرة popover لينك الموقع الجغرافي في locations.py)."""
+    return run_query(
+        'UPDATE scenes SET has_background_group=?, background_group_headcount=?, '
+        'background_group_wardrobe=?, background_group_action=? WHERE id=? AND project_id=?',
+        (has_group, headcount, wardrobe, action, scene_id, project_id))
+
+
 def unlink_scene_characters(project_id, *params):
     return run_query('DELETE FROM scene_characters WHERE scene_id=? '
                      'AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)', params + (project_id,))

@@ -1032,6 +1032,17 @@ _MIGRATIONS = {
         # بتقع بـ "no such column" في أي "إضافة مشهد" يدوي (اتلقط 2026-09-24).
         # مصدر الحقيقة للحلقة هو episode_number؛ ده بيتملى جنبه.
         ("episode_id", "INTEGER"),
+        # مجاميع/كومبارس الخلفية (طلب المالك 2026-09-24): زرار ملاحظات بسيط
+        # لكل مشهد، مش شخصيات جديدة في جدول characters - المجموعة مالهاش
+        # هوية فردية ولا مظهر ولا كاستينج زي الشخصية، إنما عدد تقريبي ووصف
+        # لبس وفعل جماعي بس. has_background_group بثلاث حالات عن قصد:
+        # NULL = لسه محدّش راجع المشهد ده، 0 = اتراجع وفعلاً مفيهوش مجاميع،
+        # 1 = فيه (والتفاصيل في الأعمدة اللي بعدها). الفرق بين NULL و0 هو
+        # اللي بيوريّنا مشاهد البريكداون اللي لسه محتاجة مراجعة.
+        ("has_background_group", "INTEGER"),
+        ("background_group_headcount", "TEXT"),
+        ("background_group_wardrobe", "TEXT"),
+        ("background_group_action", "TEXT"),
     ],
     "location_variants": [
         ("reference_image_path", "TEXT"),
