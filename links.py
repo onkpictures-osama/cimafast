@@ -8,19 +8,38 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 
-# ترتيب التبويبات في app.py، والمفتاح بتاع اسمها في i18n
+# ترتيب التبويبات في app.py، والمفتاح بتاع اسمها في i18n. الترتيب = ترتيب
+# الشغل الفعلي (اتفاق المالك 2026-09-24): السيناريو ← الأماكن ← الإكسسوار
+# (تابع للأماكن) ← الشخصيات ← الممثلين ← الملابس ← المشاهد ← اللقطات ←
+# التقارير = ما قبل الإنتاج، وبعدها الإنتاج (جدول التصوير).
 TABS = {
     "import": "tab_import",
     "locations": "tab_locations",
+    "props": "tab_props",
     "characters": "tab_characters",
     "actors": "tab_actors",
     "wardrobe": "tab_wardrobe",
-    "props": "tab_props",
     "scenes": "tab_scenes",
     "shots": "tab_breakdown",
     "reports": "tab_dashboard",
+    "schedule": "tab_schedule",
     "settings": "tab_settings",
 }
+
+# مفتاح المرحلة فوق التبويبات: كل مرحلة بتعرض تبويباتها بس، والإعدادات في
+# الاتنين. أي رابط مباشر لتبويب بيفتح مرحلته لوحده (phase_of).
+PHASES = {
+    "pre": ["import", "locations", "props", "characters", "actors", "wardrobe",
+            "scenes", "shots", "reports", "settings"],
+    "prod": ["schedule", "settings"],
+}
+
+
+def phase_of(slug, current="pre"):
+    """المرحلة اللي فيها التبويب ده؛ الإعدادات موجودة في الاتنين فبتفضل مكانها."""
+    if slug in PHASES["pre"] and slug in PHASES["prod"]:
+        return current if current in PHASES else "pre"
+    return "prod" if slug in PHASES["prod"] else "pre"
 
 
 def _first(value):

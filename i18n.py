@@ -19,6 +19,9 @@ UI_TEXT = {
     "tab_characters": {"ar": "🎭 الشخصيات", "en": "🎭 Characters"},
     "tab_actors": {"ar": "🎬 الممثلين", "en": "🎬 Cast"},
     "tab_wardrobe": {"ar": "👗 الملابس", "en": "👗 Wardrobe"},
+    "tab_schedule": {"ar": "🗓️ جدول التصوير", "en": "🗓️ Shooting schedule"},
+    "phase_pre": {"ar": "🎬 ما قبل الإنتاج", "en": "🎬 Pre-production"},
+    "phase_prod": {"ar": "🎥 الإنتاج", "en": "🎥 Production"},
     "tab_props": {"ar": "🎒 الإكسسوارات", "en": "🎒 Props"},
     "tab_scenes": {"ar": "📝 المشاهد", "en": "📝 Scenes"},
     "tab_breakdown": {"ar": "🎥 اللقطات", "en": "🎥 Shots"},
@@ -30,7 +33,7 @@ UI_TEXT = {
     "sub_actors": {"ar": "بحث الكاستينج في المنصة كلها", "en": "Casting search across the whole platform"},
     "sub_wardrobe": {"ar": "غيارات كل شخصية، مين لابس أنهي غيار في كل مشهد، وقطع كل غيار وتجهيزها",
                      "en": "Each character's changes, who wears which change in every scene, and every piece and its readiness"},
-    "sub_props": {"ar": "مكتبة الإكسسوارات", "en": "Props Library"},
+    "sub_props": {"ar": "الإكسسوار — تابع للأماكن", "en": "Props — by location"},
     "sub_scenes": {"ar": "المشاهد", "en": "Scenes"},
     "sub_breakdown": {"ar": "تفريغ اللقطات", "en": "Shot Breakdown"},
     "sub_dashboard": {"ar": "نظرة عامة على حالة كل اللقطات", "en": "Overview of all shots' status"},
@@ -788,6 +791,61 @@ TRANSLATIONS = {
     "المسلسل ده لسه مالوش حلقات — حدد العدد فوق عشان تقدر ترفع سكريبت كل حلقة.":
         "This series has no episodes yet — set the count above to upload each episode's script.",
     "الحلقة دي موجودة بالفعل": "That episode already exists",
+
+    # الإكسسوار تابع للأماكن + مراحل الشغل (2026-09-24)
+    "المرحلة": "Phase",
+    "الإكسسوار هو اللي بيجيبه الإكسسواريست: المرصوص في المكان (زي ساعة على الكومودينو) أو اللي بيتمسك في الإيد (زي مسدس). اللي بيتلبس (ساعة يد، عقد، برنيطة) بيتسجّل في الملابس.":
+        "Props are what the props master brings: set dressing (a clock on the nightstand) or hand props (a gun). Anything worn (a wristwatch, necklace, hat) belongs to wardrobe.",
+    "لإضافة قطعة: افتح المكان (أو الشخصية) واكتب في آخر صف فاضي في الجدول، وبعدين «حفظ».":
+        "To add a prop: open the location (or character), type in the empty last row of the table, then Save.",
+    "التكلفة": "Cost",
+    "لسه مطلوب": "Still needed",
+    "محتاج يتحدد مكانه": "Needs a place",
+    "إكسسوار الأماكن": "Set props",
+    "في إيد الشخصيات": "Hand props",
+    "الإكسسوار": "Prop",
+    "الكمية": "Qty",
+    "الحالة": "Status",
+    "راكور": "Continuity",
+    "مطلوب": "Needed", "اتجاب": "Acquired", "اترص في المكان": "Dressed on set",
+    "من المكان نفسه": "From the location", "من المخزن": "From stock", "تصنيع": "Made",
+    "تكلفة القطعة الواحدة — الإجمالي × الكمية": "Cost per piece — total × quantity",
+    "حساس للراكور: لازم يفضل في نفس الحالة والمكان بين اللقطات":
+        "Continuity-sensitive: must stay in the same state and place between shots",
+    "عدد المشاهد اللي القطعة متسجلة فيها": "Number of scenes this prop is recorded in",
+    "لسه مفيش أماكن في المشروع. الإكسسوار بيترص في الأماكن — ضيف الأماكن من تبويب «الأماكن» أو استورد السيناريو.":
+        "No locations yet. Props are dressed into locations — add locations in the Locations tab or import the script.",
+    "كل مكان رئيسي وتحته ديكوراته — الإكسسوار بيتسجل على الديكور اللي بيترص فيه.":
+        "Each main location with its sets underneath — props are recorded on the set they're dressed into.",
+    "ديكور": "set",
+    "حفظ إكسسوار": "Save props for",
+    "اللي بيتمسك في الإيد ومش بيتلبس (مسدس، موبايل في الإيد، شنطة فلوس...) — بيجيبه الإكسسواريست.":
+        "Held, not worn (a gun, a phone in hand, a cash bag…) — brought by the props master.",
+    "القطع دي لسه مش متحددة: مرصوصة في مكان، ولا في إيد شخصية، ولا بتتلبس (تتنقل للملابس)؟ الاقتراحات متملية من المشاهد اللي ظهرت فيها ومن اسم القطعة — راجعها ودوس «تطبيق». مفيش حاجة بتتنقل من غير ما تدوس.":
+        "These aren't sorted yet: dressed on a set, held by a character, or worn (moves to wardrobe)? Suggestions come from the scenes they appear in and their names — review and press Apply. Nothing moves until you do.",
+    "مرصوص في": "Dressed in",
+    "في إيد": "Held by",
+    "بيتلبس ← الملابس": "Worn → wardrobe",
+    "لبس مين": "Worn by",
+    "الاقتراح": "Suggestion",
+    "ظهر في": "In",
+    "مشهد في المكان ده": "scenes at this location",
+    "شكله بيتلبس": "looks worn",
+    "الشخصية اللي هتلبسها — لازم تتحدد عشان تتنقل لغيارها": "The character who wears it — needed to move it to their change",
+    "بيتعرض أول 200 من": "Showing the first 200 of",
+    "طبّق وبعدين هتظهر الباقي.": "apply, then the rest will show.",
+    "تطبيق": "Apply",
+    "محتاجين «لبس مين»": "need «Worn by»",
+    "مشاهد متجدولة": "Scheduled scenes",
+    "أيام من غير تاريخ": "Days without a date",
+    "لسه مفيش مشاهد في المشروع — الجدول بيتعمل من المشاهد. ارجع لمرحلة «ما قبل الإنتاج» وضيف المشاهد أو استورد السيناريو.":
+        "No scenes yet — the schedule is built from scenes. Go back to Pre-production and add scenes or import the script.",
+    "مشهد لسه مش في أي يوم تصوير.": "scenes aren't on any shoot day yet.",
+    "افتح جدول التصوير": "Open the shooting schedule",
+    "شاشة جدول التصوير مش متاحة في التشغيلة دي.": "The shooting schedule screen isn't available in this deployment.",
+    "أيام الممثلين": "Actor days",
+    "قريب هنا: الكول شيت، والتقارير اليومية، وباقي أقسام إدارة التصوير.":
+        "Coming here: call sheets, daily reports and the rest of production management.",
 
     # (أ) أعضاء لكل مشروع (2026-09-24)
     "أعضاء المشروع": "Project members",

@@ -13,9 +13,10 @@ from database import init_db, FIELD_HELP
 import theme
 
 from i18n import t, tr
-from ui import ltr
+from ui import ltr, open_tab_by_slug, phase_tabs
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.new_project
+import views.schedule
 import views.wardrobe
 import project_types
 import views.project_settings
@@ -549,7 +550,7 @@ if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_sta
         else:
             st.toast(t("الرابط ده لمشروع مش متاح لحسابك."), icon="🔒")
     if _link_tab:
-        st.session_state["main_tabs"] = tr(links.TABS[_link_tab])
+        open_tab_by_slug(_link_tab)
 # H4: ‎&item=‎ من تنبيه — المشهد اللي اتغيّر بيتفتح لوحده في تبويب المشاهد.
 # بيتشال من الرابط بعد ما يتقري، عشان rerun بعد كده مايرجّعش التركيز عليه.
 _link_item = links.item(st.query_params)
@@ -700,9 +701,9 @@ if _wanted in project_names:
 # ⚙️ جنب اسم المشروع بتفتح تبويب "إعدادات المشروع" على طول (تعديل/حذف
 # المشروع، الفريق، الحلقات) - طلب المالك 2026-09-23 لما دوّر على الحذف
 # وملقاهوش. الكولباك بيتنفذ قبل الـ run الجاي، فالتبويب بيتفتح قبل ما
-# ‎st.tabs(key="main_tabs")‎ يتبني.
+# التبويبات (‎main_tabs_<المرحلة>‎) تتبني.
 def _open_settings_tab():
-    st.session_state["main_tabs"] = tr(links.TABS["settings"])
+    open_tab_by_slug("settings")
 
 
 _sb_proj_row = _sb_projects.container(
@@ -817,10 +818,12 @@ st.markdown(
 
 # on_change="rerun": التبويب المفتوح بس هو اللي بيتبني (tab.open)، بدل السبعة في
 # كل ضغطة — ومعرفة التبويب المفتوح بتخلّي شريط العنوان رابط للشاشة دي بالظبط.
-_tabs = st.tabs([tr(k) for k in links.TABS.values()], key="main_tabs", on_change="rerun")
-(tab_import, tab_locations, tab_characters, tab_actors, tab_wardrobe, tab_props, tab_scenes, tab_breakdown,
- tab_dashboard, tab_settings) = _tabs
-_open_tab = next((slug for slug, tab in zip(links.TABS, _tabs) if tab.open), "import")
+# مفتاح المرحلة (ما قبل الإنتاج / الإنتاج) + تبويبات المرحلة - ui.phase_tabs
+_tabs, _open_tab = phase_tabs()
+
+
+def _is_open(slug):
+    return slug in _tabs and _tabs[slug].open
 # شريط العنوان = الشاشة الحالية: يتحفظ bookmark أو يتبعت لزميل
 st.query_params.update(project=str(project_id), tab=_open_tab)
 st.session_state["_applied_link"] = (project_id, _open_tab)
@@ -846,37 +849,40 @@ def _render(view, **kwargs):
         st.warning(t(str(exc)))
 
 
-if tab_import.open:
-    with tab_import:
+if _is_open("import"):
+    with _tabs["import"]:
         if permissions.can(_role, "run_ai"):
             _render(views.import_tab, project_id=project_id)
         else:
             st.info(t("استيراد السكريبت وتحليله لأعضاء الفريق اللي عندهم صلاحية تعديل. حسابك مشاهدة فقط."))
-if tab_locations.open:
-    with tab_locations:
+if _is_open("locations"):
+    with _tabs["locations"]:
         _render(views.locations, project_id=project_id)
-if tab_characters.open:
-    with tab_characters:
+if _is_open("characters"):
+    with _tabs["characters"]:
         _render(views.characters, project_id=project_id)
-if tab_actors.open:
-    with tab_actors:
+if _is_open("actors"):
+    with _tabs["actors"]:
         _render(views.actors, project_id=project_id, company_id=company_id)
-if tab_wardrobe.open:
-    with tab_wardrobe:
+if _is_open("wardrobe"):
+    with _tabs["wardrobe"]:
         _render(views.wardrobe, project=project, project_id=project_id, company_id=company_id)
-if tab_props.open:
-    with tab_props:
+if _is_open("props"):
+    with _tabs["props"]:
         _render(views.props, project_id=project_id)
-if tab_scenes.open:
-    with tab_scenes:
+if _is_open("scenes"):
+    with _tabs["scenes"]:
         _render(views.scenes, project=project, project_id=project_id, _is_ar=_is_ar)
-if tab_breakdown.open:
-    with tab_breakdown:
+if _is_open("shots"):
+    with _tabs["shots"]:
         _render(views.shots, project_id=project_id)
-if tab_dashboard.open:
-    with tab_dashboard:
+if _is_open("reports"):
+    with _tabs["reports"]:
         _render(views.reports, project=project, project_id=project_id, _char_count=_char_count, _loc_count=_loc_count, _scene_count=_scene_count, _shot_count=_shot_count)
-if tab_settings.open:
-    with tab_settings:
+if _is_open("schedule"):
+    with _tabs["schedule"]:
+        _render(views.schedule, project=project, project_id=project_id, board_url=_board_url)
+if _is_open("settings"):
+    with _tabs["settings"]:
         _render(views.project_settings, project_id=project_id, current_user=_current_user,
                company_id=company_id, role=_role, tier=_tier, board_url=_board_url)

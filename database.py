@@ -1036,6 +1036,19 @@ _MIGRATIONS = {
     "location_variants": [
         ("reference_image_path", "TEXT"),
     ],
+    # الإكسسوار (اتفاق المالك 2026-09-24): إكسسوار الديكور تابع للمكان/الديكور
+    # (location_id)، واللي بيتمسك في الإيد (زي المسدس) تابع للشخصية
+    # (character_id - موجود من الأول). اللي بيتلبس بيروح للملابس، مش هنا.
+    # location_id من غير FK عن قصد: مكان اتمسح = الإكسسوار يرجع "محتاج مكان"
+    # بدل ما يختفي (repo.unplaced_props).
+    "props": [
+        ("location_id", "INTEGER"),
+        ("quantity", "INTEGER DEFAULT 1"),
+        ("source", "TEXT"),
+        ("cost", "REAL"),
+        ("status", "TEXT"),
+        ("notes", "TEXT"),
+    ],
     "characters": [
         ("species", "TEXT"),
         ("gender", "TEXT"),
@@ -1111,6 +1124,7 @@ _INDEXES = [
     # كل قراءة مشاريع بتفلتر بالشركة (accounts.projects_for)، فده الفهرس اللي
     # العزل بين الشركات بيقف عليه.
     ("idx_projects_company", "projects (company_id)"),
+    ("idx_props_location", "props (location_id)"),
     ("idx_project_members_user", "project_members (user_id)"),
     # قايمة خزانة المواهب بتفلتر بـ discoverable، وصف الكاستينج بيتقري
     # بالممثل/بالمشروع/بالشخصية - نفس منطق شركة المشاريع فوق.

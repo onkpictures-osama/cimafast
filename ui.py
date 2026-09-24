@@ -335,3 +335,32 @@ def guarded_delete(delete_fn, params, friendly_error):
         # بنوريه هو بدل الرسالة العامة بتاعت الشاشة
         st.error(t(getattr(exc, "user_message", None) or friendly_error))
         return False
+
+
+
+# --- مراحل الشغل والتبويبات (اتفاق المالك 2026-09-24) ---------------------------
+# مفتاح المرحلة فوق التبويبات: ما قبل الإنتاج / الإنتاج. كل مرحلة بتعرض
+# تبويباتها بس (links.PHASES) عشان الشريط مايبقاش 11 تبويب مرة واحدة.
+
+def open_tab_by_slug(slug):
+    """بيفتح تبويب معيّن (من رابط أو زرار) — ومرحلته معاه. لازم يتنده قبل ما
+    مفتاح المرحلة والتبويبات يتبنوا في الـ run ده."""
+    import links
+    from i18n import tr
+    phase = links.phase_of(slug, st.session_state.get("_cf_phase", "pre"))
+    st.session_state["_cf_phase"] = phase
+    st.session_state[f"main_tabs_{phase}"] = tr(links.TABS[slug])
+
+
+def phase_tabs():
+    """بيرسم مفتاح المرحلة وتبويباتها. بيرجّع ({slug: tab}, slug التبويب المفتوح)."""
+    import links
+    from i18n import t, tr
+    st.session_state.setdefault("_cf_phase", "pre")
+    phase = st.segmented_control(
+        t("المرحلة"), list(links.PHASES), key="_cf_phase", required=True,
+        label_visibility="collapsed", format_func=lambda p: tr(f"phase_{p}")) or "pre"
+    slugs = links.PHASES[phase]
+    tabs = dict(zip(slugs, st.tabs([tr(links.TABS[s]) for s in slugs], key=f"main_tabs_{phase}",
+                                   on_change="rerun")))
+    return tabs, next((slug for slug, tab in tabs.items() if tab.open), slugs[0])

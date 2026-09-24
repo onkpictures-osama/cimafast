@@ -1597,3 +1597,181 @@ def actor_sizes_for_character(project_id, character_id, company_id):
         return None
     return {"name": actor["name"], **{k: row.get(k) for k in
             ("height_cm", "weight_kg", "chest_cm", "waist_cm", "hips_cm", "shoe_size_eu")}}
+
+
+
+# --- الإكسسوار: تابع للأماكن أو في إيد الشخصيات -----------------------------------
+# اتفاق المالك 2026-09-24: اللي بيتلبس (ساعة، عقد، برنيطة) = ملابس. اللي
+# بيتمسك (مسدس) = الإكسسواريست، تابع للشخصية. والمرصوص في المكان (ساعة على
+# الكومودينو) = الإكسسواريست، تابع للمكان/الديكور.
+
+PROP_SOURCES = ["شراء", "إيجار", "من المكان نفسه", "من المخزن", "تصنيع"]
+PROP_STATUSES = ["مطلوب", "اتجاب", "اترص في المكان"]
+
+# كلمات بتقول إن القطعة بتتلبس ← اقتراح نقلها للملابس (اقتراح بس، اليوزر بيأكد)
+_WORN_WORDS = ("ساعة يد", "ساعه يد", "عقد", "سلسلة", "سلسله", "خاتم", "دبلة", "دبله", "أسورة", "اسورة", "انسيال",
+               "حلق", "برنيطة", "برنيطه", "طاقية", "طاقيه", "كاب", "نضارة", "نضاره", "نظارة", "نظاره",
+               "كرافتة", "كرافته", "حزام", "شال", "طرحة", "طرحه", "جوانتي", "قفاز", "بروش", "دبوس صدر")
+
+
+def looks_worn(name):
+    n = (name or "").strip()
+    return any(w in n for w in _WORN_WORDS)
+
+
+def _project_location_ids(project_id):
+    return {r["id"] for r in fetch_all("SELECT id FROM locations WHERE project_id=?", (project_id,))}
+
+
+def props_grouped(project_id):
+    """{"by_location": {location_id: [props]}, "by_character": {character_id: [props]},
+    "unplaced": [props]} — المكان لو موجود بياخد الأولوية (مسدس مرصوص على
+    الترابيزة = إكسسوار المكان)."""
+    locs = _project_location_ids(project_id)
+    out = {"by_location": {}, "by_character": {}, "unplaced": []}
+    for p in fetch_all("SELECT * FROM props WHERE project_id=? ORDER BY name, id", (project_id,)):
+        if p["location_id"] in locs:
+            out["by_location"].setdefault(p["location_id"], []).append(p)
+        elif p["character_id"]:
+            out["by_character"].setdefault(p["character_id"], []).append(p)
+        else:
+            out["unplaced"].append(p)
+    return out
+
+
+def suggest_prop_location(project_id):
+    """prop_id → (location_id, عدد المشاهد هناك، إجمالي مشاهد القطعة) من المشاهد
+    اللي القطعة ظهرت فيها. اقتراح بس - اليوزر هو اللي بيأكد."""
+    counts = {}
+    for r in fetch_all("""
+        SELECT sp.prop_id, lv.location_id, COUNT(*) AS n
+        FROM scene_props sp JOIN scenes s ON s.id = sp.scene_id
+        JOIN location_variants lv ON lv.id = s.location_variant_id
+        JOIN props p ON p.id = sp.prop_id
+        WHERE p.project_id = ? GROUP BY sp.prop_id, lv.location_id
+    """, (project_id,)):
+        counts.setdefault(r["prop_id"], []).append((r["location_id"], r["n"]))
+    out = {}
+    for pid, rows in counts.items():
+        loc, n = max(rows, key=lambda x: x[1])
+        out[pid] = (loc, n, sum(x[1] for x in rows))
+    return out
+
+
+def prop_scene_counts(project_id):
+    return {r["prop_id"]: r["n"] for r in fetch_all("""
+        SELECT sp.prop_id, COUNT(*) AS n FROM scene_props sp JOIN props p ON p.id = sp.prop_id
+        WHERE p.project_id = ? GROUP BY sp.prop_id""", (project_id,))}
+
+
+_PROP_FIELDS = ("name", "quantity", "source", "cost", "status", "continuity_sensitive", "notes")
+
+
+def _clean_prop(r):
+    vals = {}
+    for f in _PROP_FIELDS:
+        v = r.get(f)
+        if isinstance(v, float) and v != v:          # NaN من الجدول
+            v = None
+        if f == "quantity":
+            try:
+                v = max(1, int(v))
+            except (TypeError, ValueError):
+                v = 1
+        elif f == "cost":
+            try:
+                v = float(v) if v not in (None, "") else None
+            except (TypeError, ValueError):
+                v = None
+        elif f == "continuity_sensitive":
+            v = 1 if v else 0
+        elif isinstance(v, str):
+            v = v.strip() or None
+        vals[f] = v
+    return vals
+
+
+def save_props_for(project_id, rows, location_id=None, character_id=None):
+    """جدول الإكسسوار بتاع مكان واحد (location_id) أو شخصية واحدة (character_id)
+    زي ما هو على الشاشة. الصفوف القديمة بتتحدّث بالـ id (عشان روابطها
+    بالمشاهد واللقطات تفضل)، الجديدة بتتضاف، واللي اتشال من الجدول بيتمسح.
+    المكان/الشخصية لازم يبقوا تبع المشروع. بيرجّع عدد الصفوف."""
+    if location_id is not None and location_id not in _project_location_ids(project_id):
+        return 0
+    if character_id is not None and not fetch_all(
+            "SELECT 1 FROM characters WHERE id=? AND project_id=?", (character_id, project_id)):
+        return 0
+    if location_id is not None:
+        current = {p["id"] for p in props_grouped(project_id)["by_location"].get(location_id, [])}
+    else:
+        current = {p["id"] for p in props_grouped(project_id)["by_character"].get(character_id, [])}
+    kept = set()
+    n = 0
+    with _tx() as ex:
+        for r in rows:
+            vals = _clean_prop(r)
+            if not vals["name"]:
+                continue
+            pid = r.get("_id")
+            pid = int(pid) if pid not in (None, "") and pid == pid else None
+            cols = list(_PROP_FIELDS)     # نفس ترتيب الأعمدة في الجملة تحت
+            if pid in current:
+                ex("UPDATE props SET name=?, quantity=?, source=?, cost=?, status=?, continuity_sensitive=?, "
+                   "notes=? WHERE id=? AND project_id=?", tuple(vals[c] for c in cols) + (pid, project_id))
+                kept.add(pid)
+            else:
+                ex(f"INSERT INTO props (project_id, location_id, character_id, {', '.join(cols)}) "
+                   f"VALUES (?, ?, ?, {', '.join('?' * len(cols))})",
+                   (project_id, location_id, character_id) + tuple(vals[c] for c in cols))
+            n += 1
+        for pid in current - kept:
+            ex("DELETE FROM props WHERE id=? AND project_id=?", (pid, project_id))
+    return n
+
+
+def place_props(project_id, placements):
+    """placements: [(prop_id, location_id أو None, character_id أو None)].
+    بيحط كل قطعة في مكانها أو في إيد شخصية. أي مكان/شخصية مش تبع المشروع
+    بيتجاهل. بيرجّع عدد اللي اتحط."""
+    locs = _project_location_ids(project_id)
+    chars = {r["id"] for r in fetch_all("SELECT id FROM characters WHERE project_id=?", (project_id,))}
+    n = 0
+    with _tx() as ex:
+        for prop_id, loc, char in placements:
+            loc = loc if loc in locs else None
+            char = char if char in chars else None
+            if loc is None and char is None:
+                continue
+            ex("UPDATE props SET location_id=?, character_id=COALESCE(?, character_id) WHERE id=? AND project_id=?",
+               (loc, char, prop_id, project_id))
+            n += 1
+    return n
+
+
+def move_prop_to_wardrobe(project_id, prop_id, character_id):
+    """قطعة بتتلبس ← قطعة "إكسسوار" في الغيار الأساسي للشخصية، والإكسسوار
+    نفسه بيتمسح من هنا. بيرجّع id الغيار، أو None لو الشخصية/القطعة مش في المشروع."""
+    prop = fetch_all("SELECT * FROM props WHERE id=? AND project_id=?", (prop_id, project_id))
+    look = fetch_all("""SELECT cl.id FROM character_looks cl JOIN characters c ON c.id = cl.character_id
+                        WHERE cl.character_id=? AND c.project_id=?
+                        ORDER BY COALESCE(cl.is_default, 0) DESC, cl.change_number, cl.id LIMIT 1""",
+                     (character_id, project_id))
+    if not prop or not look:
+        return None
+    p = prop[0]
+    with _tx() as ex:
+        ex("""INSERT INTO wardrobe_items (look_id, item_name, category, multiples, cost, notes, position, updated_at)
+              SELECT ?, ?, 'إكسسوار', ?, ?, ?, COALESCE(MAX(position), -1) + 1, ?
+              FROM wardrobe_items WHERE look_id=?""",
+           (look[0]["id"], p["name"], p["quantity"] or 1, p["cost"], p["notes"], _now_iso(), look[0]["id"]))
+        ex("DELETE FROM props WHERE id=? AND project_id=?", (prop_id, project_id))
+    return look[0]["id"]
+
+
+def props_summary(project_id):
+    r = fetch_all("""
+        SELECT COUNT(*) AS n,
+               COALESCE(SUM(COALESCE(cost, 0) * COALESCE(quantity, 1)), 0) AS cost,
+               SUM(CASE WHEN COALESCE(status, 'مطلوب') = 'مطلوب' THEN 1 ELSE 0 END) AS needed
+        FROM props WHERE project_id=?""", (project_id,))[0]
+    return {"count": r["n"] or 0, "cost": r["cost"] or 0, "needed": r["needed"] or 0}
