@@ -67,6 +67,12 @@ def test_creator_is_the_project_manager():
 
 
 @test
+def test_operator_is_not_labelled_manager_of_others_projects():
+    ctx = accounts.project_context("melzayat", FILM)
+    assert ctx["is_manager"] and ctx["job"] == "مشغّل المنصة", ctx
+
+
+@test
 def test_add_existing_account_with_job_and_permission():
     accounts.add_to_project("nadia", FILM, "karim", "مدير التصوير", "edit")
     ctx = accounts.project_context("karim", FILM)

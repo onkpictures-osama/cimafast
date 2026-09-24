@@ -641,7 +641,15 @@ def project_context(username, project_id):
                   "WHERE pm.project_id=? AND u.username=?", (project_id, auth.normalize_username(username)))
     if not manager and role not in SEES_ALL_PROJECTS and member and member["permission"] == "view":
         role = "viewer"
-    job = PROJECT_MANAGER_LABEL if manager else ((member or {}).get("job_title") or ROLE_LABELS.get(role, role))
+    # المشغّل بيقدر يدير أي مشروع، بس مش "مدير المشروع" في مشاريع غيره
+    creator = (p["created_by"] == auth.normalize_username(username)) or (
+        not p["created_by"] and role_in(username, p["company_id"]) == "admin")
+    if manager and not creator and role == "operator":
+        job = ROLE_LABELS["operator"]
+    elif manager:
+        job = PROJECT_MANAGER_LABEL
+    else:
+        job = (member or {}).get("job_title") or ROLE_LABELS.get(role, role)
     return {"company_id": p["company_id"], "role": role, "tier": company.get("subscription_tier") or "creator",
             "is_manager": manager, "job": job}
 
