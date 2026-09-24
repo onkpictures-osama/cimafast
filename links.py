@@ -23,6 +23,7 @@ TABS = {
     "shots": "tab_breakdown",
     "reports": "tab_dashboard",
     "schedule": "tab_schedule",
+    "team": "tab_team",
     "settings": "tab_settings",
 }
 
@@ -30,8 +31,8 @@ TABS = {
 # الاتنين. أي رابط مباشر لتبويب بيفتح مرحلته لوحده (phase_of).
 PHASES = {
     "pre": ["import", "locations", "props", "characters", "actors", "wardrobe",
-            "scenes", "shots", "reports", "settings"],
-    "prod": ["schedule", "settings"],
+            "scenes", "shots", "reports", "team", "settings"],
+    "prod": ["schedule", "team", "settings"],
 }
 
 

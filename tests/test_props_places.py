@@ -77,7 +77,8 @@ for sid, pid in ((S1, CLOCK), (S2, CLOCK), (S3, CUP), (S1, NECKLACE)):
 @test
 def test_tab_order_and_phases():
     assert list(links.TABS)[:4] == ["import", "locations", "props", "characters"]
-    assert links.PHASES["prod"] == ["schedule", "settings"]
+    assert links.PHASES["prod"] == ["schedule", "team", "settings"]
+    assert links.phase_of("team", "prod") == "prod" and links.phase_of("team", "pre") == "pre"
     assert links.phase_of("schedule") == "prod" and links.phase_of("props") == "pre"
     assert links.phase_of("settings", "prod") == "prod" and links.phase_of("settings", "pre") == "pre"
     assert all(s in links.TABS for p in links.PHASES.values() for s in p)

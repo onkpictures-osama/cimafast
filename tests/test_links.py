@@ -46,7 +46,7 @@ def test_links_are_built_the_same_way_they_are_read():
 @test
 def test_every_tab_has_a_label_and_the_order_matches_the_app():
     assert list(links.TABS) == ["import", "locations", "props", "characters", "actors", "wardrobe", "scenes",
-                                "shots", "reports", "schedule", "settings"]
+                                "shots", "reports", "schedule", "team", "settings"]
     import i18n
     for key in links.TABS.values():
         assert key in i18n.UI_TEXT, key

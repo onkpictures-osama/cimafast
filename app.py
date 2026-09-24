@@ -17,6 +17,8 @@ from ui import (close_sidebar_now, go_to, ltr, nav_link as _nav_link, open_tab_b
                 request_close_sidebar)
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.new_project
+import views.team
+import views.invite
 import views.schedule
 import views.wardrobe
 import project_types
@@ -105,7 +107,11 @@ def _render_login_screen():
     _, mid, _ = st.columns([1, 1.4, 1])
     with mid:
         st.session_state["_signup_mode"] = False
-        
+        # لينك دعوة لفريق مشروع (?invite=): بنقول مين داعيه ولأنهي مشروع،
+        # ويا يدخل بحسابه يا يعمل حساب جديد - وفي الحالتين بيلاقي المشروع
+        if views.invite.login_panel(_finish_login):
+            return
+
         # فورم عشان زرار Enter في الموبايل يبعت من غير ما المستخدم يدوّر على الزرار
         with st.form("_login_form", clear_on_submit=False):
             username = st.text_input("اسم المستخدم / Username", key="_login_username")
@@ -119,15 +125,7 @@ def _render_login_screen():
         if submitted:
             user = authenticate(username, password, _auth_users())
             if user:
-                accounts.touch_login(user)
-                st.session_state["_authenticated"] = True
-                st.session_state["_auth_user"] = user
-                st.session_state.pop("_login_attempts", None)
-                # الكوكي بيتحط في الـ run الجاي (مش هنا) عشان لو حطيناها قبل
-                # st.rerun() مباشرة، الصفحة بتتغير قبل ما المتصفح ياخد فرصة
-                # ينفّذ السكريبت اللي بيحط الكوكي فعليًا
-                st.session_state["_pending_session_cookie"] = make_session_token(user)
-                st.rerun()
+                _finish_login(user)
             # F3: كل محاولة فاشلة بتتسجّل (الاسم بس، من غير كلمة السر أبدًا)
             accounts.log_failed_login(username)
             # تأخير بسيط ومتزايد بعد كل محاولة فاشلة عشان نصعّب التخمين الآلي
@@ -142,6 +140,18 @@ def _render_login_screen():
                        "ماتكتبش Capital لوحده، ودوس 👁 عشان تشوف اللي كتبته. / "
                        "Passwords are case-sensitive — check your phone didn't capitalise the first "
                        "letter; tap 👁 to see what you typed.")
+
+
+def _finish_login(user):
+    accounts.touch_login(user)
+    st.session_state["_authenticated"] = True
+    st.session_state["_auth_user"] = user
+    st.session_state.pop("_login_attempts", None)
+    # الكوكي بيتحط في الـ run الجاي (مش هنا) عشان لو حطيناها قبل
+    # st.rerun() مباشرة، الصفحة بتتغير قبل ما المتصفح ياخد فرصة
+    # ينفّذ السكريبت اللي بيحط الكوكي فعليًا
+    st.session_state["_pending_session_cookie"] = make_session_token(user)
+    st.rerun()
 
 
 def _check_login():
@@ -507,6 +517,9 @@ _sb_projects.markdown(
 
 _current_user = st.session_state.get("_auth_user")
 
+# لينك دعوة وهو داخل بالفعل: بيدخل فريق المشروع ويتفتحله على طول
+views.invite.accept_from_link(_current_user)
+
 # F1: المستخدم بيشوف مشاريع الحسابات اللي هو عضو فيها بس. لو عضو في أكتر من
 # حساب (أو المشغّل)، بيختار واحد.
 _my_companies = accounts.companies_for(_current_user or "")
@@ -521,11 +534,7 @@ if (_link_project or _link_tab) and (_link_project, _link_tab) != st.session_sta
     st.session_state["_applied_link"] = (_link_project, _link_tab)
     if _link_project:
         if accounts.can_access_project(_current_user, _link_project):
-            _lp = repo.project(_link_project)
-            if len(_my_companies) > 1:
-                st.session_state["company_selector"] = next(
-                    c["name"] for c in _my_companies if c["id"] == _lp["company_id"])
-            st.session_state["_link_project_name"] = _lp["name"]
+            st.session_state["_link_project_id"] = _link_project
         else:
             st.toast(t("الرابط ده لمشروع مش متاح لحسابك."), icon="🔒")
     if _link_tab:
@@ -538,29 +547,20 @@ if _link_item is not None:
         st.session_state["_focus_scene"] = _link_item
     del st.query_params["item"]
 
-if len(_my_companies) > 1:
-    _company_names = {c["name"]: c for c in _my_companies}
-    _company = _company_names[_sb_projects.selectbox(t("مساحة العمل"), list(_company_names), key="company_selector",
-                                                     on_change=request_close_sidebar)]
-else:
-    _company = _my_companies[0]
+# "مساحة العمل" مابقتش تظهر خالص (المالك 2026-09-24): قايمة واحدة بكل
+# المشاريع اللي المستخدم فيها، ومساحة العمل (للعزل والسجل) والدور والباقة
+# بييجوا من المشروع المختار (accounts.project_context). قبل اختيار مشروع -
+# وللمشاريع الجديدة - مساحة العمل الشخصية بتاعته (accounts.home_company).
+_company = accounts.home_company(_current_user) or _my_companies[0]
 company_id = _company["id"]
-# B5: نوع الاشتراك (Enterprise / Studio / Creator) — كلمة "شركة" ماتظهرش
-# هنا خالص، الإطار كله User + نوع اشتراك. العرض الفعلي بقى في الشريط
-# السفلي تحت (بعد اختيار المشروع)، مش هنا.
 _tier = _company.get("subscription_tier") or "creator"
 _tier_label = accounts.TIER_LABELS.get(_tier, _tier)
-# F2: من هنا لحد آخر الـ run (والـ callbacks في الـ run الجاي) كل كتابة بتتفحص بالدور ده
 _role = _company["role"]
 st.session_state["_cf_role"] = _role
-# F3: نفس الفكرة للسجل — كل كتابة بتتسجّل باسم المستخدم والشركة دي
 st.session_state["_cf_company"] = company_id
-_can_edit = permissions.can(_role, "edit")
-if not _can_edit:
-    _sb_projects.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
 
-projects = accounts.projects_for(_current_user, company_id)
-project_names = {p["name"]: p["id"] for p in projects}
+projects = accounts.projects_for(_current_user)
+project_by_id = {p["id"]: p for p in projects}
 
 if permissions.can(_role, "create_project"):
     # المفتاح بيتغيّر بعد كل إنشاء (_new_proj_nonce): الفورم بيرجع مقفول بدل ما
@@ -674,15 +674,14 @@ if st.query_params.get("page") == "library":
     st.stop()
 
 if not projects:
-    if permissions.can(_role, "create_project"):
-        _sb_projects.info(t("ابدأ بإنشاء مشروع جديد من القائمة الجانبية"))
-    else:
-        _sb_projects.info(t("مفيش مشاريع في مساحة العمل دي لسه. مدير المشروع أو المنتج هو اللي بينشئ المشاريع."))
+    _sb_projects.info(t("لسه مفيش مشاريع. ابدأ بإنشاء مشروع جديد — أو افتح لينك الدعوة اللي وصلك من مدير مشروع."))
     st.stop()
 
-_wanted = st.session_state.pop("_link_project_name", None)
-if _wanted in project_names:
+_wanted = st.session_state.pop("_link_project_id", None)
+if _wanted in project_by_id:
     st.session_state["project_selector"] = _wanted
+if st.session_state.get("project_selector") not in project_by_id:
+    st.session_state.pop("project_selector", None)
 # ⚙️ جنب اسم المشروع بتفتح تبويب "إعدادات المشروع" على طول (تعديل/حذف
 # المشروع، الفريق، الحلقات) - طلب المالك 2026-09-23 لما دوّر على الحذف
 # وملقاهوش. الكولباك بيتنفذ قبل الـ run الجاي، فالتبويب بيتفتح قبل ما
@@ -694,24 +693,34 @@ def _open_settings_tab():
 _sb_proj_row = _sb_projects.container(
     horizontal=True, vertical_alignment="bottom", gap="small", wrap=False, key="cf_sb_proj_row")
 # تغيير المشروع = صفحة تانية: الشريط الجانبي بيتقفل (طلب المالك 2026-09-24)
-selected_project_name = _sb_proj_row.selectbox(tr("current_project_label"), list(project_names.keys()),
-                                               key="project_selector", on_change=request_close_sidebar)
+project_id = _sb_proj_row.selectbox(tr("current_project_label"), list(project_by_id),
+                                    format_func=lambda i: project_by_id[i]["name"],
+                                    key="project_selector", on_change=request_close_sidebar)
 _sb_proj_row.button("", icon=":material/settings:", key="sb_open_settings",
                     help=t("إعدادات المشروع: تعديل، حذف، الفريق، الحلقات"),
                     on_click=_open_settings_tab)
-project_id = project_names[selected_project_name]
 st.session_state["_cf_project"] = project_id       # F3: كل كتابة بتتسجّل على المشروع ده
 project = repo.project_by_id(project_id)[0]
+# مساحة العمل والدور والباقة من المشروع نفسه (مش من اختيار "مساحة عمل")
+_ctx = accounts.project_context(_current_user, project_id)
+company_id, _role, _tier = _ctx["company_id"], _ctx["role"], _ctx["tier"]
+st.session_state["_cf_role"] = _role
+st.session_state["_cf_company"] = company_id
+if not permissions.can(_role, "edit"):
+    _sb_projects.info(f"👁️ {t('مشاهدة فقط — تقدر تتصفح وتصدّر، بس مش تعدّل.')}")
 
-# "الدور" - عرض للقراءة بس، مش اختيار: الدور بيتغيّر من صفحة الفريق
-# (ROLE_LABELS نفسها بتتغيّر من هناك)، مش من هنا. من غير شكل سهم/قابلية
-# ضغط عمدًا عشان الشكل ميوهمش إنه dropdown شغال.
+# "دورك في المشروع ده" - للقراءة بس: مدير المشروع (اللي أنشأه) أو شغلانتك
+# في فريقه (مدير تصوير، مونتير...). بيتغيّر من «فريق العمل».
 _sb_projects.markdown(
     '<div class="cf-sb-field"><span class="cf-sb-field__label">%s</span>'
     '<span class="cf-sb-field__value">%s</span></div>'
-    % (html.escape(tr("role_label")), html.escape(t(accounts.ROLE_LABELS.get(_role, _role)))),
+    % (html.escape(tr("role_label")), html.escape(t(_ctx["job"]))),
     unsafe_allow_html=True,
 )
+# 👥 فريق العمل: تحت المشروع على طول، بيودّي لصفحة الفريق (ui.go_to)
+_team_n = len(accounts.project_team_view(_current_user, project_id)["people"])
+_sb_projects.button(f"👥 {t('فريق العمل')} ({_team_n})", key="sb_open_team", use_container_width=True,
+                    on_click=go_to, args=("team",))
 
 
 # جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات — كل التفاصيل
@@ -869,6 +878,9 @@ if _is_open("reports"):
 if _is_open("schedule"):
     with _tabs["schedule"]:
         _render(views.schedule, project=project, project_id=project_id, board_url=_board_url)
+if _is_open("team"):
+    with _tabs["team"]:
+        _render(views.team, project=project, project_id=project_id, current_user=_current_user)
 if _is_open("settings"):
     with _tabs["settings"]:
         _render(views.project_settings, project_id=project_id, current_user=_current_user,

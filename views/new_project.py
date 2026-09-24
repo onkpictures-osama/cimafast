@@ -77,10 +77,6 @@ def render(current_user, company_id):
     else:
         st.caption(f"{t(res)} · {t(orient)} · {ratio}")
 
-    # (أ) المشروع الجديد بيبدأ بمنشئه (والمديرين بيشوفوا الكل)؛ الاختيار ده
-    # بيضيف كل أعضاء مساحة العمل مرة واحدة
-    add_all = st.checkbox(t("ضيف كل فريق مساحة العمل للمشروع"), key=k("add_all"),
-                          help=t("من غيرها المشروع بيبدأ بيك انت بس، وتضيف الأعضاء من ⚙️ إعدادات المشروع."))
     if not st.button(t("إنشاء المشروع"), key=k("create"), type="primary", use_container_width=True):
         return False
     if not new_name.strip():
@@ -89,14 +85,14 @@ def render(current_user, company_id):
     if new_type == "مسلسل" and not episode_count:
         st.warning(t("اكتب عدد حلقات المسلسل"))
         return False
-    accounts.create_project(current_user, company_id, new_name.strip(), new_type, res, orient, ratio,
-                            episode_count=episode_count, type_details=details, add_all_members=add_all)
+    new_id = accounts.create_project(current_user, company_id, new_name.strip(), new_type, res, orient, ratio,
+                                     episode_count=episode_count, type_details=details)
     for old_key in [x for x in st.session_state if str(x).startswith("new_proj_")]:
         st.session_state.pop(old_key, None)
     st.session_state["_new_proj_nonce"] = n + 1
     # المشروع الجديد بيتفتح على طول على «إضافة سيناريو» والشريط بيتقفل -
     # قبل كده كنت بتفضل على المشروع القديم والشريط مفتوح (المالك 2026-09-24)
-    st.session_state["_link_project_name"] = new_name.strip()
+    st.session_state["_link_project_id"] = new_id
     go_to("import")
     st.toast(t("تم إنشاء المشروع"), icon="✅")
     return True

@@ -307,9 +307,11 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
         with permissions.system():
             project_id = run_query(
                 "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
-                "default_aspect_ratio, company_id, type_details, members_scoped) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+                "default_aspect_ratio, company_id, type_details, members_scoped, created_by) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
                 (name, project_type, resolution, orientation, aspect_ratio, company_id,
-                 json.dumps(type_details, ensure_ascii=False) if type_details else None))
+                 json.dumps(type_details, ensure_ascii=False) if type_details else None,
+                 auth.normalize_username(actor)))
             # (أ) المشروع الجديد: منشئه عضو فيه على طول (والمديرين بيشوفوا
             # الكل أصلًا)، و"كل الفريق" لو اتطلب في الفورم
             uids = {user(actor)["id"]}
@@ -569,3 +571,273 @@ def create_company(actor, name, admin_username, admin_display_name=None, admin_e
         act.entity_id = act.company_id = company_id
     return company_id, add_member(actor, company_id, admin_username, admin_display_name, "admin",
                                   "مدير المشروع", admin_email)
+
+
+# --- فريق المشروع (المالك 2026-09-24) ---------------------------------------------
+# "مساحة العمل" مابقتش تظهر لليوزر خالص: الفريق بيتضاف على المشروع نفسه (مباشرة
+# لو عنده حساب، أو بلينك دعوة). اللي أنشأ المشروع هو مدير المشروع، وكل واحد
+# ليه شغلانة في المشروع (مدير تصوير، مونتير...) وصلاحية (يعدّل / يتفرج).
+# جوه قاعدة البيانات مساحة العمل (companies) لسه هي حدود العزل: العضو
+# المدعو بيتسجل عضو في مساحة عمل صاحب المشروع، بس بيشوف مشروعه بس.
+
+import hashlib as _hashlib
+
+# رؤساء الأقسام في الإنتاج السينمائي - شغلانة كل واحد في فريق المشروع
+PROJECT_JOBS = [
+    "المنتج", "مدير الإنتاج", "المخرج", "مساعد المخرج الأول", "كاتب السيناريو",
+    "مدير التصوير", "مهندس الديكور", "مصمم الملابس", "الماكيير", "مهندس الصوت",
+    "المونتير", "مسؤول الكاستينج", "مشرف الراكور", "مشرف المؤثرات البصرية",
+    "مدير المواقع", "الإكسسواريست", "أخرى",
+]
+PROJECT_MANAGER_LABEL = "مدير المشروع"
+PERMISSIONS = {"edit": "يعدّل", "view": "مشاهدة بس"}
+INVITE_DAYS = 7
+
+
+def home_company(username):
+    """مساحة العمل الشخصية (اللي المستخدم مديرها) - المشاريع الجديدة بتتعمل فيها."""
+    u = user(username)
+    if not u:
+        return None
+    row = _one("""SELECT c.id, c.name, c.active, c.subscription_tier, m.role FROM memberships m
+                  JOIN companies c ON c.id = m.company_id
+                  WHERE m.user_id=? AND m.active=1 AND m.role='admin' AND c.active=1
+                  ORDER BY c.id LIMIT 1""", (u["id"],))
+    if row:
+        return dict(row, role="operator" if u["is_operator"] else row["role"])
+    companies = companies_for(username)
+    return companies[0] if companies else None
+
+
+def _project_row(project_id):
+    return _one("SELECT id, name, company_id, created_by FROM projects WHERE id=?", (project_id,))
+
+
+def is_project_manager(username, project_id):
+    """مدير المشروع = اللي أنشأه. المشاريع القديمة (من غير منشئ) مديرها
+    أدمن مساحة العمل. والمشغّل بيقدر يدير أي مشروع."""
+    p = _project_row(project_id)
+    if not p or not can_access_project(username, project_id):
+        return False
+    name = auth.normalize_username(username)
+    u = user(name)
+    if u and u["is_operator"]:
+        return True
+    if p["created_by"]:
+        return p["created_by"] == name
+    return role_in(name, p["company_id"]) == "admin"
+
+
+def project_context(username, project_id):
+    """كل اللي الشاشة محتاجاه عن المستخدم في المشروع ده: مساحة العمل (للعزل
+    والسجل)، الدور (للصلاحيات)، الباقة، وشغلانته في المشروع."""
+    p = _project_row(project_id)
+    if not p or not can_access_project(username, project_id):
+        return None
+    role = role_in(username, p["company_id"])
+    company = _one("SELECT subscription_tier FROM companies WHERE id=?", (p["company_id"],)) or {}
+    manager = is_project_manager(username, project_id)
+    member = _one("SELECT pm.job_title, pm.permission FROM project_members pm JOIN users u ON u.id = pm.user_id "
+                  "WHERE pm.project_id=? AND u.username=?", (project_id, auth.normalize_username(username)))
+    if not manager and role not in SEES_ALL_PROJECTS and member and member["permission"] == "view":
+        role = "viewer"
+    job = PROJECT_MANAGER_LABEL if manager else ((member or {}).get("job_title") or ROLE_LABELS.get(role, role))
+    return {"company_id": p["company_id"], "role": role, "tier": company.get("subscription_tier") or "creator",
+            "is_manager": manager, "job": job}
+
+
+def _require_project_manager(actor, project_id):
+    if not is_project_manager(actor, project_id):
+        raise AccessDenied("إدارة فريق المشروع لمدير المشروع بس")
+    p = _project_row(project_id)
+    tier = (_one("SELECT subscription_tier FROM companies WHERE id=?", (p["company_id"],)) or {}).get(
+        "subscription_tier") or "creator"
+    if not TIER_ALLOWS_TEAM.get(tier, True):
+        raise AccessDenied("فريق العمل متاح في باقة Studio أو Enterprise")
+    return p
+
+
+def project_team_view(actor, project_id):
+    """فريق المشروع لأي حد في المشروع: مدير المشروع الأول، وبعده الأعضاء
+    بشغلاناتهم وصلاحياتهم، والدعوات اللي لسه ماتقبلتش (للمدير بس)."""
+    p = _project_row(project_id)
+    if not p or not can_access_project(actor, project_id):
+        raise AccessDenied("المشروع ده مش متاح لحسابك")
+    manager_name = p["created_by"]
+    if not manager_name:
+        row = _one("SELECT u.username FROM memberships m JOIN users u ON u.id = m.user_id "
+                   "WHERE m.company_id=? AND m.role='admin' AND m.active=1 ORDER BY m.id LIMIT 1", (p["company_id"],))
+        manager_name = row["username"] if row else None
+    people = []
+    if manager_name:
+        mu = user(manager_name)
+        people.append({"username": manager_name, "display_name": (mu or {}).get("display_name") or manager_name,
+                       "job": PROJECT_MANAGER_LABEL, "permission": "edit", "is_manager": True})
+    for r in fetch_all("""
+        SELECT u.username, u.display_name, pm.job_title, COALESCE(pm.permission, 'edit') AS permission
+        FROM project_members pm JOIN users u ON u.id = pm.user_id
+        JOIN memberships m ON m.user_id = u.id AND m.company_id = ? AND m.active = 1
+        WHERE pm.project_id = ? AND u.active = 1 ORDER BY pm.id""", (p["company_id"], project_id)):
+        if r["username"] == manager_name:
+            continue
+        people.append({"username": r["username"], "display_name": r["display_name"] or r["username"],
+                       "job": r["job_title"] or "—", "permission": r["permission"], "is_manager": False})
+    manager = is_project_manager(actor, project_id)
+    invites = []
+    if manager:
+        invites = [dict(r) for r in fetch_all("""
+            SELECT id, invitee_name, contact, job_title, permission, created_at, expires_at FROM project_invites
+            WHERE project_id=? AND accepted_by IS NULL AND COALESCE(revoked, 0)=0 AND expires_at > ?
+            ORDER BY id DESC""", (project_id, _now()))]
+    return {"project": dict(p), "people": people, "invites": invites, "can_manage": manager}
+
+
+def _join_project(ex, project_id, company_id, uid, job, permission, actor):
+    """العضوية: عضو في مساحة عمل المشروع (بصلاحية تناسبه) + في فريق المشروع."""
+    role = "viewer" if permission == "view" else "department"
+    ex("INSERT OR IGNORE INTO memberships (company_id, user_id, role, active, created_at) VALUES (?, ?, ?, 1, ?)",
+       (company_id, uid, role, _now()))
+    # مايتنزلش دور حد أعلى (منتج/أدمن) ولا يتقفل حد "يعدّل" لمشاهدة في مشروع تاني
+    ex("UPDATE memberships SET active=1, role=CASE WHEN role IN ('admin', 'producer', 'manager') THEN role "
+       "WHEN ? = 'department' THEN 'department' ELSE role END WHERE company_id=? AND user_id=?",
+       (role, company_id, uid))
+    ex("INSERT OR IGNORE INTO project_members (project_id, user_id, added_by, added_at, job_title, permission) "
+       "VALUES (?, ?, ?, ?, ?, ?)", (project_id, uid, actor, _now(), job, permission))
+    ex("UPDATE project_members SET job_title=?, permission=? WHERE project_id=? AND user_id=?",
+       (job, permission, project_id, uid))
+    ex("UPDATE projects SET members_scoped=1 WHERE id=?", (project_id,))
+
+
+def _check_job_permission(job, permission):
+    if job not in PROJECT_JOBS:
+        raise ValueError("اختار الشغلانة من القايمة")
+    if permission not in PERMISSIONS:
+        raise ValueError("صلاحية غير معروفة")
+
+
+def add_to_project(actor, project_id, username, job, permission="edit"):
+    """بيضيف مستخدم عنده حساب لفريق المشروع على طول."""
+    p = _require_project_manager(actor, project_id)
+    _check_job_permission(job, permission)
+    name = auth.normalize_username(username)
+    u = user(name)
+    if not u or not u["active"]:
+        raise ValueError("مفيش حساب بالاسم ده — ابعتله لينك دعوة بدل كده")
+    with audit.action("project_team_add", "project_members", project_id=project_id, username=actor,
+                      summary=f"إضافة «{name}» لفريق المشروع ({job})") as act:
+        act.extra = {"المستخدم": name, "الشغلانة": job, "الصلاحية": permission}
+        with _tx() as ex:
+            _join_project(ex, project_id, p["company_id"], u["id"], job, permission, actor)
+    return name
+
+
+def update_project_member(actor, project_id, username, job, permission):
+    p = _require_project_manager(actor, project_id)
+    _check_job_permission(job, permission)
+    name = auth.normalize_username(username)
+    u = user(name)
+    if not u:
+        raise ValueError("مفيش حساب بالاسم ده")
+    with audit.action("project_team_update", "project_members", project_id=project_id, username=actor,
+                      summary=f"«{name}» في المشروع: {job} · {PERMISSIONS[permission]}"):
+        with _tx() as ex:
+            _join_project(ex, project_id, p["company_id"], u["id"], job, permission, actor)
+
+
+def remove_from_project(actor, project_id, username):
+    p = _require_project_manager(actor, project_id)
+    name = auth.normalize_username(username)
+    if p["created_by"] == name:
+        raise AccessDenied("مدير المشروع مايتشالش من مشروعه")
+    u = user(name)
+    if not u:
+        return
+    with audit.action("project_team_remove", "project_members", project_id=project_id, username=actor,
+                      summary=f"شيل «{name}» من فريق المشروع"):
+        with _tx() as ex:
+            ex("DELETE FROM project_members WHERE project_id=? AND user_id=?", (project_id, u["id"]))
+
+
+def _hash_token(token):
+    return _hashlib.sha256((token or "").encode("utf-8")).hexdigest()
+
+
+def create_invite(actor, project_id, invitee_name, contact, job, permission="edit"):
+    """لينك دعوة للمشروع - بيرجّع التوكن (بيتعرض مرة واحدة للمدير يبعته)."""
+    _require_project_manager(actor, project_id)
+    _check_job_permission(job, permission)
+    token = _secrets.token_urlsafe(24)
+    expires = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=INVITE_DAYS)).isoformat(timespec="seconds")
+    with audit.action("project_invite", "project_invites", project_id=project_id, username=actor,
+                      summary=f"دعوة «{(invitee_name or '').strip() or contact or '?'}» للمشروع ({job})"):
+        with _tx() as ex:
+            ex("INSERT INTO project_invites (project_id, token_hash, invitee_name, contact, job_title, permission, "
+               "created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+               (project_id, _hash_token(token), (invitee_name or "").strip() or None, (contact or "").strip() or None,
+                job, permission, actor, _now(), expires))
+    return token
+
+
+def invite_info(token):
+    """الدعوة لو صالحة (مش مستخدمة، مش ملغية، مش منتهية)، وإلا None."""
+    if not token or len(token) > 100:
+        return None
+    r = _one("""SELECT i.*, p.name AS project_name, p.company_id FROM project_invites i
+                JOIN projects p ON p.id = i.project_id
+                WHERE i.token_hash=? AND i.accepted_by IS NULL AND COALESCE(i.revoked, 0)=0 AND i.expires_at > ?""",
+             (_hash_token(token), _now()))
+    if not r:
+        return None
+    inviter = user(r["created_by"]) or {}
+    return dict(r, inviter=inviter.get("display_name") or r["created_by"])
+
+
+def accept_invite(token, username):
+    """المستخدم (بعد ما دخل) بيقبل الدعوة: بيدخل فريق المشروع. بيرجّع project_id."""
+    inv = invite_info(token)
+    u = user(username)
+    if not inv or not u or not u["active"]:
+        return None
+    with audit.action("project_invite_accept", "project_invites", project_id=inv["project_id"],
+                      username=u["username"], summary=f"«{u['username']}» قبل دعوة المشروع «{inv['project_name']}»"):
+        with _tx() as ex:
+            # قبول مرة واحدة: الجملة بتشترط إن الدعوة لسه متاحة
+            ex("UPDATE project_invites SET accepted_by=?, accepted_at=? WHERE id=? AND accepted_by IS NULL",
+               (u["username"], _now(), inv["id"]))
+            _join_project(ex, inv["project_id"], inv["company_id"], u["id"], inv["job_title"], inv["permission"],
+                          inv["created_by"])
+    return inv["project_id"]
+
+
+def register_from_invite(token, username, display_name, password):
+    """حساب جديد من لينك دعوة: المستخدم بيختار اسم دخوله وكلمة سره، وبيتعمله
+    مساحة عمل شخصية (عشان يقدر يعمل مشاريعه)، وبيدخل فريق المشروع على طول."""
+    inv = invite_info(token)
+    if not inv:
+        raise ValueError("اللينك ده مابقاش صالح — اطلب لينك جديد من مدير المشروع")
+    name = auth.normalize_username(username)
+    if not name or not all(ch.isalnum() or ch in "._-" for ch in name) or not name.isascii():
+        raise ValueError("اسم المستخدم لازم يكون حروف إنجليزي وأرقام و . _ - بس")
+    if user(name):
+        raise ValueError("الاسم ده متاخد — اختار اسم تاني، أو ادخل بحسابك لو ده انت")
+    if len(password or "") < 10:
+        raise ValueError("كلمة السر لازم تبقى 10 حروف على الأقل")
+    display = (display_name or "").strip() or name
+    with audit.action("user_register_invite", "users", username=name, summary=f"حساب جديد من دعوة: «{name}»"):
+        with _tx() as ex:
+            ex("INSERT INTO users (username, password_hash, display_name, is_operator, active, must_change_password, "
+               "created_at) VALUES (?, ?, ?, 0, 1, 0, ?)", (name, auth.hash_password(password), display, _now()))
+            ex("INSERT INTO companies (name, active, created_at) VALUES (?, 1, ?)", (display, _now()))
+        uid = user(name)["id"]
+        cid = _one("SELECT MAX(id) AS id FROM companies")["id"]
+        with _tx() as ex:
+            ex("INSERT INTO memberships (company_id, user_id, role, active, created_at) VALUES (?, ?, 'admin', 1, ?)",
+               (cid, uid, _now()))
+    accept_invite(token, name)
+    return name
+
+
+def revoke_invite(actor, project_id, invite_id):
+    _require_project_manager(actor, project_id)
+    with _tx() as ex:
+        ex("UPDATE project_invites SET revoked=1 WHERE id=? AND project_id=?", (invite_id, project_id))

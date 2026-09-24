@@ -10,6 +10,7 @@
 (علامات الاستفهام، RETURNING id، ON CONFLICT) بتتترجم أوتوماتيك هنا.
 """
 import os
+import datetime as dt
 import re
 import sqlite3
 
@@ -461,6 +462,25 @@ def init_db():
         -- والمشغّل بيشوفوا كل مشاريع مساحة العمل؛ الباقي بيشوف المشاريع اللي
         -- اتضافوا ليها بس. projects.members_scoped = 0 → مشروع قديم مفتوح لكل
         -- الأعضاء لحد ما المدير يحدد أعضاءه أول مرة (محدش بيخسر دخول).
+        -- دعوة لفريق مشروع (المالك 2026-09-24): لينك بيتبعت (واتساب/نسخ)،
+        -- اللي بيفتحه يدخل أو يعمل حساب ويلاقي المشروع. التوكن نفسه مش متخزن
+        -- - الـ hash بتاعه بس - فتسريب القاعدة مايديش لينكات شغالة.
+        CREATE TABLE IF NOT EXISTS project_invites (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            token_hash TEXT NOT NULL UNIQUE,
+            invitee_name TEXT,
+            contact TEXT,
+            job_title TEXT,
+            permission TEXT NOT NULL DEFAULT 'edit',
+            created_by TEXT,
+            created_at TEXT,
+            expires_at TEXT,
+            accepted_by TEXT,
+            accepted_at TEXT,
+            revoked INTEGER DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS project_members (
             id SERIAL PRIMARY KEY,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -875,6 +895,24 @@ def init_db():
             UNIQUE(company_id, user_id)
         );
 
+        -- دعوات فريق المشروع - نفس الشرح في نسخة Postgres فوق
+        CREATE TABLE IF NOT EXISTS project_invites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            invitee_name TEXT,
+            contact TEXT,
+            job_title TEXT,
+            permission TEXT NOT NULL DEFAULT 'edit',
+            created_by TEXT,
+            created_at TEXT,
+            expires_at TEXT,
+            accepted_by TEXT,
+            accepted_at TEXT,
+            revoked INTEGER DEFAULT 0,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
         -- (أ) أعضاء لكل مشروع - نفس الشرح في نسخة Postgres فوق
         CREATE TABLE IF NOT EXISTS project_members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -967,6 +1005,7 @@ def init_db():
     _migrate_schema(conn)
     _backfill_default_looks(conn)
     _rename_project_types(conn)
+    _scope_all_projects(conn)
     conn.close()
 
 
@@ -1007,6 +1046,14 @@ _MIGRATIONS = {
         # (أ) 1 = المشروع ليه أعضاء محددين (project_members). 0/NULL = مشروع
         # قديم مفتوح لكل أعضاء مساحة العمل زي ما كان قبل الميزة.
         ("members_scoped", "INTEGER DEFAULT 0"),
+        # فريق المشروع (2026-09-24): اللي أنشأ المشروع = مدير المشروع. القديم
+        # (NULL) مديره أدمن مساحة العمل اللي هو فيها.
+        ("created_by", "TEXT"),
+    ],
+    # دور كل واحد في المشروع (شغلانته: مدير تصوير، مونتير...) وصلاحيته فيه
+    "project_members": [
+        ("job_title", "TEXT"),
+        ("permission", "TEXT DEFAULT 'edit'"),
     ],
     "locations": [
         ("parent_location_id", "INTEGER"),
@@ -1204,6 +1251,25 @@ def _backfill_default_looks(conn):
     cur = conn.cursor()
     for sql, params in statements:
         cur.execute(_adapt_query(sql), params)
+    conn.commit()
+
+
+def _scope_all_projects(conn):
+    """الفريق بقى على المشروع بس (المالك 2026-09-24): كل مشروع لسه "مفتوح لكل
+    مساحة العمل" (members_scoped=0) بيتقفل على الناس اللي كانوا شايفينه -
+    أعضاء مساحة العمل غير المديرين بيتسجلوا في فريقه - فمحدش بيخسر دخول.
+    المديرين بيشوفوا كل حاجة أصلًا. idempotent."""
+    cur = conn.cursor()
+    cur.execute(_adapt_query(
+        "INSERT OR IGNORE INTO project_members (project_id, user_id, added_by, added_at, permission) "
+        "SELECT p.id, m.user_id, 'migration', ?, CASE WHEN m.role = 'viewer' THEN 'view' ELSE 'edit' END "
+        "FROM projects p JOIN memberships m ON m.company_id = p.company_id AND m.active = 1 "
+        "WHERE COALESCE(p.members_scoped, 0) = 0 AND m.role NOT IN ('admin', 'operator')"),
+        (dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),))
+    # مشروع لسه مالوش مساحة عمل (بيتربط بيها بعدين في accounts.migrate_accounts)
+    # مايتقفلش دلوقتي - كان هيتقفل على فريق فاضي ويختفي من أصحابه
+    cur.execute(_adapt_query("UPDATE projects SET members_scoped = 1 "
+                             "WHERE COALESCE(members_scoped, 0) = 0 AND company_id IS NOT NULL"))
     conn.commit()
 
 

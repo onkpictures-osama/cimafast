@@ -22,20 +22,10 @@ def render(project_id, current_user, company_id, role, tier, board_url):
     # تفاصيل خاصة بإدارة المشروع/الشركة، مش تنقّل عام.
     # جدول التصوير اتنقل لمرحلة الإنتاج (تبويب لوحده) - مش هنا. واللينكات
     # بتفتح في نفس التاب (nav_link) بدل تاب جديد يسيب القديمة وراه.
+    # فريق العمل بقى صفحة لوحده (👥 فريق العمل، تحت المشروع في الشريط) - مش هنا
     if board_url:
-        # B5: إدارة الفريق مش متاحة لاشتراك Creator خالص — شغال لوحده دايمًا.
-        if accounts.TIER_ALLOWS_TEAM.get(tier, True):
-            team_label = t("إدارة الفريق") if role in ("admin", "operator") else t("الفريق وحسابي")
-            nav_link(f"👥 {team_label}", f"{board_url}team/")
-        elif role in ("admin", "operator"):
-            st.caption(t("إدارة الفريق مش متاحة في باقة Creator — شغال لوحدك. رقّي الاشتراك لـ Studio أو Enterprise عشان تضيف فريق."))
         if permissions.can(role, "view_audit"):
             nav_link(f"🧾 {t('سجل النشاط')}", f"{board_url}activity/?company_id={company_id}")
-        st.divider()
-
-    # (أ) أعضاء المشروع: مين يشوف المشروع ده من أعضاء مساحة العمل - للمدير بس
-    if permissions.can(role, "manage_team") and accounts.TIER_ALLOWS_TEAM.get(tier, True):
-        _render_project_team(project_id, current_user)
         st.divider()
 
     # دورك في المشروع ده — لحد ما يبقى فيه نظام أدوار لكل مشروع لوحده، ده
@@ -178,36 +168,3 @@ def render(project_id, current_user, company_id, role, tier, board_url):
                 st.rerun()
     else:
         st.caption(t("حذف مشروع لمدير المشروع بس."))
-
-
-def _render_project_team(project_id, current_user):
-    """أعضاء مساحة العمل، وقدام كل واحد "في المشروع ده". مدير المشروع
-    والمشغّل بيشوفوا كل المشاريع دايمًا (الخانة مقفولة عليهم)."""
-    st.subheader(f"👥 {t('أعضاء المشروع')}")
-    try:
-        team = accounts.project_team(current_user, project_id)
-    except accounts.AccessDenied as exc:
-        st.caption(str(exc))
-        return
-    others = [m for m in team["members"] if not m["sees_all"]]
-    if not team["scoped"]:
-        st.info(t("المشروع ده مفتوح لكل أعضاء مساحة العمل (اتعمل قبل ميزة أعضاء المشروع). "
-                  "أول ما تحفظ اختيارك هنا، هيبقى للي تختارهم بس."))
-    else:
-        st.caption(t("اللي مش متعلّم عليه مش هيشوف المشروع ده خالص. مدير المشروع بيشوف كل المشاريع دايمًا."))
-    if not others:
-        st.caption(t("مفيش أعضاء تانيين في مساحة العمل لسه. ضيفهم من «إدارة الفريق» وبعدين اختارهم هنا."))
-        return
-    chosen = []
-    for m in team["members"]:
-        label = f"{m['display_name'] or m['username']} · {t(accounts.ROLE_LABELS.get(m['role'], m['role']))}"
-        if m["sees_all"]:
-            st.checkbox(label + f" — {t('بيشوف كل المشاريع')}", value=True, disabled=True,
-                        key=f"pm_{project_id}_{m['username']}_all")
-            continue
-        if st.checkbox(label, value=m["in_project"], key=f"pm_{project_id}_{m['username']}"):
-            chosen.append(m["username"])
-    if st.button(f"💾 {t('حفظ أعضاء المشروع')}", key=f"pm_save_{project_id}", type="primary"):
-        added, removed = accounts.set_project_team(current_user, project_id, chosen)
-        st.toast(f"{t('اتضاف')} {len(added)} · {t('اتشال')} {len(removed)}", icon="👥")
-        st.rerun()

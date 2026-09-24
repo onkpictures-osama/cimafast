@@ -20,6 +20,7 @@ UI_TEXT = {
     "tab_actors": {"ar": "🎬 الممثلين", "en": "🎬 Cast"},
     "tab_wardrobe": {"ar": "👗 الملابس", "en": "👗 Wardrobe"},
     "tab_schedule": {"ar": "🗓️ جدول التصوير", "en": "🗓️ Shooting schedule"},
+    "tab_team": {"ar": "👥 فريق العمل", "en": "👥 Crew"},
     "phase_pre": {"ar": "🎬 ما قبل الإنتاج", "en": "🎬 Pre-production"},
     "phase_prod": {"ar": "🎥 الإنتاج", "en": "🎥 Production"},
     "tab_props": {"ar": "🎒 الإكسسوارات", "en": "🎒 Props"},
@@ -852,6 +853,44 @@ TRANSLATIONS = {
     "أيام الممثلين": "Actor days",
     "قريب هنا: الكول شيت، والتقارير اليومية، وباقي أقسام إدارة التصوير.":
         "Coming here: call sheets, daily reports and the rest of production management.",
+
+    # فريق المشروع والدعوات (2026-09-24)
+    "فريق العمل": "Crew",
+    "في الفريق": "on the crew",
+    "اللي أنشأ المشروع هو مدير المشروع.": "Whoever created the project is its manager.",
+    "إضافة حد للفريق أو تغيير الأدوار من مدير المشروع.": "The project manager adds people and changes roles.",
+    "فريق العمل متاح في باقة Studio أو Enterprise — رقّي الاشتراك عشان تضيف فريق للمشروع.":
+        "Crews are available on Studio or Enterprise — upgrade to add a crew to the project.",
+    "دعوات لسه ماتقبلتش": "Pending invitations",
+    "لحد": "until",
+    "الشغلانة في المشروع": "Job on this project",
+    "الصلاحية": "Access",
+    "يعدّل": "Can edit",
+    "مشاهدة بس": "View only",
+    "شيل من الفريق": "Remove from crew",
+    "أضف حد لفريق العمل": "Add someone to the crew",
+    "اسم الدخول لو عنده حساب — أو موبايله/إيميله": "Their username if they have an account — or phone/email",
+    "اختار الشغلانة": "Pick the job",
+    "لو كتبت اسم دخول حد عنده حساب بيتضاف على طول. غير كده بيتعمل لينك دعوة تبعته له (واتساب أو نسخ) — بيفتحه ويعمل حسابه ويلاقي المشروع.":
+        "A username with an account is added right away. Otherwise you get an invite link to send (WhatsApp or copy) — they open it, create an account and find the project.",
+    "أضف": "Add",
+    "اختار الشغلانة في المشروع": "Pick their job on the project",
+    "اتضاف للفريق": "Added to the crew",
+    "اكتب اسمه أو رقمه عشان تعرف الدعوة دي لمين": "Enter their name or number so you know who the invite is for",
+    "لينك الدعوة جاهز — ابعته للشخص ده. بيشتغل مرة واحدة ولمدة 7 أيام.":
+        "The invite link is ready — send it to them. It works once, for 7 days.",
+    "انت مدعو لفريق عمل مشروع": "You're invited to the crew of",
+    "على CimaFast Studio": "on CimaFast Studio",
+    "ابعته واتساب": "Send on WhatsApp",
+    "انضميت لفريق العمل — المشروع اتفتح": "You joined the crew — the project is open",
+    "لينك الدعوة ده مابقاش صالح — اطلب لينك جديد من مدير المشروع.": "This invite link is no longer valid — ask the project manager for a new one.",
+    "لسه مفيش مشاريع. ابدأ بإنشاء مشروع جديد — أو افتح لينك الدعوة اللي وصلك من مدير مشروع.":
+        "No projects yet. Create a new one — or open the invite link a project manager sent you.",
+    "المنتج": "Producer", "مدير الإنتاج": "Production manager", "المخرج": "Director",
+    "مساعد المخرج الأول": "1st AD", "كاتب السيناريو": "Screenwriter", "مدير التصوير": "DoP",
+    "مهندس الديكور": "Production designer", "مصمم الملابس": "Costume designer", "الماكيير": "Make-up & hair",
+    "مهندس الصوت": "Sound", "المونتير": "Editor", "مسؤول الكاستينج": "Casting", "مشرف الراكور": "Script supervisor",
+    "مشرف المؤثرات البصرية": "VFX supervisor", "مدير المواقع": "Location manager", "الإكسسواريست": "Props master",
 
     # (أ) أعضاء لكل مشروع (2026-09-24)
     "أعضاء المشروع": "Project members",

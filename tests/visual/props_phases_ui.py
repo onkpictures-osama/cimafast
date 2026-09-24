@@ -43,7 +43,7 @@ def run(port, shot_dir):
         _no_exception(page, "login")
         tabs = _tabs(page)
         want = ["سيناريو", "الأماكن", "الإكسسوار", "الشخصيات", "الممثلين", "الملابس", "المشاهد", "اللقطات",
-                "التقارير", "إعدادات"]
+                "التقارير", "فريق العمل", "إعدادات"]
         check("pre-production tabs in the agreed order",
               len(tabs) == len(want) and all(w in x for w, x in zip(want, tabs)), str(tabs))
 
@@ -72,7 +72,8 @@ def run(port, shot_dir):
         page.locator("button").filter(has_text="الإنتاج").last.click(); _settle(page, 1800)
         _no_exception(page, "production phase")
         tabs = _tabs(page)
-        check("production phase shows schedule + settings", len(tabs) == 2 and "جدول التصوير" in tabs[0], str(tabs))
+        check("production phase shows schedule + crew + settings",
+              len(tabs) == 3 and "جدول التصوير" in tabs[0] and "فريق العمل" in tabs[1], str(tabs))
         check("schedule tab shows its summary", "مشاهد متجدولة" in page.locator("body").inner_text())
 
         # الرابط المباشر (زي اللي في التنبيهات والرئيسية): بيفتح مرحلته لوحده.
