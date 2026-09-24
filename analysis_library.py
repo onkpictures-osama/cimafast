@@ -388,7 +388,7 @@ def can_delete(username, entry):
 def delete(username, entry_id):
     entry = get(username, entry_id)
     if not can_delete(username, entry):
-        raise LibraryError("حذف التحليل لصاحبه أو لمدير الشركة بس.")
+        raise LibraryError("حذف التحليل لصاحبه أو لمدير المشروع بس.")
     with permissions.system(), audit.action(
             "library_delete", "analysis_library", entity_id=entry_id, company_id=entry["company_id"],
             username=username, summary=f"حذف تحليل «{entry['script_name']}» من مكتبة التحليلات") as act:

@@ -635,10 +635,10 @@ def _scope(actor, company_id):
             return "1=1", []
         return "company_id = ?", [company_id]
     if not allowed:
-        raise accounts.AccessDenied("سجل النشاط لمدير الشركة بس")
+        raise accounts.AccessDenied("سجل النشاط لمدير المشروع بس")
     if company_id is not None:
         if company_id not in allowed:
-            raise accounts.AccessDenied("مش مدير الشركة دي")
+            raise accounts.AccessDenied("مش مدير مشروع في الحساب ده")
         return "company_id = ?", [company_id]
     marks = ",".join("?" * len(allowed))
     return f"company_id IN ({marks})", list(allowed)

@@ -170,4 +170,4 @@ def render(project_id, current_user, company_id, role, tier, board_url):
                 st.success(t("تم حذف المشروع"))
                 st.rerun()
     else:
-        st.caption(t("حذف مشروع لمدير الشركة بس."))
+        st.caption(t("حذف مشروع لمدير المشروع بس."))

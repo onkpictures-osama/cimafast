@@ -53,7 +53,7 @@
         <thead><tr><th>الاسم</th><th>المستخدم</th><th>المسمى</th><th>الدور</th><th>آخر دخول</th><th class="admin-only" hidden></th></tr></thead>
         <tbody id="members"></tbody>
       </table>
-      <p id="not-admin" class="muted" hidden>مدير الشركة بس هو اللي يضيف ناس أو يغيّر أدوارهم.</p>
+      <p id="not-admin" class="muted" hidden>مدير المشروع بس هو اللي يضيف ناس أو يغيّر أدوارهم.</p>
     </section>
 
     <section class="card admin-only" hidden>
@@ -69,7 +69,7 @@
       </form>
     </section>
     {% else %}
-    <section class="card"><p>حسابك مش مربوط بأي شركة. كلّم مدير الشركة بتاعتك.</p></section>
+    <section class="card"><p>حسابك مش مربوط بأي شركة. كلّم مدير المشروع بتاعك.</p></section>
     {% endif %}
 
     {% if is_operator %}

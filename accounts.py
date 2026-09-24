@@ -40,7 +40,7 @@ def _tx():
 # الأدوار، من الأوسع للأضيق. الفرض (مين يقدر يمسح إيه) بند F2؛ هنا بنسجلها بس.
 ROLES = ("admin", "producer", "manager", "department", "viewer")
 ROLE_LABELS = {
-    "admin": "مدير الشركة", "producer": "منتج", "manager": "مدير إنتاج / مساعد مخرج أول",
+    "admin": "مدير المشروع", "producer": "منتج", "manager": "مدير إنتاج / مساعد مخرج أول",
     "department": "رئيس قسم", "viewer": "مشاهدة فقط", "operator": "مشغّل المنصة",
 }
 DEFAULT_COMPANY = "الشركة الافتراضية"
@@ -311,7 +311,7 @@ def delete_project(actor, project_id):
 
 def _require_admin(actor, company_id):
     if role_in(actor, company_id) not in ("admin", "operator"):
-        raise AccessDenied("مدير الشركة بس يقدر يعمل ده")
+        raise AccessDenied("مدير المشروع بس يقدر يعمل ده")
 
 
 def _require_manageable(actor, company_id, username):
@@ -482,4 +482,4 @@ def create_company(actor, name, admin_username, admin_display_name=None, admin_e
         company_id = _one("SELECT MAX(id) AS id FROM companies")["id"]
         act.entity_id = act.company_id = company_id
     return company_id, add_member(actor, company_id, admin_username, admin_display_name, "admin",
-                                  "مدير الشركة", admin_email)
+                                  "مدير المشروع", admin_email)
