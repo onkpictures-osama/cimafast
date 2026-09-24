@@ -53,8 +53,29 @@ SIDEBAR_CSS = r'''
         flex-direction: column;
     }
     /* المشاريع: فوق النص بشوية - المسافة بتكبر مع طول الشاشة وليها حد */
+    /* ترتيب المالك 2026-09-24: اللوجو ← خط ← المكتبات ← خط ← المشروع ← (فراغ)
+       ← الحساب تحت. المكتبات والمشروع ورا بعض على طول، والخطوط هي الفواصل. */
+    section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-cf_sb_libs) {
+        margin-top: 10px;
+    }
     section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-cf_sb_projects) {
-        margin-top: clamp(20px, 12vh, 140px);
+        margin-top: 4px;
+    }
+    section[data-testid="stSidebar"] .st-key-cf_sb_libs hr.cf-sb-sep,
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects hr.cf-sb-sep {
+        width: 100%;
+        margin: 6px 0;
+    }
+    /* حاوية الـ markdown بتاعة الخط بتتقاس صفر، فأول زرار تحتها كان بيغطّي
+       الخط (بين اللوجو والمكتبات) - ارتفاع ثابت يخليه يبان */
+    section[data-testid="stSidebar"] .st-key-cf_sb_libs [data-testid="stElementContainer"]:has(hr.cf-sb-sep),
+    section[data-testid="stSidebar"] .st-key-cf_sb_projects [data-testid="stElementContainer"]:has(hr.cf-sb-sep) {
+        height: 14px !important;
+        min-height: 14px;
+    }
+    /* أزرار المكتبات: الكلام من بداية السطر (يمين في العربي) زي باقي النص */
+    section[data-testid="stSidebar"] .st-key-cf_sb_libs .stButton button {
+        justify-content: flex-start;
     }
     /* الحساب: آخر الشريط */
     section[data-testid="stSidebar"] [data-testid="stLayoutWrapper"]:has(> .st-key-cf_sb_account) {

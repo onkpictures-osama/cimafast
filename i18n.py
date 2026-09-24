@@ -10,7 +10,7 @@ UI_TEXT = {
     "new_project": {"ar": "➕ إنشاء مشروع جديد", "en": "➕ New Project"},
     "select_project": {"ar": "اختر مشروع للعمل عليه", "en": "Select a project"},
     "current_project_label": {"ar": "📍 المشروع الحالي", "en": "📍 Current project"},
-    "role_label": {"ar": "الدور", "en": "Role"},
+    "role_label": {"ar": "دورك في المشروع", "en": "Your role"},
     "language_label": {"ar": "🌐 اللغة", "en": "🌐 Language"},
     "edit_delete_project": {"ar": "✏️ تعديل / حذف المشروع الحالي", "en": "✏️ Edit / Delete Current Project"},
     "settings": {"ar": "⚙️ الإعدادات", "en": "⚙️ Settings"},
@@ -853,6 +853,19 @@ TRANSLATIONS = {
     "أيام الممثلين": "Actor days",
     "قريب هنا: الكول شيت، والتقارير اليومية، وباقي أقسام إدارة التصوير.":
         "Coming here: call sheets, daily reports and the rest of production management.",
+
+    # المكتبات في الشريط الجانبي (2026-09-24)
+    "مكتبة الممثلين": "Actors library",
+    "مكتبة مواقع التصوير": "Locations library",
+    "رجوع للمشروع": "Back to the project",
+    "رجوع": "Back",
+    "افتح مكتبة الممثلين": "Open the actors library",
+    "بتختار ممثل/ة لدور": "Choosing an actor for",
+    "رجوع للشخصية": "Back to the character",
+    "لدور": "For",
+    "اختار مشروع من الشريط الجانبي عشان ترشّح أو تتعاقد.": "Pick a project in the sidebar to shortlist or cast.",
+    "اختار من مكتبة الممثلين": "Choose from the actors library",
+    "المكتبة دي بتتبني دلوقتي — المرحلة الجاية.": "This library is being built — it's the next phase.",
 
     # فريق المشروع والدعوات (2026-09-24)
     "فريق العمل": "Crew",

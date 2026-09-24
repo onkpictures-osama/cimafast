@@ -13,11 +13,12 @@ from database import init_db, FIELD_HELP
 import theme
 
 from i18n import t, tr
-from ui import (close_sidebar_now, go_to, ltr, nav_link as _nav_link, open_tab_by_slug, phase_tabs,
-                request_close_sidebar)
+from ui import (LIBRARY_PAGES, close_sidebar_now, go_to, ltr, nav_link as _nav_link, open_page,
+                open_tab_by_slug, phase_tabs, request_close_sidebar)
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
 import views.new_project
 import views.team
+import views.library_pages
 import views.invite
 import views.schedule
 import views.wardrobe
@@ -509,11 +510,21 @@ with st.sidebar.container(gap=2, key="cf_sb_brand", horizontal_alignment="center
         st.markdown(f"**{tr('studio_tagline')}**")
         st.caption(t(_APP_DESCRIPTION))
 
+# ترتيب الشريط (المالك 2026-09-24): اللوجو ← خط ← المكتبات ← خط ← إنشاء
+# مشروع، المشروع الحالي، دورك فيه، فريق المشروع ← خط ← بيانات المستخدم.
+# المكتبات صفحات لوحدها (ui.open_page) - تتفتح من هنا على طول، ومن جوه
+# المشروع في وضع "اختار لـ..." (زي اختيار ممثل لشخصية).
+_sb_libs = st.sidebar.container(gap=6, key="cf_sb_libs")
+_sb_libs.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
+_page = st.query_params.get("page")
+for _slug, _label in (("actors", f"🎭 {t('مكتبة الممثلين')}"),
+                      ("locations_lib", f"📍 {t('مكتبة مواقع التصوير')}"),
+                      ("library", f"📚 {t('مكتبة التحليلات')}")):
+    _sb_libs.button(_label, key=f"sb_lib_{_slug}", use_container_width=True, on_click=open_page, args=(_slug,),
+                    type="primary" if _page == _slug else "secondary")
+
 _sb_projects = st.sidebar.container(gap=6, key="cf_sb_projects")
-_sb_projects.markdown(
-    '<div class="cf-sb-section-label">%s</div>' % html.escape(tr("sidebar_projects")),
-    unsafe_allow_html=True,
-)
+_sb_projects.markdown('<hr class="cf-sb-sep">', unsafe_allow_html=True)
 
 _current_user = st.session_state.get("_auth_user")
 
@@ -570,13 +581,6 @@ if permissions.can(_role, "create_project"):
         # views/new_project.py
         if views.new_project.render(_current_user, company_id):
             st.rerun()
-
-# مكتبة التحليلات في مجموعة المشاريع (تصحيح المالك 2026-09-24): شغلها كله
-# للمشاريع - تستورد تحليل في مشروع أو تبدأ منه مشروع - ومحفوظة على مساحة
-# العمل زي المشاريع. مجموعة الحساب تحت للهوية والتنبيهات واللغة والخروج بس.
-# قبل فحص "مفيش مشاريع" عشان تفضل متاحة لحساب لسه مالوش مشاريع.
-with _sb_projects:
-    _nav_link(f"📚 {t('مكتبة التحليلات')}", "?page=library")
 
 # الشريط ده بيتبني قبل فحص "مفيش مشاريع" تحت (مش بعد اختيار المشروع):
 # يوزر ملوش مشاريع كان بيوقف عند st.stop() من غير زرار خروج ولا مفتاح
@@ -662,18 +666,17 @@ if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):
     _logout()
     st.rerun()
 
-# مكتبة التحليلات (‎?page=library‎): شاشة الحساب، قبل اختيار أي مشروع — بتشتغل
-# حتى لمستخدم لسه مالوش مشاريع (يرفع ملف تحليل وينزّله).
-if st.query_params.get("page") == "library":
-    st.session_state["_cf_project"] = None     # F3: كتابات المكتبة مش تبع مشروع
-    try:
-        views.library.render(current_user=_current_user, company_id=company_id, role=_role,
-                             is_ar=_is_ar)
-    except permissions.Denied as _exc:
-        st.warning(t(str(_exc)))
+def _render_library_page(page, project_id=None, project_company=None):
+    """صفحة مكتبة بدل تبويبات المشروع (views/library_pages.py)."""
+    views.library_pages.render(page, _current_user, project_id, project_company or company_id,
+                               company_id, _role, _is_ar)
+    close_sidebar_now()
     st.stop()
 
+
 if not projects:
+    if _page in LIBRARY_PAGES:
+        _render_library_page(_page)
     _sb_projects.info(t("لسه مفيش مشاريع. ابدأ بإنشاء مشروع جديد — أو افتح لينك الدعوة اللي وصلك من مدير مشروع."))
     st.stop()
 
@@ -721,6 +724,10 @@ _sb_projects.markdown(
 _team_n = len(accounts.project_team_view(_current_user, project_id)["people"])
 _sb_projects.button(f"👥 {t('فريق العمل')} ({_team_n})", key="sb_open_team", use_container_width=True,
                     on_click=go_to, args=("team",))
+
+# صفحة مكتبة مفتوحة (?page=): بتتعرض بدل تبويبات المشروع، والشريط كامل جنبها
+if _page in LIBRARY_PAGES:
+    _render_library_page(_page, project_id, company_id)
 
 
 # جدول التصوير، إدارة الفريق، تعديل/حذف المشروع، الحلقات — كل التفاصيل

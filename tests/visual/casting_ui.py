@@ -57,15 +57,19 @@ def stage(page, shot_dir):
     card = _char_card(page, "نادية")
     check("casting section inside the card", "الممثل/ة والكاستينج" in card.inner_text())
 
-    form = card.locator('[data-testid="stForm"]').filter(has_text="اختار ممثل/ة").first
-    form.locator('[data-testid="stSelectbox"]').first.click()
-    _settle(page, 500)
-    page.get_by_role("option").filter(has_text="ممثل/ة جديد/ة مش في الخزانة").first.click()
-    _settle(page, 400)
-    form.get_by_label("الاسم (لو جديد/ة)").fill("ممثلة اختبار")
-    form.get_by_role("button", name="✅ تعاقد").click()
+    # الاختيار بقى من مكتبة الممثلين نفسها (المالك 2026-09-24): الكارت بيفتحها
+    # في وضع "بتختار لدور نادية"، وبعد التعاقد بترجع للشخصية
+    card.get_by_role("button").filter(has_text="اختار من مكتبة الممثلين").first.click()
     _settle(page, 2000)
-    _no_exception(page, "cast new actor from card")
+    page.get_by_text("إضافة ممثل/ة جديد/ة").first.click()
+    _settle(page, 800)
+    form = page.locator('[data-testid="stForm"]').filter(has_text="إضافة الممثل/ة").first
+    form.locator("input").first.fill("ممثلة اختبار")
+    form.get_by_role("button").filter(has_text="إضافة الممثل/ة").first.click()
+    _settle(page, 2000)
+    page.get_by_role("button").filter(has_text="تعاقد للدور ده").first.click()
+    _settle(page, 2500)
+    _no_exception(page, "cast new actor from the library")
 
     card = _char_card(page, "نادية")
     head = card.locator("summary").first.inner_text()

@@ -421,7 +421,11 @@ def request_close_sidebar():
 
 
 def go_to(slug):
-    """يفتح تبويب (ومرحلته) ويقفل الشريط - لأي زرار بيودّي لصفحة جوه المشروع."""
+    """يفتح تبويب (ومرحلته) ويقفل الشريط - لأي زرار بيودّي لصفحة جوه المشروع.
+    لو كان فيه صفحة مكتبة مفتوحة، بيقفلها (التبويب يبان مكانها)."""
+    for k in ("page", "pick"):
+        if k in st.query_params:
+            del st.query_params[k]
     open_tab_by_slug(slug)
     request_close_sidebar()
 
@@ -432,3 +436,32 @@ def close_sidebar_now():
         n = st.session_state.get("_cf_close_n", 0) + 1
         st.session_state["_cf_close_n"] = n
         st.html(_CLOSE_JS % n, unsafe_allow_javascript=True)
+
+
+# --- صفحات المكتبات (المالك 2026-09-24) -----------------------------------------
+# مكتبة الممثلين، مكتبة مواقع التصوير، مكتبة التحليلات: صفحات لوحدها
+# (?page=...) بتتفتح من الشريط الجانبي على طول، أو من جوه المشروع في وضع
+# "اختار لـ..." (?pick=<id> - زي اختيار ممثل لشخصية). تغيير الـ query params
+# مابيعملش reload للصفحة، فالجلسة والشريط بيفضلوا زي ما هم.
+LIBRARY_PAGES = ("actors", "locations_lib", "library")
+
+
+def open_page(page, **params):
+    """كولباك: يفتح صفحة مكتبة (ومعاها params زي pick) ويقفل الشريط."""
+    for k in ("page", "pick", "tab"):
+        if k in st.query_params:
+            del st.query_params[k]
+    st.query_params["page"] = page
+    for k, v in params.items():
+        st.query_params[k] = str(v)
+    request_close_sidebar()
+
+
+def close_page(tab=None):
+    """كولباك: يقفل صفحة المكتبة ويرجع للمشروع (وتبويب معيّن لو اتحدد)."""
+    for k in ("page", "pick"):
+        if k in st.query_params:
+            del st.query_params[k]
+    if tab:
+        open_tab_by_slug(tab)
+    request_close_sidebar()

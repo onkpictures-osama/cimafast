@@ -261,7 +261,7 @@ def _internal_profile_script():
     permissions.set_resolver(lambda: "operator")
     st.session_state["ui_lang"] = os.environ.get("_PP_LANG", "ar")
     st.session_state[actors._SELECTED_KEY] = int(os.environ["_PP_ACTOR"])
-    actors.render(None, None)
+    actors.render_library("x", None, None)     # البروفايل بقى في صفحة مكتبة الممثلين
 
 
 @test
