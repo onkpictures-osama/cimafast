@@ -40,6 +40,7 @@ import audit  # noqa: E402
 import auth  # noqa: E402
 import database  # noqa: E402
 import home  # noqa: E402
+import project_types  # noqa: E402
 import links  # noqa: E402
 import notify  # noqa: E402
 import permissions  # noqa: E402
@@ -488,12 +489,24 @@ async def api_create_project(request: Request):
     kind = b.get("project_type") or "فيلم"
     if not name:
         return JSONResponse({"error": "اسم المشروع مطلوب"}, status_code=400)
-    if kind not in ("فيلم", "مسلسل", "إعلان", "فيديو قصير"):
+    if kind not in project_types.TYPES:
         return JSONResponse({"error": "نوع مش معروف"}, status_code=400)
+    episodes = None
+    if kind == project_types.SERIES:
+        # المسلسل مايتعملش من غير عدد حلقاته (طلب المالك 2026-09-24)
+        try:
+            episodes = int(b.get("episode_count"))
+        except (TypeError, ValueError):
+            episodes = 0
+        if not 1 <= episodes <= 500:
+            return JSONResponse({"error": "اكتب عدد حلقات المسلسل"}, status_code=400)
+    res, orient, ratio = project_types.technical_defaults(kind)
     try:
-        pid = accounts.create_project(user, cid, name, kind, "1080p", "أفقي", "16:9")
+        pid = accounts.create_project(user, cid, name, kind, res, orient, ratio, episode_count=episodes)
     except (accounts.AccessDenied, permissions.Denied) as exc:
         return JSONResponse({"error": str(exc)}, status_code=403)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     return JSONResponse({"project_id": pid, "href": links.screen(HOME_APP, pid, "import")})
 
 

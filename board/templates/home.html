@@ -103,9 +103,11 @@
         </div>
         {% if creatable %}
         <form id="new-project" class="new" hidden>
-          <label class="field"><span>اسم المشروع</span><input name="name" required placeholder="مثال: عروسة البحر"></label>
           <label class="field"><span>النوع</span>
-            <select name="project_type"><option>فيلم</option><option>مسلسل</option><option>إعلان</option><option>فيديو قصير</option></select></label>
+            <select name="project_type" id="new-type"><option>فيلم</option><option>مسلسل</option><option>إعلان</option><option>فيديو قصير</option></select></label>
+          <label class="field" id="new-episodes-field" hidden><span>عدد الحلقات</span>
+            <input name="episode_count" id="new-episodes" type="number" min="1" max="500" inputmode="numeric" placeholder="مثال: 30"></label>
+          <label class="field"><span>اسم المشروع</span><input name="name" required placeholder="مثال: عروسة البحر"></label>
           {% if creatable|length > 1 %}
           <label class="field"><span>الشركة</span>
             <select name="company_id">{% for c in creatable %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>

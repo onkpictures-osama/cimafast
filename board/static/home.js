@@ -43,6 +43,15 @@
     toggle.setAttribute("aria-expanded", String(!form.hidden));
     if (!form.hidden) form.querySelector("[name=name]").focus();
   });
+  // النوع أول اختيار؛ المسلسل بيطلب عدد الحلقات (إجباري) قبل أي حاجة تانية
+  const typeSel = $("#new-type"), epField = $("#new-episodes-field"), epInput = $("#new-episodes");
+  const syncType = () => {
+    const series = typeSel?.value === "مسلسل";
+    if (epField) epField.hidden = !series;
+    if (epInput) epInput.required = series;
+  };
+  typeSel?.addEventListener("change", syncType);
+  syncType();
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const status = $("#new-status");

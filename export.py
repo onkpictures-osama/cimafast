@@ -101,13 +101,13 @@ COLUMNS = [
 
 def _fetch_breakdown_rows(project_id, fetch_all):
     scenes = fetch_all("""
-        SELECT s.id as scene_id, s.scene_number, s.int_ext, s.day_night, s.notes as scene_notes,
-               l.name as location_name, lv.variant_name
+        SELECT s.id as scene_id, s.scene_number, s.scene_suffix, s.episode_number, s.int_ext, s.day_night,
+               s.notes as scene_notes, l.name as location_name, lv.variant_name
         FROM scenes s
         LEFT JOIN location_variants lv ON s.location_variant_id = lv.id
         LEFT JOIN locations l ON lv.location_id = l.id
         WHERE s.project_id = ?
-        ORDER BY s.scene_number
+        ORDER BY """ + _EPISODE_ORDER + """
     """, (project_id,))
 
     rows = []
@@ -378,7 +378,7 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
             if nomination:
                 nomination += " (مرشح)"
         scene_rows = fetch_all("""
-            SELECT DISTINCT s.scene_number, l.name AS location_name
+            SELECT DISTINCT s.scene_number, s.scene_suffix, s.episode_number, l.name AS location_name
             FROM scene_characters sch
             JOIN scenes s ON sch.scene_id = s.id
             LEFT JOIN location_variants lv ON s.location_variant_id = lv.id
@@ -386,7 +386,7 @@ def build_characters_sheet_excel(project, project_id, fetch_all):
             WHERE sch.character_id = ?
             ORDER BY s.scene_number
         """, (ch["id"],))
-        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        scene_numbers = _scene_labels(scene_rows)   # 3/12 في المسلسل
         location_names = sorted({r["location_name"] for r in scene_rows if r["location_name"]})
         rows.append({
             "number": ce.get("cast_number") or idx,
@@ -421,6 +421,18 @@ GENERAL_BREAKDOWN_COLUMNS = [
 _MAIN_ROLE_TYPES = {"بطل", "شرير"}
 
 
+def _scene_labels(rows):
+    """أرقام المشاهد بالترتيب ومن غير تكرار، بنفس scene_label (3/12 في
+    المسلسل). العد بالمشهد نفسه مش بالرقم بس: مشهد 1 في الحلقة 1 ومشهد 1 في
+    الحلقة 2 مشهدين."""
+    ordered = sorted(rows, key=lambda r: (r["episode_number"] is None, r["episode_number"] or 0,
+                                          r["scene_number"], r["scene_suffix"] or ""))
+    return list(dict.fromkeys(scene_label(r) for r in ordered))
+
+
+_EPISODE_ORDER = "CASE WHEN s.episode_number IS NULL THEN 1 ELSE 0 END, s.episode_number, s.scene_number"
+
+
 def _numbered_names(rows):
     """"1- سلمى"، "4- سامي"... بترتيب رقم الكاست، واللي مالوش رقم بالاسم آخر
     القايمة - نفس الأرقام اللي في جدول التصوير والكول شيت."""
@@ -439,7 +451,7 @@ def build_general_breakdown_excel(project, project_id, fetch_all):
         FROM scenes s
         LEFT JOIN location_variants lv ON s.location_variant_id = lv.id
         LEFT JOIN locations l ON lv.location_id = l.id
-        WHERE s.project_id=? ORDER BY s.scene_number
+        WHERE s.project_id=? ORDER BY """ + _EPISODE_ORDER + """
     """, (project_id,))
     rows = []
     for idx, sc in enumerate(scenes, start=1):
@@ -506,13 +518,12 @@ def build_locations_sheet_excel(project, project_id, fetch_all):
     rows = []
     for idx, loc in enumerate(locations, start=1):
         scene_rows = fetch_all("""
-            SELECT s.scene_number
+            SELECT s.scene_number, s.scene_suffix, s.episode_number
             FROM scenes s
             JOIN location_variants lv ON s.location_variant_id = lv.id
             WHERE lv.location_id = ?
-            ORDER BY s.scene_number
         """, (loc["id"],))
-        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        scene_numbers = _scene_labels(scene_rows)
         # لو المكان ده ديكور/تكوين فرعي تابع لمكان رئيسي، نوضح ده في خانة
         # الديكور مع اسم المكان الرئيسي اللي بينتمي له
         if loc["parent_location_id"]:
@@ -557,12 +568,11 @@ def build_props_sheet_excel(project, project_id, fetch_all):
     rows = []
     for idx, prop in enumerate(props, start=1):
         scene_rows = fetch_all("""
-            SELECT s.scene_number FROM scene_props sp
+            SELECT s.scene_number, s.scene_suffix, s.episode_number FROM scene_props sp
             JOIN scenes s ON sp.scene_id = s.id
             WHERE sp.prop_id = ?
-            ORDER BY s.scene_number
         """, (prop["id"],))
-        scene_numbers = sorted({r["scene_number"] for r in scene_rows})
+        scene_numbers = _scene_labels(scene_rows)
         rows.append({
             "number": idx,
             "name": prop["name"],

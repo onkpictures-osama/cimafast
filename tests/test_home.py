@@ -31,7 +31,8 @@ accounts.add_member("boss_a", A, "costume", role="department", job_title="مصم
 accounts.add_member("boss_a", A, "ad", role="department", job_title="مساعد مخرج أول")
 accounts.add_member("boss_a", A, "watcher", role="viewer")
 EMPTY = accounts.create_project("boss_a", A, "مشروع فاضي", "فيلم", "1080p", "أفقي", "16:9")
-FULL = accounts.create_project("boss_a", A, "عروسة البحر", "مسلسل", "1080p", "أفقي", "16:9")
+FULL = accounts.create_project("boss_a", A, "عروسة البحر", "مسلسل", "1080p", "أفقي", "16:9",
+                              episode_count=10)
 OTHER = accounts.create_project("boss_b", B, "سر الشركة ب", "فيلم", "1080p", "أفقي", "16:9")
 
 loc = repo.add_location(FULL, "شقة حسام", "", None, None)

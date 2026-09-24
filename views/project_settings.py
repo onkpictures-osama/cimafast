@@ -69,8 +69,23 @@ def render(project_id, current_user, company_id, role, tier, board_url):
 
     # الحلقات (للمسلسلات بس)
     if project["project_type"] == "مسلسل":
-        st.subheader(f"🎬 {t('الحلقات')}")
+        st.subheader(f"📺 {t('الحلقات')}")
         episodes = repo.episodes_of_project(project_id)
+
+        # عدد الحلقات: بيكمّل الناقص من 1 لحد الرقم ده. مابيمسحش حلقات لو
+        # الرقم قلّ - مسح حلقة (ومشاهدها) قرار لوحده، من الحلقة نفسها تحت.
+        _have = max((e["episode_number"] for e in episodes), default=0)
+        c_n, c_b = st.columns([2, 1], vertical_alignment="bottom")
+        _target = c_n.number_input(t("عدد الحلقات"), min_value=1, max_value=500, step=1,
+                                   value=max(_have, 1), key=f"ep_count_{project_id}",
+                                   disabled=not can_edit)
+        if c_b.button(t("تحديث العدد"), key=f"ep_count_btn_{project_id}", disabled=not can_edit,
+                      use_container_width=True):
+            made = repo.ensure_episodes(project_id, _target)
+            st.toast(f"{t('اتضاف')} {made} {t('حلقة')}" if made else t("كل الحلقات موجودة بالفعل"), icon="📺")
+            st.rerun()
+        if not episodes:
+            st.warning(t("المسلسل ده لسه مالوش حلقات — حدد العدد فوق عشان تقدر ترفع سكريبت كل حلقة."))
 
         st.markdown(f"**{t('إنشاء حلقة جديدة')}**")
         new_ep_num = st.number_input(t("رقم الحلقة"), min_value=1, value=len(episodes) + 1, key=f"new_ep_num_{project_id}")
@@ -78,12 +93,12 @@ def render(project_id, current_user, company_id, role, tier, board_url):
         new_ep_desc = st.text_area(t("وصف الحلقة"), key=f"new_ep_desc_{project_id}")
 
         if st.button(t("إضافة حلقة"), key=f"add_ep_btn_{project_id}", disabled=not can_edit):
-            if new_ep_title.strip():
-                repo.add_episode(project_id, int(new_ep_num), new_ep_title, new_ep_desc)
+            if any(e["episode_number"] == int(new_ep_num) for e in episodes):
+                st.warning(t("الحلقة دي موجودة بالفعل"))
+            else:
+                repo.add_episode(project_id, int(new_ep_num), new_ep_title.strip() or None, new_ep_desc)
                 st.success(t("تم إضافة الحلقة"))
                 st.rerun()
-            else:
-                st.warning(t("أدخل عنوان الحلقة"))
 
         if episodes:
             st.markdown(f"**{t('الحلقات')} ({len(episodes)})**")

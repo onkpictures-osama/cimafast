@@ -251,9 +251,22 @@ def can_access_project(username, project_id):
     return bool(p) and role_in(username, p["company_id"]) is not None
 
 
-def create_project(actor, company_id, name, project_type, resolution, orientation, aspect_ratio):
+def create_project(actor, company_id, name, project_type, resolution, orientation, aspect_ratio,
+                   episode_count=None, type_details=None):
     """مشروع جديد في شركة معيّنة. قبل F1 المشروع كان بيتعمل من غير شركة وكل الناس
-    تشوفه؛ دلوقتي بيتسجّل تبع الشركة اللي المستخدم شغال فيها."""
+    تشوفه؛ دلوقتي بيتسجّل تبع الشركة اللي المستخدم شغال فيها.
+
+    المسلسل لازم يجي بعدد حلقاته (≥1)، والحلقات من 1 لـ N بتتعمل معاه على
+    طول عشان رفع السكريبت يبقى "لأنهي حلقة" من أول يوم. type_details: dict
+    بالتفاصيل الخاصة بالنوع، بيتخزن JSON."""
+    if project_type == "مسلسل":
+        try:
+            episode_count = int(episode_count)
+        except (TypeError, ValueError):
+            episode_count = 0
+        if episode_count < 1:
+            raise ValueError("المسلسل لازم يبقى له عدد حلقات (1 أو أكتر)")
+    import json
     role = role_in(actor, company_id)
     if role is None:
         raise AccessDenied("مش عضو في الشركة دي")
@@ -266,8 +279,13 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
         with permissions.system():
             project_id = run_query(
                 "INSERT INTO projects (name, project_type, default_resolution, default_orientation, "
-                "default_aspect_ratio, company_id) VALUES (?, ?, ?, ?, ?, ?)",
-                (name, project_type, resolution, orientation, aspect_ratio, company_id))
+                "default_aspect_ratio, company_id, type_details) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (name, project_type, resolution, orientation, aspect_ratio, company_id,
+                 json.dumps(type_details, ensure_ascii=False) if type_details else None))
+            if project_type == "مسلسل":
+                import repo
+                repo.ensure_episodes(project_id, episode_count)
+                act.extra["حلقات"] = episode_count
         act.entity_id = act.project_id = project_id
     return project_id
 

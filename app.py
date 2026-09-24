@@ -15,6 +15,8 @@ import theme
 from i18n import t, tr
 from ui import ltr
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
+import views.new_project
+import project_types
 import views.project_settings
 import repo
 import accounts
@@ -574,18 +576,10 @@ project_names = {p["name"]: p["id"] for p in projects}
 
 if permissions.can(_role, "create_project"):
     with _sb_projects.expander(tr("new_project")):
-        new_name = st.text_input(t("اسم المشروع"), placeholder=t("مثال: عروسة البحر"))
-        new_type = st.selectbox(t("نوع المشروع"), ["فيلم", "مسلسل", "إعلان", "فيديو قصير"], format_func=t, help=FIELD_HELP["project_type"])
-        new_res = st.selectbox(t("الدقة الافتراضية"), ["720p", "1080p", "2K", "4K"], help=FIELD_HELP["default_resolution"])
-        new_orient = st.selectbox(t("الاتجاه الافتراضي"), ["أفقي", "رأسي", "مربع"], format_func=t, help=FIELD_HELP["default_orientation"])
-        new_ratio = st.selectbox(t("نسبة الأبعاد الافتراضية"), ["4:5", "16:9", "9:16", "1:1", "4:3", "21:9"], index=0)
-        if st.button(t("إنشاء المشروع")):
-            if new_name.strip():
-                accounts.create_project(_current_user, company_id, new_name, new_type, new_res, new_orient, new_ratio)
-                st.success(t("تم إنشاء المشروع"))
-                st.rerun()
-            else:
-                st.warning(t("اكتب اسم المشروع أولًا"))
+        # النوع أول اختيار، وكل نوع ليه أسئلته (المسلسل: عدد الحلقات) -
+        # views/new_project.py
+        if views.new_project.render(_current_user, company_id):
+            st.rerun()
 
 # الشريط ده بيتبني قبل فحص "مفيش مشاريع" تحت (مش بعد اختيار المشروع):
 # يوزر ملوش مشاريع كان بيوقف عند st.stop() من غير زرار خروج ولا مفتاح
@@ -748,7 +742,7 @@ _caption_line = (
 st.markdown(
     f"""
     <div style="text-align:center;">
-        <h2 style="margin-bottom:2px;">🎬 {project['name']}</h2>
+        <h2 style="margin-bottom:2px;">{project_types.TYPE_ICONS.get(project['project_type'], '🎬')} {html.escape(project['name'])}</h2>
         <div style="opacity:0.75; font-size:0.9rem;">{_caption_line}</div>
     </div>
     """,

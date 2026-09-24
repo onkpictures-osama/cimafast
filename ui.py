@@ -115,15 +115,15 @@ def bump_version(project_id):
     repo.bump_project_data_version(project_id)
 
 
-def shift_scene_numbers(project_id, from_number, exclude_scene_id=None):
+def shift_scene_numbers(project_id, from_number, exclude_scene_id=None, episode_number=None):
     """لو المستخدم ضاف أو غيّر رقم مشهد لرقم مستخدم قبل كده، بندفع كل المشاهد
     اللي رقمها >= الرقم الجديد رقم واحد لقدام - بما إن اللقطات مربوطة
     بالمشهد عن طريق scene_id (مش رقم المشهد)، الدفع ده آمن ومبيأثرش على أي
     بيانات تانية، بس بيحدث رقم المشهد المعروض بس."""
     if exclude_scene_id is not None:
-        repo.shift_scene_numbers_up_except(project_id, from_number, exclude_scene_id)
+        repo.shift_scene_numbers_up_except(project_id, from_number, exclude_scene_id, episode_number)
     else:
-        repo.shift_scene_numbers_up(project_id, from_number)
+        repo.shift_scene_numbers_up(project_id, from_number, episode_number)
 
 
 def shift_shot_numbers(project_id, scene_id, from_number, exclude_shot_id=None):

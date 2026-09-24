@@ -5,6 +5,8 @@ import analysis_library
 import json
 import logging
 import uuid
+import re
+
 import streamlit as st
 import streamlit.components.v1 as st_components
 from ai_prompt import AI_JSON_PROMPT
@@ -244,6 +246,107 @@ def _render_analysis_dashboard(scenes):
         )
 
 
+# ---------- المسلسل: الاستيراد بالحلقة (طلب المالك 2026-09-24) ----------
+# الحلقة بتتحدد **قبل** الرفع (شبكة بحالة كل حلقة)، والبرنامج عمره ما بيخمّن
+# رقم حلقة ويحطه لوحده: لو الملف أو اسمه بيقول حلقة تانية، بيسأل.
+
+_EP_IN_NAME = re.compile(r"(?:الحلقة|حلقة|حلقه|(?<![A-Za-z])(?:episode|ep))[\s_\-\.]*0*([0-9٠-٩]{1,3})",
+                         re.IGNORECASE)
+_AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+
+
+def episode_from_filename(name):
+    """رقم الحلقة من اسم الملف ("الحلقة 07.docx"، "ep3.pdf")، أو None."""
+    m = _EP_IN_NAME.search(name or "")
+    return int(m.group(1).translate(_AR_DIGITS)) if m else None
+
+
+def _episode_key(project_id):
+    return f"import_episode_{project_id}"
+
+
+def _render_episode_picker(project_id):
+    """شبكة الحلقات بعدد مشاهد كل واحدة. بترجّع رقم الحلقة المختارة."""
+    overview = repo.episode_overview(project_id)
+    if not overview:
+        st.warning(t("المسلسل ده لسه مالوش حلقات. حدد عدد الحلقات من ⚙️ إعدادات المشروع."))
+        return None
+    numbers = [e["episode_number"] for e in overview]
+    counts = {e["episode_number"]: e["scenes"] for e in overview}
+    key = _episode_key(project_id)
+    if st.session_state.get(key) not in numbers:
+        # أول حلقة لسه مالهاش سكريبت - اللي غالبًا اليوزر جاي يرفعها
+        st.session_state[key] = next((n for n in numbers if not counts[n]), numbers[0])
+    done = sum(1 for n in numbers if counts[n])
+    st.markdown(f"**📺 {t('ارفع سكريبت أنهي حلقة؟')}** "
+                f"<span style='opacity:.7'>({ltr(done)} {t('من')} {ltr(len(numbers))} {t('حلقة ليها سكريبت')})</span>",
+                unsafe_allow_html=True)
+    st.pills(t("الحلقة"), numbers, key=key, label_visibility="collapsed",
+             format_func=lambda n: f"{n} {'✅' if counts[n] else '⬜'}")
+    chosen = st.session_state.get(key) or numbers[0]
+    n = counts.get(chosen, 0)
+    st.caption(f"✅ = {t('فيها سكريبت')} · ⬜ = {t('لسه')}  —  "
+               + (f"{t('الحلقة')} {ltr(chosen)}: {ltr(n)} {t('مشهد متسجل')}" if n
+                  else f"{t('الحلقة')} {ltr(chosen)}: {t('لسه مالهاش سكريبت')}"))
+    loose = repo.scenes_without_episode_count(project_id)
+    if loose:
+        st.caption(f"⚠️ {ltr(loose)} {t('مشهد في المشروع من غير حلقة (اتضافوا قبل كده) — حدد حلقتهم من تبويب المشاهد.')}")
+    return chosen
+
+
+def _series_assignment(project_id, scenes, chosen):
+    """بتقرر كل مشهد هيروح أنهي حلقة، وبتسأل لو فيه تعارض.
+
+    بترجّع (المشاهد بأرقام حلقاتها، جاهز؟، رقم الحلقة اللي هتتستبدل أو None)."""
+    file_eps = sorted({int(sc["episode_number"]) for sc in scenes if sc.get("episode_number") is not None})
+    loose = sum(1 for sc in scenes if sc.get("episode_number") is None)
+    st.markdown(f"**📺 {t('توزيع المشاهد على الحلقات')}**")
+
+    # ملف فيه كذا حلقة: كل مشهد بحلقته اللي في الملف
+    if len(file_eps) >= 2:
+        per = {n: sum(1 for sc in scenes if sc.get("episode_number") == n) for n in file_eps}
+        st.info(f"{t('الملف ده فيه')} {ltr(len(file_eps))} {t('حلقات')}: "
+                + "، ".join(f"{t('الحلقة')} {n} ({ltr(c)} {t('مشهد')})" for n, c in per.items())
+                + (f"\n\n{ltr(loose)} {t('مشهد من غير رقم حلقة هيتحطوا في الحلقة')} {ltr(chosen)}." if loose else ""))
+        out = [dict(sc, episode_number=sc["episode_number"] if sc.get("episode_number") is not None else chosen)
+               for sc in scenes]
+        return out, True, None
+
+    # حلقة واحدة: اللي اخترتها، إلا لو الملف أو اسمه بيقول غير كده
+    detected = file_eps[0] if file_eps else episode_from_filename(st.session_state.get("_import_src_name"))
+    target = chosen
+    if detected is not None and detected != chosen:
+        where = t("جوه الملف") if file_eps else t("في اسم الملف")
+        st.warning(f"{t('انت اخترت الحلقة')} {ltr(chosen)}، {t('بس')} {where} {t('مكتوب الحلقة')} {ltr(detected)}.")
+        pick = st.radio(t("المشاهد دي تبع أنهي حلقة؟"),
+                        [chosen, detected], index=None, horizontal=True,
+                        format_func=lambda n: f"{t('الحلقة')} {n}"
+                        + (f" ({t('اللي اخترتها')})" if n == chosen else f" ({t('اللي في الملف')})"),
+                        key=f"import_ep_conflict_{project_id}_{chosen}_{detected}")
+        if pick is None:
+            st.caption(t("اختار الحلقة الصح عشان تقدر تكمّل."))
+            return scenes, False, None
+        target = pick
+
+    existing = next((e["scenes"] for e in repo.episode_overview(project_id) if e["episode_number"] == target), 0)
+    replace = None
+    if existing:
+        mode = st.radio(
+            f"{t('الحلقة')} {ltr(target)} {t('فيها')} {ltr(existing)} {t('مشهد بالفعل')}:",
+            ["add", "replace"], horizontal=True, key=f"import_ep_mode_{project_id}_{target}",
+            format_func=lambda m: t("➕ ضيف الجديد بس (المكرر بيتخطى)") if m == "add"
+            else t("♻️ استبدل مشاهد الحلقة كلها"))
+        if mode == "replace":
+            st.error(f"⚠️ {t('الاستبدال بيمسح')} {ltr(existing)} {t('مشهد من الحلقة')} {ltr(target)} "
+                     f"{t('بلقطاتهم وروابطهم وجدولتهم نهائيًا، وبعدين يستورد الملف الجديد.')}")
+            if not st.checkbox(t("متأكد — استبدل"), key=f"import_ep_replace_ok_{project_id}_{target}"):
+                return scenes, False, None
+            replace = target
+    else:
+        st.caption(f"{t('كل المشاهد')} ({ltr(len(scenes))}) {t('هتتحط في الحلقة')} {ltr(target)}.")
+    return [dict(sc, episode_number=target) for sc in scenes], True, replace
+
+
 def render(project_id):
     st.subheader(tr("sub_import"))
     st.caption(t(
@@ -283,7 +386,18 @@ def render(project_id):
         )
         st.code(AI_JSON_PROMPT, language="text")
 
-    uploaded_file = st.file_uploader(t("اختر ملف السكريبت"), type=["docx", "txt", "pdf", "json"], key="script_upload")
+    _project = repo.project_by_id(project_id)[0]
+    _series = repo.is_series(_project)
+    _chosen_episode = None
+    if _series:
+        with st.container(border=True, key="cf_import_episodes"):
+            _chosen_episode = _render_episode_picker(project_id)
+    _upload_label = (f"{t('اختر ملف سكريبت الحلقة')} {_chosen_episode}" if _chosen_episode
+                     else t("اختر ملف السكريبت"))
+    uploaded_file = st.file_uploader(_upload_label, type=["docx", "txt", "pdf", "json"], key="script_upload")
+    if uploaded_file is not None:
+        # اسم الملف بيتفضل بعد التحليل (الـ AI بياخد دقايق) عشان فحص "الحلقة الكام"
+        st.session_state["_import_src_name"] = uploaded_file.name
 
     _known = [r["name"] for r in repo.character_names_of_project(project_id)]
     _ai_active = ai_jobs.active_job(project_id)
@@ -614,11 +728,22 @@ def render(project_id):
         if excluded_scene_indices:
             st.caption(f"{t('هيتستبعد')} {len(excluded_scene_indices)} {t('مشهد من الاستيراد حسب اختيارك فوق.')}")
 
+        _ep_ready, _ep_replace = True, None
+        if _series and _chosen_episode:
+            st.markdown("---")
+            with st.container(border=True, key="cf_import_ep_assign"):
+                preview_scenes, _ep_ready, _ep_replace = _series_assignment(
+                    project_id, preview_scenes, _chosen_episode)
+
         col_a, col_b = st.columns(2)
         with col_a:
-            if st.button(t("🔵 تأكيد وإضافة كل المشاهد للمشروع")):
+            if st.button(t("🔵 تأكيد وإضافة كل المشاهد للمشروع"), disabled=not _ep_ready):
                 scenes_to_import = apply_character_merges(preview_scenes, merge_map)
                 scenes_to_import = apply_location_merges(scenes_to_import, location_merge_map)
+                if _ep_replace is not None:
+                    with audit.action("episode_replace", "scenes", project_id=project_id,
+                                      summary=f"استبدال سكريبت الحلقة {_ep_replace}"):
+                        repo.delete_episode_scenes(project_id, _ep_replace)
                 # F3: استيراد فيه ١٤٣ مشهد بيكتب آلاف الصفوف. الصف الواحد ده
                 # بيقول مين استورد وإمتى وكام مشهد — والتفاصيل في البيانات نفسها.
                 with audit.action("import_script", "scenes", project_id=project_id) as _act:

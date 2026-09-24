@@ -908,6 +908,9 @@ _MIGRATIONS = {
         ("owner_name", "TEXT"),
         ("owner_role", "TEXT"),
         ("data_version", "INTEGER DEFAULT 1"),
+        # تفاصيل خاصة بنوع المشروع (JSON): مدة الحلقة للمسلسل، المنصة للفيديو
+        # القصير... - عمود واحد بدل عمود لكل نوع، لأن كل نوع أسئلته غير التاني.
+        ("type_details", "TEXT"),
     ],
     "locations": [
         ("parent_location_id", "INTEGER"),
@@ -929,6 +932,11 @@ _MIGRATIONS = {
         ("look_change_notes", "TEXT"),
         ("suggested_shot_size", "TEXT"),
         ("suggested_camera_movement", "TEXT"),
+        # الجدول الأصلي فيه episode_id بس القواعد القديمة (/v1 والإنتاج)
+        # اتعملت قبله ومفيش مهاجرة كانت بتضيفه - فـ repo.add_scene كانت
+        # بتقع بـ "no such column" في أي "إضافة مشهد" يدوي (اتلقط 2026-09-24).
+        # مصدر الحقيقة للحلقة هو episode_number؛ ده بيتملى جنبه.
+        ("episode_id", "INTEGER"),
     ],
     "location_variants": [
         ("reference_image_path", "TEXT"),
@@ -957,19 +965,25 @@ _MIGRATIONS = {
 
 
 def scene_label(scene):
-    """رقم المشهد زي ما بيتكتب في الورق: 35 أو 35A.
+    """رقم المشهد زي ما بيتكتب في الورق: 35 أو 35A، وفي المسلسل 3/35
+    (الحلقة 3، المشهد 35).
 
     كل حتة بتعرض رقم مشهد لازم تعدي من هنا، عشان الرقم في البرنامج يفضل هو
-    نفسه الرقم اللي الفريق ماسكه في التصوير."""
+    نفسه الرقم اللي الفريق ماسكه في التصوير. رقم الحلقة بيتكتب بس لو
+    موجود في الصف - والاستيراد مابيحطهوش غير لمشاريع المسلسلات."""
     if scene is None:
         return ""
     try:
         number = scene["scene_number"]
-        suffix = scene["scene_suffix"] if "scene_suffix" in scene.keys() else None
+        keys = scene.keys()
+        suffix = scene["scene_suffix"] if "scene_suffix" in keys else None
+        episode = scene["episode_number"] if "episode_number" in keys else None
     except (TypeError, KeyError, AttributeError):
         number = scene.get("scene_number") if hasattr(scene, "get") else scene
         suffix = scene.get("scene_suffix") if hasattr(scene, "get") else None
-    return f"{number}{suffix or ''}"
+        episode = scene.get("episode_number") if hasattr(scene, "get") else None
+    label = f"{number}{suffix or ''}"
+    return f"{episode}/{label}" if episode is not None else label
 
 
 def next_free_number(numbers):

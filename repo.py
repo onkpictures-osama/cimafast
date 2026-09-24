@@ -506,12 +506,20 @@ def bump_project_data_version(*params):
     return run_query('UPDATE projects SET data_version = COALESCE(data_version, 1) + 1 WHERE id=?', params)
 
 
-def shift_scene_numbers_up_except(*params):
-    return run_query('UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ? AND id != ?', params)
+# الدفع (رقم مستخدم ← باقي المشاهد رقم لقدام) جوه نفس الحلقة بس: في المسلسل
+# مشهد 5 في الحلقة 2 مالوش علاقة بمشهد 5 في الحلقة 7. COALESCE بدل "IS ?"
+# عشان نفس الجملة تشتغل على SQLite وPostgres (NULL = فيلم/من غير حلقة).
+_SAME_EPISODE = "COALESCE(episode_number, -1) = COALESCE(?, -1)"
 
 
-def shift_scene_numbers_up(*params):
-    return run_query('UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ?', params)
+def shift_scene_numbers_up_except(project_id, from_number, exclude_id, episode_number=None):
+    return run_query('UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ? '
+                     f'AND id != ? AND {_SAME_EPISODE}', (project_id, from_number, exclude_id, episode_number))
+
+
+def shift_scene_numbers_up(project_id, from_number, episode_number=None):
+    return run_query('UPDATE scenes SET scene_number = scene_number + 1 WHERE project_id=? AND scene_number >= ? '
+                     f'AND {_SAME_EPISODE}', (project_id, from_number, episode_number))
 
 
 def shift_shot_numbers_up_except(project_id, *params):
@@ -759,7 +767,10 @@ def scene_ids_of_project(*params):
 
 
 def scenes_of_project(*params):
-    return fetch_all('SELECT * FROM scenes WHERE project_id=? ORDER BY scene_number', params)
+    # الحلقة الأول (المسلسل)، والمشاهد من غير حلقة في الآخر
+    return fetch_all('SELECT * FROM scenes WHERE project_id=? '
+                     'ORDER BY CASE WHEN episode_number IS NULL THEN 1 ELSE 0 END, episode_number, '
+                     'scene_number, scene_suffix', params)
 
 
 def scene_character_names(*params):
@@ -782,8 +793,19 @@ def episode_labels(*params):
     return fetch_all('SELECT id, episode_number, title FROM episodes WHERE project_id=? ORDER BY episode_number', params)
 
 
-def add_scene(*params):
-    return run_query('INSERT INTO scenes (project_id, episode_id, scene_number, int_ext, day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?,?)', params)
+def add_scene(project_id, episode_id, *params):
+    """الحلقة بتتكتب رقمها (episode_number - مصدر الحقيقة) جنب الـ id، عشان
+    المشهد اليدوي يطلع "3/12" زي المستورد بالظبط."""
+    episode_number = None
+    if episode_id is not None:
+        rows = fetch_all("SELECT episode_number FROM episodes WHERE id=? AND project_id=?",
+                         (episode_id, project_id))
+        episode_number = rows[0]["episode_number"] if rows else None
+        if episode_number is None:
+            episode_id = None
+    return run_query('INSERT INTO scenes (project_id, episode_id, episode_number, scene_number, int_ext, '
+                     'day_night, weather, location_variant_id, notes) VALUES (?,?,?,?,?,?,?,?,?)',
+                     (project_id, episode_id, episode_number) + params)
 
 
 def link_character_to_scene(project_id, scene_id, character_id):
@@ -827,8 +849,25 @@ def scene_numbers_of_project(*params):
     return fetch_all('SELECT scene_number FROM scenes WHERE project_id=?', params)
 
 
-def other_scene_with_number(*params):
-    return fetch_all('SELECT id FROM scenes WHERE project_id=? AND scene_number=? AND id != ?', params)
+def other_scene_with_number(project_id, number, scene_id, episode_number=None):
+    return fetch_all(f'SELECT id FROM scenes WHERE project_id=? AND scene_number=? AND id != ? AND {_SAME_EPISODE}',
+                     (project_id, number, scene_id, episode_number))
+
+
+def scene_numbers_in_episode(project_id, episode_number=None):
+    return fetch_all(f'SELECT scene_number FROM scenes WHERE project_id=? AND {_SAME_EPISODE}',
+                     (project_id, episode_number))
+
+
+def set_scene_episode(project_id, scene_id, episode_number):
+    """بينقل مشهد لحلقة (أو يشيله من أي حلقة بـ None)، والـ id بيتظبط معاه."""
+    ep_id = None
+    if episode_number is not None:
+        rows = fetch_all("SELECT id FROM episodes WHERE project_id=? AND episode_number=?",
+                         (project_id, int(episode_number)))
+        ep_id = rows[0]["id"] if rows else None
+    return run_query("UPDATE scenes SET episode_number=?, episode_id=? WHERE id=? AND project_id=?",
+                     (episode_number, ep_id, scene_id, project_id))
 
 
 def character_ids_in_scene(*params):
@@ -1284,3 +1323,56 @@ def character_tracking(project_id, character_id):
     out["days"] = [{"day_number": dood["days"][i], "date": dood["dates"][i], "code": code}
                    for i, code in enumerate(row["codes"]) if code and code != "H"]
     return out
+
+
+
+# --- المسلسل: الحلقات ------------------------------------------------------------
+# الحلقة بتاعة المشهد = scenes.episode_number (مصدر الحقيقة: موجود في كل
+# القواعد، والاستيراد والجدول بيقروه). جدول episodes بيشيل بيانات الحلقة
+# نفسها (عنوان، وصف) - وصف المشروع إنه "مسلسل من N حلقة" = صفوفه.
+
+SERIES_TYPE = "مسلسل"
+
+
+def is_series(project):
+    return bool(project) and project["project_type"] == SERIES_TYPE
+
+
+def ensure_episodes(project_id, count):
+    """بيتأكد إن الحلقات من 1 لـ count موجودة (الناقص بس بيتعمل). مابيمسحش
+    حاجة لو العدد قلّ - مسح حلقة فيها مشاهد قرار لوحده. بيرجّع عدد اللي اتعمل."""
+    have = {r["episode_number"] for r in fetch_all(
+        "SELECT episode_number FROM episodes WHERE project_id=?", (project_id,))}
+    made = 0
+    for n in range(1, int(count) + 1):
+        if n not in have:
+            run_query("INSERT INTO episodes (project_id, episode_number, title) VALUES (?, ?, ?)",
+                      (project_id, n, None))
+            made += 1
+    return made
+
+
+def episode_overview(project_id):
+    """كل حلقة بعدد مشاهدها: [{episode_number, title, id, scenes}] بالترتيب.
+    الحلقات اللي ليها مشاهد ومالهاش صف في episodes (استيراد قديم) بتظهر برضه."""
+    eps = {r["episode_number"]: {"episode_number": r["episode_number"], "title": r["title"],
+                                 "id": r["id"], "scenes": 0}
+           for r in fetch_all("SELECT id, episode_number, title FROM episodes WHERE project_id=?",
+                              (project_id,))}
+    for r in fetch_all("SELECT episode_number, COUNT(*) AS n FROM scenes WHERE project_id=? "
+                       "AND episode_number IS NOT NULL GROUP BY episode_number", (project_id,)):
+        eps.setdefault(r["episode_number"], {"episode_number": r["episode_number"], "title": None,
+                                             "id": None, "scenes": 0})["scenes"] = r["n"]
+    return [eps[k] for k in sorted(eps)]
+
+
+def scenes_without_episode_count(project_id):
+    return fetch_all("SELECT COUNT(*) AS n FROM scenes WHERE project_id=? AND episode_number IS NULL",
+                     (project_id,))[0]["n"]
+
+
+def delete_episode_scenes(project_id, episode_number):
+    """بيمسح مشاهد حلقة واحدة (ولقطاتها وروابطها بالـ cascade) - لـ "استبدال
+    سكريبت الحلقة". جوه المشروع ده بس."""
+    return run_query("DELETE FROM scenes WHERE project_id=? AND episode_number=?",
+                     (project_id, int(episode_number)))
