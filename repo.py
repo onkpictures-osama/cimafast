@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 from contextlib import contextmanager
 
@@ -2138,3 +2139,106 @@ def rank_venues_for(project_id, location_id, company_id):
         ranked.append(dict(v, covered=covered, total=len(needs), same_city=same_city))
     ranked.sort(key=lambda v: (-len(v["covered"]), not v["same_city"], v["name"]))
     return ranked
+
+
+# --- طاولة التقطيع (الدِكوباج) ----------------------------------------------------
+# رسمة المكان من فوق (افتراضية لكل حالاته أو خاصة بحالة)، وأماكن الشخصيات
+# والكاميرات في كل مشهد، واللقطة بتغطي أنهي حتت من النص. المنطق في blocking.py.
+
+def scene_place(project_id, scene_id):
+    """المكان والحالة بتوع المشهد: {location_id, location, base_description,
+    variant_id, variant, variant_description} أو None لو المشهد مالوش مكان."""
+    rows = fetch_all("""
+        SELECT l.id AS location_id, l.name AS location, l.base_description,
+               v.id AS variant_id, v.variant_name AS variant, v.description AS variant_description
+        FROM scenes s JOIN location_variants v ON v.id=s.location_variant_id
+        JOIN locations l ON l.id=v.location_id
+        WHERE s.id=? AND s.project_id=? AND l.project_id=?""", (scene_id, project_id, project_id))
+    return dict(rows[0]) if rows else None
+
+
+def location_plan(project_id, location_id, variant_id=0):
+    """الرسمة: الخاصة بالحالة لو موجودة، وإلا الافتراضية. بيرجّع
+    {plan (dict), source, is_default, updated_at, updated_by} أو None لو مفيش رسمة خالص."""
+    import blocking
+    rows = fetch_all(
+        "SELECT variant_id, plan, source, updated_at, updated_by FROM location_plans "
+        "WHERE project_id=? AND location_id=? AND variant_id IN (0, ?) ORDER BY variant_id DESC",
+        (project_id, location_id, variant_id or 0))
+    if not rows:
+        return None
+    r = rows[0]
+    return {"plan": blocking.clean_plan(r["plan"]) or blocking.empty_plan(), "source": r["source"],
+            "is_default": r["variant_id"] == 0, "updated_at": r["updated_at"], "updated_by": r["updated_by"],
+            "has_default": any(x["variant_id"] == 0 for x in rows)}
+
+
+def save_location_plan(project_id, location_id, variant_id, plan, source="manual", updated_by=None):
+    """variant_id=0 = الرسمة الافتراضية للمكان (كل الحالات)."""
+    import blocking
+    clean = blocking.clean_plan(plan)
+    if clean is None:
+        raise ValueError("plan is not valid")
+    if not fetch_all("SELECT 1 FROM locations WHERE id=? AND project_id=?", (location_id, project_id)):
+        raise ValueError("location is not in this project")
+    if variant_id and not fetch_all("SELECT 1 FROM location_variants WHERE id=? AND location_id=?",
+                                    (variant_id, location_id)):
+        raise ValueError("state is not of this location")
+    now = dt.datetime.now().isoformat(timespec="seconds")
+    body = json.dumps(clean, ensure_ascii=False)
+    with _tx() as ex:
+        ex("INSERT OR IGNORE INTO location_plans (project_id, location_id, variant_id, plan, source, updated_at, "
+           "updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)", (project_id, location_id, variant_id or 0, body, source,
+                                                         now, updated_by))
+        ex("UPDATE location_plans SET plan=?, source=?, updated_at=?, updated_by=? "
+           "WHERE project_id=? AND location_id=? AND variant_id=?",
+           (body, source, now, updated_by, project_id, location_id, variant_id or 0))
+
+
+def drop_variant_plan(project_id, location_id, variant_id):
+    """الحالة ترجع للرسمة الافتراضية."""
+    if not variant_id:
+        return
+    with _tx() as ex:
+        ex("DELETE FROM location_plans WHERE project_id=? AND location_id=? AND variant_id=?",
+           (project_id, location_id, variant_id))
+
+
+def scene_blocking(project_id, scene_id):
+    rows = fetch_all("SELECT data FROM scene_blocking WHERE project_id=? AND scene_id=?", (project_id, scene_id))
+    try:
+        return json.loads(rows[0]["data"]) if rows else None
+    except ValueError:
+        return None
+
+
+def save_scene_blocking(project_id, scene_id, data, plan):
+    """data بيتنضّف: الشخصيات لازم تبقى من شخصيات المشروع، والكاميرات من لقطات المشهد."""
+    import blocking
+    chars = {r["id"] for r in fetch_all("SELECT id FROM characters WHERE project_id=?", (project_id,))}
+    shots = {r["id"] for r in fetch_all(
+        "SELECT sh.id FROM shots sh JOIN scenes s ON s.id=sh.scene_id WHERE sh.scene_id=? AND s.project_id=?",
+        (scene_id, project_id))}
+    if not fetch_all("SELECT 1 FROM scenes WHERE id=? AND project_id=?", (scene_id, project_id)):
+        raise ValueError("scene is not in this project")
+    body = json.dumps(blocking.clean_blocking(data, plan, chars, shots), ensure_ascii=False)
+    now = dt.datetime.now().isoformat(timespec="seconds")
+    with _tx() as ex:
+        ex("INSERT OR IGNORE INTO scene_blocking (project_id, scene_id, data, updated_at) VALUES (?, ?, ?, ?)",
+           (project_id, scene_id, body, now))
+        ex("UPDATE scene_blocking SET data=?, updated_at=? WHERE project_id=? AND scene_id=?",
+           (body, now, project_id, scene_id))
+
+
+def set_shot_blocks(project_id, shot_id, block_ids):
+    import blocking
+    run_query("UPDATE shots SET script_blocks=? WHERE id=? AND scene_id IN (SELECT id FROM scenes WHERE project_id=?)",
+              (blocking.dump_block_ids(block_ids), shot_id, project_id))
+
+
+def scene_character_rows(project_id, scene_id):
+    """شخصيات المشهد (للنقط في الرسمة): id، الاسم، رقم الكاست."""
+    return fetch_all("""
+        SELECT c.id, c.name, c.cast_number FROM scene_characters sc JOIN characters c ON c.id=sc.character_id
+        WHERE sc.scene_id=? AND c.project_id=? ORDER BY COALESCE(c.cast_number, 9999), c.name""",
+                     (scene_id, project_id))

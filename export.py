@@ -2,6 +2,7 @@
 تصدير تفريغ اللقطات (Shot List / Breakdown) لملف Excel أو Word أو PDF بفورمات
 سينمائي احترافي قابل للطباعة.
 """
+import json
 import os
 import textwrap
 from datetime import date
@@ -1002,8 +1003,160 @@ def build_shot_list_pdf(project, project_id, fetch_all):
         c.line(margin, y - row_height, page_w - margin, y - row_height)
         y -= row_height
 
+    _draw_plans_appendix(c, project_id, fetch_all, font_name, bold_font_name, page_w, page_h, margin)
     c.save()
     return buf.getvalue()
+
+
+# ---------- الرسومات من فوق (طاولة التقطيع) في آخر تفريغ اللقطات ----------
+
+_PLAN_CHAR_COLORS = ["#E4572E", "#17BEBB", "#76B041", "#C0398B", "#6A4C93", "#2E86AB", "#F29E4C", "#1B998B"]
+_PLAN_SHOT_COLORS = ["#D4A017", "#1E88E5", "#D81B60", "#43A047", "#8E24AA", "#F4511E", "#00897B", "#E53935",
+                     "#7CB342", "#5E35B1", "#FFB300", "#1976D2"]
+
+
+def _plans_of_project(project_id, fetch_all):
+    """لكل مشهد عنده رسمة مكان أو شخصيات/كاميرات متحطوطة: (المشهد، الرسمة، الـ blocking،
+    الشخصيات، اللقطات) — بنفس ترتيب المشاهد."""
+    import blocking
+    out = []
+    scenes = fetch_all("""SELECT s.id, s.scene_number, s.scene_suffix, s.episode_number, v.id AS variant_id,
+                                 v.variant_name, l.id AS location_id, l.name AS location
+                          FROM scenes s LEFT JOIN location_variants v ON v.id=s.location_variant_id
+                          LEFT JOIN locations l ON l.id=v.location_id
+                          WHERE s.project_id=? ORDER BY s.episode_number, s.scene_number, s.id""", (project_id,))
+    for sc in scenes:
+        plan_row = None
+        if sc["location_id"]:
+            rows = fetch_all("SELECT plan FROM location_plans WHERE project_id=? AND location_id=? AND variant_id IN (0, ?) "
+                             "ORDER BY variant_id DESC", (project_id, sc["location_id"], sc["variant_id"] or 0))
+            plan_row = rows[0] if rows else None
+        bl_rows = fetch_all("SELECT data FROM scene_blocking WHERE project_id=? AND scene_id=?", (project_id, sc["id"]))
+        if not plan_row and not bl_rows:
+            continue
+        plan = blocking.clean_plan(plan_row["plan"]) if plan_row else blocking.empty_plan()
+        try:
+            bl = json.loads(bl_rows[0]["data"]) if bl_rows else blocking.empty_blocking()
+        except ValueError:
+            bl = blocking.empty_blocking()
+        chars = {r["id"]: r["name"] for r in fetch_all(
+            "SELECT id, name FROM characters WHERE project_id=?", (project_id,))}
+        shots = fetch_all("SELECT id, shot_number, shot_size, camera_movement FROM shots WHERE scene_id=? "
+                          "ORDER BY shot_number", (sc["id"],))
+        out.append((sc, plan, bl, chars, shots))
+    return out
+
+
+def _draw_plan(c, plan, bl, chars, shots, box, font_name, bold_font_name):
+    """الرسمة جوه مستطيل box=(x, y, w, h) بإحداثيات الصفحة (y لفوق). الشمال في
+    الرسمة = الشمال في الصفحة، وفوق = فوق (بنقلب محور y بس)."""
+    import math
+    import blocking
+    bx, by, bw, bh = box
+    m = blocking.margin(plan["w"], plan["h"])
+    span_w, span_h = plan["w"] + 2 * m, plan["h"] + 2 * m
+    k = min(bw / span_w, bh / span_h)
+    ox = bx + (bw - span_w * k) / 2 + m * k
+    oy = by + bh - (bh - span_h * k) / 2 - m * k
+
+    def P(x, y):
+        return ox + x * k, oy - y * k
+
+    u = max(plan["w"], plan["h"]) / 500 * k * 1.4     # أكبر شوية من الشاشة: الورق بيتقري من بعيد
+    c.setStrokeColor(colors.HexColor("#1B2A4A")); c.setLineWidth(2)
+    x0, y0 = P(0, plan["h"])
+    c.rect(x0, y0, plan["w"] * k, plan["h"] * k, stroke=1, fill=0)
+    c.setLineWidth(0.8)
+    for it in plan["items"]:
+        c.saveState()
+        cx, cy = P(it["x"], it["y"])
+        c.translate(cx, cy); c.rotate(-it["r"])
+        w, h = it["w"] * k, it["h"] * k
+        fill = {"wall": "#9AA3B5", "window": "#BFE0FF", "door": "#E8C9A0", "plant": "#CDE8C4"}.get(it["k"], "#E8EBF2")
+        c.setFillColor(colors.HexColor(fill)); c.setStrokeColor(colors.HexColor("#56627A"))
+        if it["k"] == "plant":
+            c.circle(0, 0, max(w, h) / 2, stroke=1, fill=1)
+        else:
+            c.roundRect(-w / 2, -h / 2, w, h, 2, stroke=1, fill=1)
+        if it["label"]:
+            c.setFillColor(colors.HexColor(f"#{INK}")); c.setFont(font_name, max(7, 11 * u))
+            c.drawCentredString(0, -3 * u, _ar(it["label"]))
+        c.restoreState()
+    c.setStrokeColor(colors.HexColor("#56627A")); c.setLineWidth(1.2)
+    for s in plan["strokes"]:
+        path = c.beginPath()
+        path.moveTo(*P(*s["pts"][0]))
+        for pt in s["pts"][1:]:
+            path.lineTo(*P(*pt))
+        c.drawPath(path, stroke=1, fill=0)
+    shot_by_id = {sh["id"]: (i, sh) for i, sh in enumerate(shots)}
+    for cam in bl.get("cams") or []:
+        if cam.get("shot_id") not in shot_by_id:
+            continue
+        i, sh = shot_by_id[cam["shot_id"]]
+        col = colors.HexColor(_PLAN_SHOT_COLORS[i % len(_PLAN_SHOT_COLORS)])
+        cx, cy = P(cam["x"], cam["y"])
+        fov = math.radians(blocking.fov_for(sh["shot_size"]))
+        length = max(plan["w"], plan["h"]) * 0.35 * k
+        a = math.radians(-cam["r"])
+        c.setFillColor(col); c.setStrokeColor(col); c.setFillAlpha(0.18)
+        path = c.beginPath(); path.moveTo(cx, cy)
+        path.lineTo(cx + length * math.cos(a + fov / 2), cy + length * math.sin(a + fov / 2))
+        path.lineTo(cx + length * math.cos(a - fov / 2), cy + length * math.sin(a - fov / 2))
+        path.close(); c.drawPath(path, stroke=1, fill=1)
+        c.setFillAlpha(1)
+        c.roundRect(cx - 12 * u, cy - 9 * u, 24 * u, 18 * u, 3, stroke=0, fill=1)
+        c.setFillColor(colors.white); c.setFont(bold_font_name, max(7, 12 * u))
+        c.drawCentredString(cx, cy - 4 * u, str(sh["shot_number"]))
+    for i, ch in enumerate(bl.get("chars") or []):
+        name = chars.get(ch.get("id"))
+        if not name:
+            continue
+        col = colors.HexColor(_PLAN_CHAR_COLORS[i % len(_PLAN_CHAR_COLORS)])
+        cx, cy = P(ch["x"], ch["y"])
+        if ch.get("tx") is not None:
+            c.setStrokeColor(col); c.setDash(4, 3); c.setLineWidth(1.4)
+            c.line(cx, cy, *P(ch["tx"], ch["ty"])); c.setDash()
+            c.circle(*P(ch["tx"], ch["ty"]), 5 * u, stroke=1, fill=0)
+        a = math.radians(-ch.get("f", 0))
+        c.setFillColor(col)
+        path = c.beginPath()
+        path.moveTo(cx + 26 * u * math.cos(a), cy + 26 * u * math.sin(a))
+        path.lineTo(cx + 14 * u * math.cos(a + 0.5), cy + 14 * u * math.sin(a + 0.5))
+        path.lineTo(cx + 14 * u * math.cos(a - 0.5), cy + 14 * u * math.sin(a - 0.5))
+        path.close(); c.drawPath(path, stroke=0, fill=1)
+        c.circle(cx, cy, 12 * u, stroke=0, fill=1)
+        c.setFillColor(colors.HexColor(f"#{INK}")); c.setFont(bold_font_name, max(7, 11 * u))
+        c.drawCentredString(cx, cy - 26 * u, _ar(name))
+
+
+def _draw_plans_appendix(c, project_id, fetch_all, font_name, bold_font_name, page_w, page_h, margin):
+    """صفحة لكل مشهدين: الرسمة من فوق + مفتاح اللقطات."""
+    plans = _plans_of_project(project_id, fetch_all)
+    half = (page_w - 2 * margin) / 2
+    for idx, (sc, plan, bl, chars, shots) in enumerate(plans):
+        if idx % 2 == 0:
+            c.showPage()
+            c.setFillColor(colors.HexColor(f"#{INK}")); c.setFont(bold_font_name, 13)
+            c.drawCentredString(page_w / 2, page_h - margin - 14, _ar("الرسومات من فوق (طاولة التقطيع)"))
+        right = page_w - margin - (idx % 2) * half
+        top = page_h - margin - 34
+        title = f"مشهد {scene_label(sc)}"
+        if sc["location"]:
+            title += f" — {sc['location']}" + (f" ({sc['variant_name']})" if sc["variant_name"] else "")
+        c.setFillColor(colors.HexColor(f"#{NAVY}")); c.setFont(bold_font_name, 10.5)
+        c.drawRightString(right - 6, top, _ar(title))
+        legend_h = 12 * min(len(shots), 8) + 6
+        _draw_plan(c, plan, bl, chars, shots, (right - half + 8, margin + legend_h, half - 16, top - 10 - margin - legend_h),
+                   font_name, bold_font_name)
+        c.setFont(font_name, 7.5)
+        ly = margin + legend_h - 10
+        for i, sh in enumerate(shots[:8]):
+            c.setFillColor(colors.HexColor(_PLAN_SHOT_COLORS[i % len(_PLAN_SHOT_COLORS)]))
+            c.rect(right - 14, ly - 1, 8, 8, stroke=0, fill=1)
+            c.setFillColor(colors.HexColor(f"#{INK}"))
+            c.drawRightString(right - 18, ly, _ar(f"لقطة {sh['shot_number']} — {sh['shot_size'] or ''} · {sh['camera_movement'] or ''}"))
+            ly -= 12
 
 
 # ---------- تقرير البناء الدرامي (dramaturgy.py) ----------

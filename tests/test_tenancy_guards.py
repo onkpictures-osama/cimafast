@@ -93,6 +93,7 @@ SCOPED_TABLES = {
     "locations", "location_variants", "props", "episodes",
     "wardrobe_items",          # P10: عن طريق الغيار (character_looks → characters)
     "shooting_days", "post_departments", "post_comments",   # الإنتاج وما بعده
+    "location_plans", "scene_blocking",                     # طاولة التقطيع
 }
 # جداول الربط: مالهاش بيانات خاصة بيها، بس ربط صف بصف من مشروع تاني هو نفسه
 # تسريب. هنا حتى الـ INSERT لازم يتأكد إن الطرفين في المشروع.

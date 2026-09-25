@@ -69,6 +69,7 @@ ENTITY_LABELS = {
     "scene_props": "إكسسوارات المشاهد", "shot_characters": "شخصيات اللقطات",
     "shot_props": "إكسسوارات اللقطات", "reference_images": "الصور المرجعية",
     "camera_setups": "إعدادات الكاميرا",
+    "location_plans": "رسومات الأماكن", "scene_blocking": "أماكن الشخصيات والكاميرات",
     "post_departments": "أقسام ما بعد الإنتاج", "post_comments": "تعليقات ما بعد الإنتاج",
 }
 
@@ -92,7 +93,7 @@ TARGET_LABELS = {
     "general_breakdown_excel": "التفريغ العام", "locations_sheet_excel": "كشف أماكن التصوير",
     "props_sheet_excel": "كشف الإكسسوار", "post_report_excel": "تقرير ما بعد الإنتاج",
     # غير كده
-    "script_analysis": "تحليل سيناريو", "streamlit": "التطبيق",
+    "script_analysis": "تحليل سيناريو", "location_plan": "رسمة مكان بالذكاء الاصطناعي", "streamlit": "التطبيق",
 }
 
 

@@ -55,6 +55,8 @@ _ON_CONFLICT_TARGETS = {
     "memberships": "(company_id, user_id)",
     "project_members": "(project_id, user_id)",
     "post_departments": "(project_id, dept_key)",
+    "location_plans": "(project_id, location_id, variant_id)",
+    "scene_blocking": "(scene_id)",
 }
 _INSERT_IGNORE_RE = re.compile(r"INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)", re.IGNORECASE)
 
@@ -521,6 +523,30 @@ def init_db():
             created_by TEXT,
             created_at TEXT,
             booked_at TEXT
+        );
+
+        -- طاولة التقطيع (المالك 2026-09-25): رسمة من فوق لكل مكان. variant_id=0
+        -- هي الرسمة الافتراضية لكل حالات المكان؛ حالة ليها رسمة خاصة = صف بالـ id
+        -- بتاعها. plan = JSON (blocking.clean_plan). source: manual أو ai.
+        CREATE TABLE IF NOT EXISTS location_plans (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+            variant_id INTEGER NOT NULL DEFAULT 0,
+            plan TEXT NOT NULL,
+            source TEXT DEFAULT 'manual',
+            updated_at TEXT,
+            updated_by TEXT,
+            UNIQUE(project_id, location_id, variant_id)
+        );
+
+        -- أماكن الشخصيات والكاميرات في مشهد (blocking.clean_blocking)
+        CREATE TABLE IF NOT EXISTS scene_blocking (
+            id SERIAL PRIMARY KEY,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            scene_id INTEGER NOT NULL UNIQUE REFERENCES scenes(id) ON DELETE CASCADE,
+            data TEXT NOT NULL,
+            updated_at TEXT
         );
 
         -- ما بعد الإنتاج (المالك 2026-09-24، بند PP1): قسم لكل شغلانة (مونتاج،
@@ -1045,6 +1071,34 @@ def init_db():
             FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE
         );
 
+        -- طاولة التقطيع (المالك 2026-09-25): رسمة من فوق لكل مكان. variant_id=0
+        -- هي الرسمة الافتراضية لكل حالات المكان؛ حالة ليها رسمة خاصة = صف بالـ id
+        -- بتاعها. plan = JSON (blocking.clean_plan). source: manual أو ai.
+        CREATE TABLE IF NOT EXISTS location_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            location_id INTEGER NOT NULL,
+            variant_id INTEGER NOT NULL DEFAULT 0,
+            plan TEXT NOT NULL,
+            source TEXT DEFAULT 'manual',
+            updated_at TEXT,
+            updated_by TEXT,
+            UNIQUE(project_id, location_id, variant_id),
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE
+        );
+
+        -- أماكن الشخصيات والكاميرات في مشهد (blocking.clean_blocking)
+        CREATE TABLE IF NOT EXISTS scene_blocking (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            scene_id INTEGER NOT NULL UNIQUE,
+            data TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+        );
+
         -- ما بعد الإنتاج (المالك 2026-09-24، بند PP1): قسم لكل شغلانة (مونتاج،
         -- تلوين، موسيقى، تصميم صوت، دوبلاج وميكساج، مؤثرات بصرية، تترات
         -- وماستر) بحالته ونسبة إنجازه والاستوديو/الفريلانسر ولينكات المعاينة.
@@ -1314,6 +1368,8 @@ _MIGRATIONS = {
         ("day_night", "TEXT"),
         ("weather", "TEXT"),
         ("action_description", "TEXT"),
+        # طاولة التقطيع: اللقطة بتغطي أنهي حتت من نص المشهد (JSON أرقام الحتت)
+        ("script_blocks", "TEXT"),
     ],
     "shot_characters": [
         ("has_dialogue", "INTEGER DEFAULT 1"),

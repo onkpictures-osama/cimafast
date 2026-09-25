@@ -11,9 +11,11 @@ from database import (
     next_free_number,
     scene_label,
 )
+import blocking
 from i18n import t, tr
 from ui import IMAGE_TYPES, bump_version, delete_image_file, fmt_day_night, image_abs_path, ltr, mark_saved, multiselect, safe_index, save_uploaded_image, shift_shot_numbers, show_saved_badge, unused_dialogue_lines
 import repo
+from views import decoupage
 
 
 def render(project_id):
@@ -27,6 +29,14 @@ def render(project_id):
         scene_id = scene_map[sel_scene]
         current_scene_row = repo.scene_notes_and_time(scene_id)[0]
         available_dialogue_lines = unused_dialogue_lines(current_scene_row["notes"], scene_id, fetch_all)
+
+        # 🎬 طاولة التقطيع: نص المشهد + الرسمة من فوق (views/decoupage.py). الحتت
+        # اللي المخرج بيختارها هناك بتعبّي فورم اللقطة الجديدة تحت.
+        _blocks = decoupage.render(project_id, scene_id, current_scene_row["notes"], repo.shots_of_scene(scene_id))
+        _pre_ids = st.session_state.get(f"dec_prefill_{scene_id}") or []
+        _pre_action, _pre_dialogue = blocking.texts_for(_blocks, _pre_ids)
+        _pre_lines = [l for l in _pre_dialogue.split("\n") if l]
+        st.markdown(f"#### ➕ {t('لقطة جديدة')}")
 
         with st.form(f"add_shot_{scene_id}"):
             col1, col2, col3 = st.columns(3)
@@ -54,7 +64,7 @@ def render(project_id):
                 sh_weather = st.text_input(t("حالة الطقس"), placeholder=t("مثال: شتاء مشمس، أو صيف حار وضبابي"))
 
             sh_action = st.text_area(
-                t("وصف الحركة داخل اللقطة"), height=100,
+                t("وصف الحركة داخل اللقطة"), value=_pre_action, height=100,
                 placeholder=t("مثال: أحمد بيدخل الأوضة وبيقفل الباب وراه، سارة واقفة جنب الشباك بتبص برة"),
             )
             sh_emotion_label = st.text_input(t("وصف المشاعر"), placeholder=t("مثال: أحمد حزين، سارة غير مهتمة"))
@@ -63,7 +73,8 @@ def render(project_id):
                     "دول سطور الحوار اللي لسه في حوار المشهد ومتحطوش في لقطة تانية - اختار بس اللي موجود في "
                     "اللقطة دي (سيبها من غير اختيار لو اللقطة من غير حوار)."
                 ))
-                sh_selected_dialogue = multiselect(t("سطور الحوار المتاحة من حوار المشهد"), available_dialogue_lines)
+                sh_selected_dialogue = multiselect(t("سطور الحوار المتاحة من حوار المشهد"), available_dialogue_lines,
+                                                   default=[l for l in _pre_lines if l in available_dialogue_lines])
                 sh_dialogue = "\n".join(sh_selected_dialogue)
                 with st.expander(t("أو اكتب/عدّل الحوار يدويًا بدل الاختيار")):
                     sh_dialogue_manual = st.text_area(
@@ -74,7 +85,7 @@ def render(project_id):
                         sh_dialogue = sh_dialogue_manual
             else:
                 sh_dialogue = st.text_area(
-                    t("الحوار (لو موجود)"), height=150,
+                    t("الحوار (لو موجود)"), value=_pre_dialogue, height=150,
                     placeholder=t("مثال: أحمد (حزين): إزيك يا سارة؟\nسارة (غير مبالية): تمام والحمد لله."),
                 )
             sh_style = st.text_area(
@@ -111,6 +122,9 @@ def render(project_id):
                     shift_shot_numbers(project_id, scene_id, sh_number)
                     st.info(t("الرقم ده كان مستخدم - تم نقل باقي اللقطات رقم واحد لقدام عشان تتزبط."))
                 shot_id = repo.add_shot(scene_id, sh_number, sh_size, sh_movement, sh_angle, sh_duration, sh_day_night, sh_weather, sh_action, sh_emotion, sh_emotion_label, sh_dialogue, sh_style, int(sh_music), int(sh_confirmed))
+                if _pre_ids:
+                    repo.set_shot_blocks(project_id, shot_id, _pre_ids)
+                    st.session_state.pop(f"dec_prefill_{scene_id}", None)
                 bump_version(project_id)
                 if sh_storyboard is not None:
                     storyboard_path = save_uploaded_image(sh_storyboard, f"shots/{shot_id}")
