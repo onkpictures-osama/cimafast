@@ -105,6 +105,16 @@ def run(port, shot_dir):
             page.screenshot(path=os.path.join(shot_dir, "plan.png"), full_page=False)
             page.locator(".cf-pl").first.screenshot(path=os.path.join(shot_dir, "plan-only.png"))
 
+        # الموبايل: الطاولة تحت بعض ومفيش زحلقة أفقية
+        page.set_viewport_size({"width": 390, "height": 844}); _settle(page, 1500)
+        over = page.evaluate("() => { const m = document.querySelector('section[data-testid=stMain]');"
+                             " return m.scrollWidth - m.clientWidth; }")
+        check("mobile: no sideways scroll with the cutting table", over <= 2, f"{over}px")
+        check("mobile: plan still visible", page.locator(".cf-pl svg").first.bounding_box()["width"] > 250)
+        if shot_dir:
+            page.locator(".cf-pl").first.screenshot(path=os.path.join(shot_dir, "plan-mobile.png"))
+        page.set_viewport_size({"width": 1500, "height": 1100}); _settle(page, 800)
+
         # حالة تانية لنفس المكان بتشوف الرسمة الافتراضية
         loc = _q(db, "SELECT location_id FROM location_variants v JOIN scenes s ON s.location_variant_id=v.id "
                      "WHERE s.scene_number=1")[0][0]
