@@ -38,7 +38,7 @@ import sys
 # جداول مش بتتسجّل: السجل نفسه (عشان مايسجّلش نفسه للأبد)، وذاكرة "آخر شاشة"
 # بتاعت الصفحة الرئيسية (بتتكتب مع كل ضغطة تبويب — دي حدث استخدام مش تغيير بيانات).
 # notification_seen (H4) نفس فكرة user_profile: "اتشاف لحد فين" حالة شاشة، مش تغيير بيانات.
-SKIP_TABLES = {"audit_log", "usage_events", "user_profile", "notification_seen"}
+SKIP_TABLES = {"audit_log", "usage_events", "user_profile", "notification_seen", "assistant_messages"}
 
 # أعمدة قيمتها ماتتكتبش في السجل أبدًا. hash كلمة السر لو اتخزن في اللوج يبقى
 # اللوج بقى نسخة تانية من ملف كلمات السر.

@@ -15,7 +15,7 @@ from i18n import t, tr
 from importer import import_parsed_scenes
 from script_md import to_markdown
 from script_parser import apply_character_merges, apply_location_merges, extract_lines, find_location_matches_with_states, find_similar_location_groups, find_similar_name_groups, looks_like_screenplay, parse_json_script, parse_script
-from ui import fmt_day_night, fmt_int_ext, ltr, multiselect
+from ui import fmt_day_night, fmt_int_ext, go_to, ltr, multiselect
 import audit
 import repo
 from views import dramaturgy_panel
@@ -396,6 +396,22 @@ def _render_external_steps():
         st.code(AI_JSON_PROMPT, language="text")
 
 
+def _no_script_start(project_id, uploaded_file):
+    """مشروع فاضي ومفيش ملف: طريق تاني تبدأ بيه بإيدك (تحليل نشاط أول يوزرز
+    2026-09-26: ٥ من ٦ مشاريع جديدة وقفت هنا — فتحوا «إضافة سيناريو» من غير
+    ملف، ولفّوا بين المراحل ومشيوا)."""
+    if uploaded_file is not None or repo.count_scenes(project_id)[0]["c"]:
+        return
+    with st.container(border=True, key="cf_no_script"):
+        st.markdown(f"**✍️ {t('مفيش سيناريو جاهز؟ ابدأ بإيدك')}**")
+        st.caption(t("ضيف المشاهد والشخصيات والأماكن واحدة واحدة، وتقدر ترفع السيناريو بعدين في أي وقت."))
+        c1, c2, c3 = st.columns(3)
+        c1.button(f"📝 {t('ضيف مشهد')}", key="nos_scenes", on_click=go_to, args=("scenes",), use_container_width=True)
+        c2.button(f"🎭 {t('ضيف شخصية')}", key="nos_chars", on_click=go_to, args=("characters",),
+                  use_container_width=True)
+        c3.button(f"📍 {t('ضيف مكان')}", key="nos_locs", on_click=go_to, args=("locations",), use_container_width=True)
+
+
 def render(project_id):
     st.subheader(tr("sub_import"))
     st.caption(t("ارفع ملف السيناريو، واختار طريقة التحليل — والمشاهد والأماكن والشخصيات بتتملى لوحدها "
@@ -410,6 +426,7 @@ def render(project_id):
     _upload_label = (f"{t('اختر ملف سكريبت الحلقة')} {_chosen_episode}" if _chosen_episode
                      else t("اختر ملف السكريبت"))
     uploaded_file = st.file_uploader(_upload_label, type=["docx", "txt", "pdf", "json"], key="script_upload")
+    _no_script_start(project_id, uploaded_file)
     if uploaded_file is not None:
         # اسم الملف بيتفضل بعد التحليل (الـ AI بياخد دقايق) عشان فحص "الحلقة الكام"
         st.session_state["_import_src_name"] = uploaded_file.name

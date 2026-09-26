@@ -42,8 +42,11 @@
          تالت لـ"الرئيسية" في البيانات، فالتبويب النشط هنا ثابت. #}
       <a class="tab tab--active" aria-current="page" href="{{ focus.open_href if focus else app ~ '?tab=import' }}">
         <span class="tab__icon" aria-hidden="true">🎬</span> التطبيق</a>
-      <a class="tab" href="{{ board }}team/">
-        <span class="tab__icon" aria-hidden="true">👥</span> {{ "إدارة الفريق" if can_manage_team else "الفريق وحسابي" }}</a>
+      {# كان «إدارة الفريق» (صفحة مساحة العمل القديمة) - الفريق بقى لكل مشروع
+         (👥 في الشريط الجانبي)، والحساب في «👤 حسابي». اليوزرز الجداد كانوا
+         بيفتحوها أول ما يدخلوا ويرجعوا (تحليل 2026-09-26). #}
+      <a class="tab" href="{{ app }}?page=account">
+        <span class="tab__icon" aria-hidden="true">👤</span> حسابي</a>
     </nav>
   </header>
 

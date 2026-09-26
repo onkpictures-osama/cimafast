@@ -153,6 +153,10 @@ def authenticate(username, password, users):
         return None
     if verify_password(password, stored):
         return name
+    # كلمة سر منسوخة من رسالة بتيجي أحيانًا بمسافة أو سطر في الآخر (أول يوم
+    # يوزرز جداد: حد حاول ٥ مرات في ٦ ثواني). بنجرب من غير المسافات اللي على الأطراف.
+    if isinstance(password, str) and password.strip() != password and verify_password(password.strip(), stored):
+        return name
     return None
 
 

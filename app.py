@@ -21,7 +21,7 @@ import views.new_project
 import views.team
 import views.library_pages
 import views.invite
-import views.schedule, views.post, views.progress_bar, views.account
+import views.schedule, views.post, views.progress_bar, views.account, views.assistant
 import views.wardrobe
 import project_types
 import views.project_settings
@@ -312,6 +312,9 @@ if "ui_lang" not in st.session_state:
 _is_ar = st.session_state["ui_lang"] == "ar"
 _dir = "rtl" if _is_ar else "ltr"
 _text_align = "right" if _is_ar else "left"
+# 🤖 المساعد: زرار عائم في كل الصفحات (views/assistant.py)، و«افتح» من رده بيتطبق هنا قبل التبويبات
+views.assistant.consume_navigation()
+views.assistant.render()
 # شريط أدوات Streamlit نفسه (Deploy + قائمة الثلاث نقط) بيتلف عاديًا من
 # غير ما يتبع اتجاه اللغة، فبنعكس ترتيبه بس وقت العربي عشان يطلع في الناحية
 # المقابلة (شمال) بدل ما يتلخبط مع الشريط الجانبي اللي بيبقى يمين

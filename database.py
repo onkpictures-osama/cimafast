@@ -525,6 +525,23 @@ def init_db():
             booked_at TEXT
         );
 
+        -- 🤖 مساعد البرنامج (المالك 2026-09-26): كل سؤال ورده، ومن أنهي شاشة —
+        -- عشان نعرف اليوزرز بيقفوا فين. سجل للحسابات مش بيانات مشروع.
+        CREATE TABLE IF NOT EXISTS assistant_messages (
+            id SERIAL PRIMARY KEY,
+            at TEXT NOT NULL,
+            username TEXT NOT NULL,
+            company_id INTEGER,
+            project_id INTEGER,
+            screen TEXT,
+            question TEXT NOT NULL,
+            answer TEXT,
+            state TEXT DEFAULT 'asked',
+            cost_usd REAL,
+            job_id TEXT,
+            answered_at TEXT
+        );
+
         -- طاولة التقطيع (المالك 2026-09-25): رسمة من فوق لكل مكان. variant_id=0
         -- هي الرسمة الافتراضية لكل حالات المكان؛ حالة ليها رسمة خاصة = صف بالـ id
         -- بتاعها. plan = JSON (blocking.clean_plan). source: manual أو ai.
@@ -1071,6 +1088,23 @@ def init_db():
             FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE
         );
 
+        -- 🤖 مساعد البرنامج (المالك 2026-09-26): كل سؤال ورده، ومن أنهي شاشة —
+        -- عشان نعرف اليوزرز بيقفوا فين. سجل للحسابات مش بيانات مشروع.
+        CREATE TABLE IF NOT EXISTS assistant_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            at TEXT NOT NULL,
+            username TEXT NOT NULL,
+            company_id INTEGER,
+            project_id INTEGER,
+            screen TEXT,
+            question TEXT NOT NULL,
+            answer TEXT,
+            state TEXT DEFAULT 'asked',
+            cost_usd REAL,
+            job_id TEXT,
+            answered_at TEXT
+        );
+
         -- طاولة التقطيع (المالك 2026-09-25): رسمة من فوق لكل مكان. variant_id=0
         -- هي الرسمة الافتراضية لكل حالات المكان؛ حالة ليها رسمة خاصة = صف بالـ id
         -- بتاعها. plan = JSON (blocking.clean_plan). source: manual أو ai.
@@ -1427,6 +1461,7 @@ def _existing_columns(conn, table):
 # فهارس على أعمدة اتضافت بعدين — لازم تتعمل بعد _MIGRATIONS مش مع إنشاء الجداول،
 # لأن العمود نفسه لسه مش موجود في قاعدة قديمة وقت الإنشاء.
 _INDEXES = [
+    ("idx_assistant_user_at", "assistant_messages (username, at)"),
     # H4: جرس التنبيهات بيسأل كل ٣٠ ثانية "إيه الجديد في مشاريعي".
     ("idx_audit_project_at", "audit_log (project_id, at)"),
     # كل قراءة مشاريع بتفلتر بالشركة (accounts.projects_for)، فده الفهرس اللي

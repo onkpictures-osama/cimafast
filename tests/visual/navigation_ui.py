@@ -78,6 +78,8 @@ def run(port, width):
         check(f"{tag} new project opens right away", title > 0)
         check(f"{tag} …on «إضافة سيناريو»", "إضافة سيناريو" in _selected_tab(page), _selected_tab(page))
         check(f"{tag} …and the sidebar closes", not _sidebar_open(page))
+        main = page.locator("section[data-testid=stMain]")
+        check(f"{tag} empty project offers a no-script start", "مفيش سيناريو جاهز؟ ابدأ بإيدك" in main.inner_text())
         _open_sidebar(page)
         form_open = page.evaluate("""() => [...document.querySelectorAll('[data-testid=stSidebar] details')]
             .some(d => d.open && d.querySelector('summary').innerText.includes('إنشاء مشروع'))""")
