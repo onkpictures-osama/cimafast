@@ -87,7 +87,7 @@ def run(port, shot_dir):
         # الشخصيات والكاميرات: حط نادية وكاميرا لقطة 1، واسحب نادية
         page.locator(".cf-pl-bar button").filter(has_text="الشخصيات والكاميرات").first.click(); _settle(page, 300)
         page.locator(".cf-pl-bar button").filter(has_text="● نادية").first.click(); _settle(page, 300)
-        page.locator(".cf-pl-bar button").filter(has_text="🎥 1").first.click(); _settle(page, 300)
+        page.locator(".cf-pl-bar button").filter(has_text="كاميرا لقطة 1").first.click(); _settle(page, 300)
         svg = page.locator(".cf-pl svg").first
         box = svg.bounding_box()
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -100,7 +100,10 @@ def run(port, shot_dir):
         chars, cams = data.get("chars", []), data.get("cams", [])
         check("character placed and moved from the centre",
               len(chars) == 1 and (chars[0]["x"] != 300 or chars[0]["y"] != 200), str(data)[:200])
-        check("camera for shot 1 placed", len(cams) == 1, str(data)[:200])
+        check("camera for shot 1 placed inside the room, facing up",
+              len(cams) == 1 and 0 < cams[0]["y"] < 400 and cams[0]["r"] == -90, str(data)[:200])
+        check("shot 2's camera is still offered by name",
+              page.locator(".cf-pl-bar button").filter(has_text="كاميرا لقطة 2").count() == 1)
         if shot_dir:
             page.screenshot(path=os.path.join(shot_dir, "plan.png"), full_page=False)
             page.locator(".cf-pl").first.screenshot(path=os.path.join(shot_dir, "plan-only.png"))

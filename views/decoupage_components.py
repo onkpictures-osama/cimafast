@@ -186,14 +186,27 @@ export default function (component) {
     } else {
       const placedC = new Set(B.chars.map(c => c.id)), placedS = new Set(B.cams.map(c => c.shot_id));
       const freeC = data.chars.filter(c => !placedC.has(c.id)), freeS = data.shots.filter(s => !placedS.has(s.id));
-      if (freeC.length || freeS.length) bar2.appendChild(el('span', 'cap', L.place));
-      freeC.forEach(c => { const b = el('button', '', '● ' + c.name); b.style.borderColor = c.color;
-        b.onclick = () => { B.chars.push({ id: c.id, x: P.w / 2, y: P.h / 2, f: 0 }); S.sel = { t: 'char', id: c.id }; S.dirtyBl = true; redraw(); }; bar2.appendChild(b); });
-      freeS.forEach(s => { const b = el('button', '', '🎥 ' + s.number); b.style.borderColor = s.color;
-        b.onclick = () => { B.cams.push({ shot_id: s.id, x: P.w / 2, y: P.h + M / 2, r: -90 }); S.sel = { t: 'cam', id: s.id }; S.dirtyBl = true; redraw(); }; bar2.appendChild(b); });
-      if (!data.chars.length && !data.shots.length) bar2.appendChild(el('span', 'cap', L.nothing_to_place));
+      // كل واحد جديد بيتحط جنب اللي قبله مش فوقه
+      const spot = (n) => 0.25 + 0.12 * (n % 5);
+      if (freeC.length) {
+        bar2.appendChild(el('span', 'cap', L.place_chars));
+        freeC.forEach(c => { const b = el('button', '', '● ' + c.name); b.style.borderColor = c.color;
+          b.onclick = () => { B.chars.push({ id: c.id, x: Math.round(P.w * spot(B.chars.length)), y: Math.round(P.h / 2), f: 0 });
+            S.sel = { t: 'char', id: c.id }; S.dirtyBl = true; redraw(); }; bar2.appendChild(b); });
+      } else if (!data.chars.length) bar2.appendChild(el('span', 'cap', L.no_chars));
+      barBox.appendChild(bar2);
+      // الكاميرات: سطر لوحده - كاميرا لكل لقطة، بتتحط جوه المكان تحت وباصّة لفوق
+      const barC = el('div', 'cf-pl-bar');
+      if (!data.shots.length) barC.appendChild(el('span', 'cap', L.no_shots));
+      else if (freeS.length) {
+        barC.appendChild(el('span', 'cap', L.place_cams));
+        freeS.forEach(s => { const b = el('button', '', '🎥 ' + L.cam_of_shot + ' ' + s.number); b.style.borderColor = s.color;
+          b.onclick = () => { B.cams.push({ shot_id: s.id, x: Math.round(P.w * spot(B.cams.length)), y: Math.round(P.h - 0.1 * P.h), r: -90 });
+            S.sel = { t: 'cam', id: s.id }; S.dirtyBl = true; redraw(); }; barC.appendChild(b); });
+      } else barC.appendChild(el('span', 'cap', L.all_cams_placed));
+      barBox.appendChild(barC);
     }
-    barBox.appendChild(bar2);
+    if (S.mode === 'decor') barBox.appendChild(bar2);
     const selObj = selected();
     if (selObj) {
       const bar3 = el('div', 'cf-pl-bar');

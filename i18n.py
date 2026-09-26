@@ -1186,6 +1186,14 @@ TRANSLATIONS = {
     'تقدر تطلّع كلمة سر جديدة للحسابات اللي إنت عملتها بس': 'You can only reset passwords of accounts you created',
     'كلمة السر لازم تكون ١٠ حروف على الأقل': 'The password must be at least 10 characters',
     'كلمة السر الحالية غلط': 'The current password is wrong',
+    # كاميرات طاولة التقطيع أوضح (2026-09-26)
+    '🎭 حط الشخصيات:': '🎭 Place characters:',
+    '🎥 حط كاميرا كل لقطة:': "🎥 Place each shot's camera:",
+    'كاميرا لقطة': 'Camera of shot',
+    '🎭 مفيش شخصيات مربوطة بالمشهد ده — اربطها من تبويب المشاهد.': '🎭 No characters linked to this scene — link them in the Scenes tab.',
+    '🎥 الكاميرات بتيجي من اللقطات: كل لقطة ليها كاميرا. اعمل لقطة الأول (اختار من النص «لقطة من المختار»، أو فورم «لقطة جديدة» تحت)، وزرار كاميرتها هيظهر هنا.': '🎥 Cameras come from shots: each shot has one camera. Create a shot first (“Shot from selection” in the script, or the “New shot” form below) and its camera button appears here.',
+    '🎥 كل الكاميرات في الرسمة — دوس على كاميرا واسحبها، ولفّها بـ ⟲ ⟳ عشان المثلث يبص على اللي بتصوّره.': '🎥 All cameras are on the plan — drag a camera, and turn it with ⟲ ⟳ so its triangle points at what it films.',
+    'اسحب الشخصيات والكاميرات لمكانها. السهم الصغير = الشخصية باصّة فين. الكاميرا = المربع الملوّن برقم اللقطة، والمثلث قدامها = اللي بتصوّره. دوس على أي حاجة عشان تلفّها أو تشيلها، وبعدين «احفظ الرسمة».': 'Drag characters and cameras into place. The small arrow is where a character faces. A camera is the coloured square with the shot number; the triangle in front is what it films. Click anything to turn or remove it, then “Save plan”.',
 }
 
 
