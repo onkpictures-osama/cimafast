@@ -169,7 +169,7 @@ def auth_users():
 
 def user(username):
     return _one("SELECT id, username, display_name, email, job_title, is_operator, active, "
-                "must_change_password, last_login_at FROM users WHERE username=?",
+                "must_change_password, last_login_at, created_by FROM users WHERE username=?",
                 (auth.normalize_username(username),))
 
 
@@ -571,6 +571,56 @@ def create_company(actor, name, admin_username, admin_display_name=None, admin_e
         act.entity_id = act.company_id = company_id
     return company_id, add_member(actor, company_id, admin_username, admin_display_name, "admin",
                                   "مدير المشروع", admin_email)
+
+
+# --- 👤 حسابي: حسابات جديدة من المشغّل (المالك 2026-09-26) ---------------------------
+# "وسيلة سلسة جوه اليوزر بتاعي أطلّع بيها يوزر نيم وباسوورد أديه لشخص، والشخص ده
+# بعد كده يقدر يغيّر الباسوورد." الحساب الجديد بياخد مساحة عمل شخصية (زي كل
+# الحسابات) وكلمة سر مؤقتة بتتعرض مرة واحدة، ولازم يغيّرها أول ما يدخل.
+
+def _require_operator(actor):
+    u = user(actor)
+    if not u or not u["is_operator"]:
+        raise AccessDenied("المشغّل بس يقدر يعمل حسابات جديدة")
+    return u
+
+
+def create_account(actor, display_name, username, tier="studio"):
+    """بيرجّع (company_id، كلمة السر المؤقتة). اسم دخول مستخدم قبل كده = خطأ،
+    عشان مانضيفش حد موجود لمساحة عمل جديدة من غير ما نقصد."""
+    _require_operator(actor)
+    name = auth.normalize_username(username)
+    if not name or not all(ch.isalnum() and ch.isascii() or ch in "._-" for ch in name):
+        raise ValueError("اسم الدخول لازم يكون حروف إنجليزي وأرقام و . _ - بس")
+    if user(name):
+        raise ValueError("اسم الدخول ده مستخدم قبل كده — اختار اسم تاني")
+    if tier not in TIERS:
+        raise ValueError(f"نوع اشتراك غير معروف: {tier}")
+    shown = (display_name or "").strip() or name
+    company_id, password = create_company(actor, shown, name, shown)
+    set_subscription_tier(actor, company_id, tier)
+    with _tx() as ex:
+        ex("UPDATE users SET created_by=? WHERE username=?", (auth.normalize_username(actor), name))
+    return company_id, password
+
+
+def accounts_created_by(actor):
+    _require_operator(actor)
+    return fetch_all("""SELECT username, display_name, created_at, last_login_at, must_change_password, active
+                        FROM users WHERE created_by=? ORDER BY created_at DESC, id DESC""",
+                     (auth.normalize_username(actor),))
+
+
+def operator_reset_password(actor, username):
+    """كلمة سر مؤقتة جديدة لحساب عمله المشغّل ده (نسيها، أو الرسالة ضاعت)."""
+    _require_operator(actor)
+    target = user(username)
+    if not target or target["created_by"] != auth.normalize_username(actor):
+        raise AccessDenied("تقدر تطلّع كلمة سر جديدة للحسابات اللي إنت عملتها بس")
+    company = next((c["id"] for c in companies_for(target["username"]) if c["role"] == "admin"), None)
+    if company is None:
+        raise AccessDenied("الحساب ده مالوش مساحة عمل")
+    return reset_password(actor, company, target["username"])
 
 
 # --- فريق المشروع (المالك 2026-09-24) ---------------------------------------------

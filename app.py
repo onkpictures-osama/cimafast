@@ -21,7 +21,7 @@ import views.new_project
 import views.team
 import views.library_pages
 import views.invite
-import views.schedule, views.post, views.progress_bar
+import views.schedule, views.post, views.progress_bar, views.account
 import views.wardrobe
 import project_types
 import views.project_settings
@@ -663,6 +663,10 @@ if _lang_selected.lower() != st.session_state["ui_lang"]:
     st.session_state["ui_lang"] = _lang_selected.lower()
     st.rerun()
 
+# 👤 حسابي: كلمة السر، وللمشغّل عمل حسابات جديدة (views/account.py)
+_sb_account.button(f"👤 {t('حسابي')}", key="sb_open_account", use_container_width=True,
+                   on_click=open_page, args=("account",), type="primary" if _page == "account" else "secondary")
+
 # زرار خروج بعرض الشريط كامل - آخر حاجة في الشريط زي ما كان دايمًا.
 if _sb_account.button(tr("logout"), key="logout_btn", use_container_width=True):
     _logout()
@@ -675,6 +679,11 @@ def _render_library_page(page, project_id=None, project_company=None):
     close_sidebar_now()
     st.stop()
 
+
+if _page == "account":
+    views.account.render(_current_user)
+    close_sidebar_now()
+    st.stop()
 
 if not projects:
     if _page in LIBRARY_PAGES:
