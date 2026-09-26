@@ -22,7 +22,7 @@ import dramaturgy_jobs as jobs
 import permissions
 from export import build_dramatic_structure_pdf, build_dramatic_structure_word
 from i18n import t, tr
-from ui import ltr
+from ui import FREE_NOTE, free_cost, ltr
 
 _log = logging.getLogger("cimafast.dramaturgy")
 
@@ -91,7 +91,7 @@ def show_report(report, script_name, key):
     st.markdown(_report_html(report, lang), unsafe_allow_html=True)
     meta = report.get("meta") or {}
     bits = [b for b in (meta.get("model"),
-                        f"${meta['cost_usd']}" if meta.get("cost_usd") is not None else None,
+                        free_cost(f"${meta['cost_usd']}") if meta.get("cost_usd") is not None else None,
                         (meta.get("generated_at") or "")[:16].replace("T", " ") or None) if b]
     if bits:
         st.caption(ltr(" · ".join(bits)))
@@ -180,10 +180,11 @@ def render(current_user, library_id, key):
         allowed = jobs.can_run(current_user, entry)
         label = t("🎭 عمل تقرير تاني") if report else t("🎭 اعمل تقرير البناء الدرامي")
         # التكلفة على الزرار نفسه — قرار المالك: التقرير بدوسة، والتمن قدامك قبلها
-        if st.button(f"{label} · ~{ltr(f'${cost:.2f}')}", key=f"drama_go_{key}",
+        # الرقم تقديري والخدمة مجانية دلوقتي - مكتوبة على الزرار عشان محدش يخاف يدوس
+        if st.button(f"{label} · ~{ltr(f'${cost:.2f}')} · {t('مجاني دلوقتي')}", key=f"drama_go_{key}",
                      use_container_width=True, type="secondary" if report else "primary",
                      disabled=not allowed,
-                     help=(f"{ltr(n)} {t('مشهد')} · {t('بحد أقصى')} {ltr(f'${ceiling:.2f}')}"
+                     help=(f"{ltr(n)} {t('مشهد')} · {t('بحد أقصى')} {ltr(f'${ceiling:.2f}')} · {t(FREE_NOTE)}"
                            if allowed else t(permissions.MESSAGES["run_ai"]))):
             _start(current_user, entry, key)
 

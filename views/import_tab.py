@@ -15,7 +15,7 @@ from i18n import t, tr
 from importer import import_parsed_scenes
 from script_md import to_markdown
 from script_parser import apply_character_merges, apply_location_merges, extract_lines, find_location_matches_with_states, find_similar_location_groups, find_similar_name_groups, looks_like_screenplay, parse_json_script, parse_script
-from ui import fmt_day_night, fmt_int_ext, go_to, ltr, multiselect
+from ui import FREE_NOTE, fmt_day_night, fmt_int_ext, free_cost, go_to, ltr, multiselect
 import audit
 import repo
 from views import dramaturgy_panel
@@ -154,6 +154,7 @@ def _render_source_picker(fast, ai):
               delta=len(as_) - len(fs) if len(as_) != len(fs) else None)
     if meta.get("cost_usd") is not None:
         c3.metric(t("تكلفة التحليل"), f"${meta['cost_usd']}")
+        c3.caption(f"💚 {t(FREE_NOTE)}")
 
     only_ai = sorted(set(as_) - set(fs))
     only_fast = sorted(set(fs) - set(as_))
@@ -447,7 +448,7 @@ def render(project_id):
         with _c_ai:
             _run_ai = st.button(f"🤖 {t('CimaFast AI Inspector')}", use_container_width=True, key="imp_ai",
                                 type="primary", disabled=bool(_ai_active),
-                                help=t("تحليل عميق بالذكاء الاصطناعي — بيبدأ على طول وبياخد دقايق."))
+                                help=t("تحليل عميق بالذكاء الاصطناعي — بيبدأ على طول وبياخد دقايق. مجاني دلوقتي."))
             st.caption(t("الأدق · بياخد دقايق"))
         with _c_ext:
             if st.button(f"🌐 {t('التحليل خارج CimaFast')}", use_container_width=True, key="imp_ext",
@@ -519,7 +520,7 @@ def render(project_id):
             info = ai_jobs.status(_job)
             state, detail = info.get("state"), info.get("detail", "")
             spent = info.get("cost_usd")
-            extra = f" · ${spent}" if spent else ""
+            extra = f" · {free_cost(f'${spent}')}" if spent else ""
             if state == "done":
                 st.success(f"[ ✅ ] {t('التحليل خلص')} — {detail}{extra}")
                 # الفراجمنت بيعيد تشغيل نفسه بس. الكود اللي بيحمّل النتيجة

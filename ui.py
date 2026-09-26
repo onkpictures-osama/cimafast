@@ -140,6 +140,16 @@ def shift_shot_numbers(project_id, scene_id, from_number, exclude_shot_id=None):
         repo.shift_shot_numbers_up(project_id, scene_id, from_number)
 
 
+# الأرقام اللي بتظهر جنب تحليلات الذكاء الاصطناعي تقديرية، والخدمة مجانية دلوقتي
+# (المالك 2026-09-26: "عشان محدش يتخض ويخاف يستخدمها").
+FREE_NOTE = "تكلفة تقديرية — مجاني دلوقتي"
+
+
+def free_cost(amount_text):
+    """‎$0.12‎ → ‎$0.12 (تكلفة تقديرية — مجاني دلوقتي)‎"""
+    return f"{amount_text} ({t(FREE_NOTE)})"
+
+
 _DIALOGUE_LINE_RE = re.compile(r'^([^:：]{1,30})[:：]\s*(.+)$')
 
 
