@@ -15,9 +15,39 @@ import streamlit as st
 import permissions
 import repo
 from i18n import t
-from ui import IMAGE_TYPES, close_page, image_abs_path, ltr, multiselect, save_uploaded_image
+import os
+import re
+
+from ui import IMAGE_TYPES, close_page, delete_image_file, image_abs_path, ltr, multiselect, save_uploaded_image, thumb_uri
 
 _SELECTED = "_cf_selected_venue"
+# اسم الملف لو معناه حاجة (kitchen.jpg ← kitchen، مطبخ.jpg ← مطبخ)؛ أسامي الكاميرا
+# والواتساب (IMG_1234، WhatsApp Image …) مالهاش معنى فبتبقى «مساحة ٣»
+_CAMERA_PREFIX = re.compile(r"(?i)^(img|dsc|dscn|pxl|photo|image|whatsapp|screenshot|snapchat|signal|mvimg)\b")
+
+
+def _space_name(filename, n):
+    stem = os.path.splitext(os.path.basename(filename or ""))[0]
+    clean = re.sub(r"[_\-.]+", " ", stem).strip()
+    if not clean or re.fullmatch(r"[\d\s]+", clean) or _CAMERA_PREFIX.match(clean):
+        return f"{t('مساحة')} {n}"
+    return clean[:60]
+
+
+def _add_space_photos(venue_id, company_id, files, start_n):
+    """كل صورة = مساحة جديدة بصورتها (لحد repo.MAX_SPACE_PHOTOS في المرة)."""
+    files = list(files or [])[:repo.MAX_SPACE_PHOTOS]
+    items = [(_space_name(f.name, start_n + i), save_uploaded_image(f, f"venues/{venue_id}/spaces"))
+             for i, f in enumerate(files)]
+    return repo.add_venue_spaces_from_photos(venue_id, company_id, items)
+
+
+def _photos_uploader(key, help_text=None):
+    files = st.file_uploader(f"📷 {t('صور المساحات — لحد 20 صورة، كل صورة = ديكور أو أوضة')}", type=IMAGE_TYPES,
+                             accept_multiple_files=True, key=key, help=help_text)
+    if files and len(files) > repo.MAX_SPACE_PHOTOS:
+        st.warning(f"{t('اخترت')} {ltr(len(files))} {t('صورة — هيتضاف أول 20 بس. ارفع الباقي في مرة تانية.')}")
+    return files
 
 
 def _can_write():
@@ -136,12 +166,16 @@ def _profile(venue_id, project_id, company_id, loc):
 
     st.markdown(f"#### {t('المساحات اللي جواه')}")
     if v["spaces"]:
-        df = pd.DataFrame([{t("المساحة"): sp["name"], t("النوع"): t(sp["space_type"]) if sp["space_type"] else "",
-                            t("ينفع كـ"): sp["suitable_for"] or "", t("د/خ"): sp["int_ext"] or ""}
+        with_photos = any(sp.get("photo_path") for sp in v["spaces"])
+        df = pd.DataFrame([dict(({t("الصورة"): thumb_uri(sp.get("photo_path"))} if with_photos else {}),
+                                **{t("المساحة"): sp["name"], t("النوع"): t(sp["space_type"]) if sp["space_type"] else "",
+                                   t("ينفع كـ"): sp["suitable_for"] or "", t("د/خ"): sp["int_ext"] or ""})
                            for sp in v["spaces"]])
         if _is_ar():
             df = df[df.columns[::-1]]
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(df, hide_index=True, use_container_width=True,
+                     row_height=70 if with_photos else None,
+                     column_config={t("الصورة"): st.column_config.ImageColumn(t("الصورة"), width="small")})
     else:
         st.caption(t("لسه مفيش مساحات متسجلة للموقع ده."))
 
@@ -218,8 +252,10 @@ def _add_form(company_id):
                      "في مكتبة فريقك على طول."))
         with st.form("venue_add", clear_on_submit=True):
             values = _fields("vnew")
-            photo = st.file_uploader(t("صورة"), type=IMAGE_TYPES, key="vnew_photo")
-            spaces = multiselect(t("المساحات اللي جواه"), repo.SPACE_TYPES, format_func=t, key="vnew_spaces")
+            photo = st.file_uploader(t("صورة الموقع"), type=IMAGE_TYPES, key="vnew_photo")
+            space_photos = _photos_uploader("vnew_space_photos")
+            spaces = multiselect(t("أو اختار المساحات اللي جواه من غير صور"), repo.SPACE_TYPES, format_func=t,
+                                 key="vnew_spaces")
             go = st.form_submit_button(f"➕ {t('إضافة الموقع')}", type="primary", disabled=not _can_write())
         if go:
             if not values["name"].strip():
@@ -230,6 +266,8 @@ def _add_form(company_id):
                 repo.set_venue_photo(vid, company_id, save_uploaded_image(photo, f"venues/{vid}"))
             if spaces:
                 repo.save_venue_spaces(vid, company_id, [{"name": s, "space_type": s} for s in spaces])
+            if space_photos:
+                _add_space_photos(vid, company_id, space_photos, len(spaces or []) + 1)
             st.session_state[_SELECTED] = vid
             st.toast(t("اتضاف الموقع للمكتبة"), icon="📍")
             st.rerun()
@@ -249,26 +287,63 @@ def _edit(v, company_id):
             if photo is not None:
                 repo.set_venue_photo(v["id"], company_id, save_uploaded_image(photo, f"venues/{v['id']}"))
             st.rerun()
+        # 📷 صور كتير مرة واحدة: كل صورة بتبقى صف جديد في الجدول بمعاينتها، وتكمّل بياناته
+        st.markdown(f"**{t('المساحات (الديكورات والأوض)')}**")
+        nonce = st.session_state.get(f"_vsp_nonce_{v['id']}", 0)
+        files = _photos_uploader(f"vsp_up_{v['id']}_{nonce}")
+        if files and st.button(f"➕ {t('ضيف')} {ltr(min(len(files), repo.MAX_SPACE_PHOTOS))} {t('مساحة من الصور')}",
+                               key=f"vsp_add_{v['id']}", type="primary"):
+            n = _add_space_photos(v["id"], company_id, files, len(v["spaces"]) + 1)
+            st.session_state[f"_vsp_nonce_{v['id']}"] = nonce + 1
+            st.toast(f"📷 {t('اتضافت')} {n} {t('مساحة — كمّل بياناتها في الجدول')}")
+            st.rerun()
+        photo_col = t("الصورة")
         cols = {"name": t("المساحة"), "space_type": t("النوع"), "suitable_for": t("ينفع كـ"), "int_ext": t("د/خ"),
                 "notes": t("ملاحظات")}
-        df = pd.DataFrame([dict({"_id": sp["id"]}, **{c: sp[k] for k, c in cols.items()}) for sp in v["spaces"]],
-                          columns=["_id"] + list(cols.values()))
-        order = list(cols.values())
+        df = pd.DataFrame([dict({"_id": sp["id"], photo_col: thumb_uri(sp.get("photo_path"))},
+                                **{c: sp[k] for k, c in cols.items()}) for sp in v["spaces"]],
+                          columns=["_id", photo_col] + list(cols.values()))
+        # الخانات الفاضية كانت بتتكتب «None» في الجدول
+        df[list(cols.values())] = df[list(cols.values())].astype(object).where(df[list(cols.values())].notna(), "")
+        df[photo_col] = df[photo_col].astype(object).where(df[photo_col].notna(), "")
+        order = [photo_col] + list(cols.values())
         edited = st.data_editor(
             df, key=f"vspaces_{v['id']}", num_rows="dynamic", hide_index=True, use_container_width=True,
-            column_order=order[::-1] if _is_ar() else order,
-            column_config={cols["name"]: st.column_config.TextColumn(required=True),
+            column_order=order[::-1] if _is_ar() else order, disabled=[photo_col],
+            row_height=70 if any(sp.get("photo_path") for sp in v["spaces"]) else None,
+            column_config={photo_col: st.column_config.ImageColumn(photo_col, width="small",
+                                                                  help=t("صورة واحدة لكل مساحة — تتغيّر من تحت الجدول")),
+                           cols["name"]: st.column_config.TextColumn(required=True),
                            cols["space_type"]: st.column_config.SelectboxColumn(options=repo.SPACE_TYPES),
                            cols["suitable_for"]: st.column_config.TextColumn(
                                help=t("المساحة دي تنفع تمثّل إيه؟ مثلًا: أوضة ولاد، عيادة، مكتب محامي")),
                            cols["int_ext"]: st.column_config.SelectboxColumn(options=["INT", "EXT", "INT/EXT"])})
         if st.button(f"💾 {t('حفظ المساحات')}", key=f"vspaces_save_{v['id']}"):
             back = {c: k for k, c in cols.items()}
-            rows = [dict({"_id": r["_id"]}, **{back[c]: r[c] for c in edited.columns if c in back})
+            rows = [dict({"_id": r["_id"]}, **{back[c]: (r[c] if isinstance(r[c], str) else None)
+                                                for c in edited.columns if c in back})
                     for _, r in edited.iterrows()]
             repo.save_venue_spaces(v["id"], company_id, rows)
             st.rerun()
+        _replace_photo(v, company_id)
         if st.button(f"🗑️ {t('امسح الموقع من المكتبة')}", key=f"vdel_{v['id']}"):
             repo.delete_venue(v["id"], company_id)
             st.session_state.pop(_SELECTED, None)
             st.rerun()
+
+
+def _replace_photo(v, company_id):
+    """صورة واحدة لكل مساحة: تغيّرها (الجديدة بتحل محل القديمة)."""
+    if not v["spaces"]:
+        return
+    names = {sp["id"]: sp["name"] for sp in v["spaces"]}
+    c1, c2, c3 = st.columns([2, 3, 1], vertical_alignment="bottom")
+    sid = c1.selectbox(t("غيّر صورة مساحة"), list(names), format_func=names.get, key=f"vsp_pick_{v['id']}")
+    nonce = st.session_state.get(f"_vsp_rep_{v['id']}", 0)
+    photo = c2.file_uploader(t("الصورة الجديدة"), type=IMAGE_TYPES, key=f"vsp_rep_up_{v['id']}_{nonce}")
+    if c3.button(f"📷 {t('غيّر')}", key=f"vsp_rep_go_{v['id']}", disabled=photo is None, use_container_width=True):
+        old = repo.set_space_photo(v["id"], company_id, sid, save_uploaded_image(photo, f"venues/{v['id']}/spaces"))
+        if old:
+            delete_image_file(old)
+        st.session_state[f"_vsp_rep_{v['id']}"] = nonce + 1
+        st.rerun()

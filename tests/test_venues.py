@@ -144,6 +144,31 @@ def test_saving_spaces_keeps_ids():
     assert "garden" in repo.venue_for(VILLA, A)["concepts"]
 
 
+@test
+def test_each_photo_becomes_a_space_capped_at_twenty():
+    """📷 صور كتير مرة واحدة: كل صورة = مساحة بصورة واحدة (المالك 2026-09-26)."""
+    items = [(f"مساحة {i}", f"uploads/venues/x/{i}.jpg") for i in range(25)]
+    assert repo.add_venue_spaces_from_photos(B_SECRET, A, items) == 0          # موقع شركة تانية
+    before = len(repo.venue_for(FLAT_ZAMALEK, A)["spaces"])
+    assert repo.add_venue_spaces_from_photos(FLAT_ZAMALEK, A, items) == repo.MAX_SPACE_PHOTOS == 20
+    spaces = repo.venue_for(FLAT_ZAMALEK, A)["spaces"]
+    assert len(spaces) == before + 20
+    assert all(sp["photo_path"] for sp in spaces[before:])
+
+
+@test
+def test_one_photo_per_space_replacement():
+    sp = repo.venue_for(FLAT_ZAMALEK, A)["spaces"][-1]
+    assert repo.set_space_photo(FLAT_ZAMALEK, B, sp["id"], "uploads/hack.jpg") is None   # مش صاحب الموقع
+    old = repo.set_space_photo(FLAT_ZAMALEK, A, sp["id"], "uploads/new.jpg")
+    assert old == sp["photo_path"]
+    assert [x for x in repo.venue_for(FLAT_ZAMALEK, A)["spaces"] if x["id"] == sp["id"]][0]["photo_path"] == "uploads/new.jpg"
+    # حفظ الجدول (الاسم والنوع…) مايمسحش الصورة
+    rows = [dict(_id=x["id"], name=x["name"], space_type="مطبخ") for x in repo.venue_for(FLAT_ZAMALEK, A)["spaces"]]
+    repo.save_venue_spaces(FLAT_ZAMALEK, A, rows)
+    assert [x for x in repo.venue_for(FLAT_ZAMALEK, A)["spaces"] if x["id"] == sp["id"]][0]["photo_path"] == "uploads/new.jpg"
+
+
 def main():
     failed = 0
     for fn in _results:

@@ -328,6 +328,30 @@ def render_image_picker(key, current_rel, subfolder, prompt_for, on_saved, refer
         st.rerun()
 
 
+@st.cache_data(max_entries=600, show_spinner=False)
+def _thumb(abs_path, mtime, size):
+    from io import BytesIO
+    import base64
+    from PIL import Image, ImageOps
+    with Image.open(abs_path) as im:
+        im = ImageOps.exif_transpose(im).convert("RGB")
+        im.thumbnail((size, size))
+        buf = BytesIO()
+        im.save(buf, "JPEG", quality=72)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def thumb_uri(rel_path, size=160):
+    """معاينة صغيرة (data URI) لصورة محفوظة — لعمود صورة في جدول. None لو مفيش صورة."""
+    abs_path = image_abs_path(rel_path)
+    if not abs_path:
+        return None
+    try:
+        return _thumb(abs_path, os.path.getmtime(abs_path), size)
+    except Exception:  # noqa: BLE001 — صورة بايظة مابتوقعش الجدول
+        return None
+
+
 def image_abs_path(rel_path):
     if not rel_path:
         return None

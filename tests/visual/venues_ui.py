@@ -64,6 +64,35 @@ def run(port, shot_dir):
         _no_exception(page, "add venue")
         main = _main(page)
         check("new venue profile with its spaces", "فيلا الاختبار" in main and "المساحات اللي جواه" in main)
+
+        # 📷 صور كتير: كل صورة = مساحة بمعاينتها في الجدول
+        import sqlite3
+        import tempfile
+        from PIL import Image
+        tmpd = tempfile.mkdtemp()
+        paths = []
+        for name, color in (("مطبخ.png", "orange"), ("IMG_2031.jpg", "teal"), ("living_room.jpg", "purple")):
+            pth = os.path.join(tmpd, name)
+            Image.new("RGB", (640, 420), color).save(pth)
+            paths.append(pth)
+        page.locator('[data-testid="stExpander"]').filter(has_text="تعديل الموقع ومساحاته").first.locator("summary").first.click()
+        _settle(page, 1500)
+        up = page.locator('[data-testid="stFileUploader"]').filter(has_text="صور المساحات").last
+        up.locator('input[type="file"]').set_input_files(paths); _settle(page, 2500)
+        page.get_by_role("button").filter(has_text="مساحة من الصور").first.click(); _settle(page, 3000)
+        _no_exception(page, "add spaces from photos")
+        db = os.path.join(app.tmp, "studio.db")
+        con = sqlite3.connect(db)
+        got = con.execute("SELECT s.name, s.photo_path FROM venue_spaces s JOIN venues v ON v.id=s.venue_id "
+                          "WHERE v.name='فيلا الاختبار' AND s.photo_path IS NOT NULL ORDER BY s.id").fetchall()
+        con.close()
+        names = [g[0] for g in got]
+        check("three photos → three spaces with photos", len(got) == 3, str(got))
+        check("names come from meaningful file names, camera names become «مساحة N»",
+              names[:1] == ["مطبخ"] and names[1].startswith("مساحة") and names[2] == "living room", str(names))
+        check("photo files saved", all(os.path.exists(os.path.join(app.tree, g[1])) for g in got))
+        if shot_dir:
+            page.screenshot(path=os.path.join(shot_dir, "space-photos.png"), full_page=True)
         page.get_by_role("button").filter(has_text="رجوع لقايمة المواقع").first.click(); _settle(page, 1500)
 
         page.locator('[class*="st-key-venue_q"] input').fill("غرفة نوم")

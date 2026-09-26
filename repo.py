@@ -2023,6 +2023,34 @@ def delete_venue(venue_id, company_id):
     return run_query("DELETE FROM venues WHERE id=? AND owner_company_id=?", (venue_id, company_id))
 
 
+MAX_SPACE_PHOTOS = 20      # في الرفعة الواحدة (المالك 2026-09-26)
+
+
+def add_venue_spaces_from_photos(venue_id, company_id, items):
+    """items = [(الاسم، مسار الصورة)] — كل صورة = مساحة (ديكور أو أوضة) جديدة
+    بصورة واحدة، والباقي بيتملى في الجدول. لصاحب الموقع بس. بيرجّع العدد."""
+    if not fetch_all("SELECT 1 FROM venues WHERE id=? AND owner_company_id=?", (venue_id, company_id)):
+        return 0
+    items = list(items)[:MAX_SPACE_PHOTOS]
+    with _tx() as ex:
+        for name, path in items:
+            ex("INSERT INTO venue_spaces (venue_id, name, photo_path) VALUES (?, ?, ?)",
+               (venue_id, (name or "").strip()[:60] or "مساحة", path))
+    return len(items)
+
+
+def set_space_photo(venue_id, company_id, space_id, path):
+    """صورة واحدة لكل مساحة: الجديدة بتحل محل القديمة. بيرجّع مسار القديمة (عشان تتمسح)."""
+    if not fetch_all("SELECT 1 FROM venues WHERE id=? AND owner_company_id=?", (venue_id, company_id)):
+        return None
+    old = fetch_all("SELECT photo_path FROM venue_spaces WHERE id=? AND venue_id=?", (space_id, venue_id))
+    if not old:
+        return None
+    with _tx() as ex:
+        ex("UPDATE venue_spaces SET photo_path=? WHERE id=? AND venue_id=?", (path, space_id, venue_id))
+    return old[0]["photo_path"]
+
+
 def save_venue_spaces(venue_id, company_id, rows):
     """مساحات الموقع زي الجدول على الشاشة - بالـ id عشان ربط الديكورات بيها
     يفضل. لصاحب الموقع بس. بيرجّع عدد المساحات."""
