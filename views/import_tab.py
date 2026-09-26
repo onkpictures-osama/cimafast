@@ -15,7 +15,7 @@ from i18n import t, tr
 from importer import import_parsed_scenes
 from script_md import to_markdown
 from script_parser import apply_character_merges, apply_location_merges, extract_lines, find_location_matches_with_states, find_similar_location_groups, find_similar_name_groups, looks_like_screenplay, parse_json_script, parse_script
-from ui import FREE_NOTE, fmt_day_night, fmt_int_ext, free_cost, go_to, ltr, multiselect
+from ui import FREE_NOTE, feature_on, fmt_day_night, fmt_int_ext, free_cost, go_to, ltr, multiselect
 import audit
 import repo
 from views import dramaturgy_panel
@@ -446,10 +446,11 @@ def render(project_id):
                                   help=t("سريع ومجاني، على الجهاز من غير ذكاء اصطناعي — أحسن للسيناريوهات المنظمة."))
             st.caption(t("سريع · مجاني"))
         with _c_ai:
+            _ai_allowed = feature_on("ai_analysis")
             _run_ai = st.button(f"🤖 {t('CimaFast AI Inspector')}", use_container_width=True, key="imp_ai",
-                                type="primary", disabled=bool(_ai_active),
+                                type="primary", disabled=bool(_ai_active) or not _ai_allowed,
                                 help=t("تحليل عميق بالذكاء الاصطناعي — بيبدأ على طول وبياخد دقايق. مجاني دلوقتي."))
-            st.caption(t("الأدق · بياخد دقايق"))
+            st.caption(t("الأدق · بياخد دقايق") if _ai_allowed else f"🔒 {t('مقفول على حسابك')}")
         with _c_ext:
             if st.button(f"🌐 {t('التحليل خارج CimaFast')}", use_container_width=True, key="imp_ext",
                          help=t("حلّل على Claude أو ChatGPT أو Gemini بنفسك وارجع بالنتيجة.")):

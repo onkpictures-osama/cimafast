@@ -96,6 +96,9 @@ def can_run(username, entry):
     الشركة المفتوحة دلوقتي)، أو صاحب التحليل لو من غير شركة، أو المشغّل."""
     if not username:
         return False
+    import admin_users
+    if not admin_users.feature_on(username, "dramaturgy"):
+        return False
     u = accounts.user(username)
     if u and u["is_operator"]:
         return True

@@ -17,7 +17,7 @@ import repo
 from database import fetch_all
 from export import build_post_report_excel
 from i18n import t
-from ui import ltr
+from ui import feature_on, ltr
 from views.looks import can_edit
 
 
@@ -100,7 +100,7 @@ def render(project, project_id, current_user):
     st.download_button(f"📊 {t('تقرير ما بعد الإنتاج (Excel)')}", data=_report,
                        file_name=f"{project['name']}_ما_بعد_الإنتاج.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                       key=f"dl_post_{project_id}")
+                       key=f"dl_post_{project_id}", disabled=not feature_on("exports"))
 
     editable = can_edit()
     for item in s["items"]:

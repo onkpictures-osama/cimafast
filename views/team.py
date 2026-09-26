@@ -15,7 +15,7 @@ import streamlit as st
 
 import accounts
 from i18n import t
-from ui import ltr
+from ui import feature_locked, feature_on, ltr
 
 
 def _app_url():
@@ -47,6 +47,9 @@ def render(project, project_id, current_user):
         st.info(t("فريق العمل متاح في باقة Studio أو Enterprise — رقّي الاشتراك عشان تضيف فريق للمشروع."))
         return
     st.divider()
+    if not feature_on("invite_team"):
+        feature_locked("invite_team")
+        return
     _add_form(project, project_id, current_user)
     if team["invites"]:
         st.divider()

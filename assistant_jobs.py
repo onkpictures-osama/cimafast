@@ -58,7 +58,9 @@ def ask(username, question, context, history=(), company_id=None, project_id=Non
     question = (question or "").strip()[:assistant.MAX_QUESTION]
     if not question:
         raise ValueError("اكتب سؤالك الأول")
-    if asked_today(username) >= DAILY_LIMIT:
+    import admin_users
+    admin_users.require_feature(username, "assistant")
+    if asked_today(username) >= admin_users.assistant_limit(username, DAILY_LIMIT):
         raise LimitReached("وصلت لحد الأسئلة النهارده — كمّل بكرة، أو كلّم فريق البرنامج.")
     inbox, _, _ = _dirs()
     jid = f"q{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"

@@ -140,6 +140,18 @@ def shift_shot_numbers(project_id, scene_id, from_number, exclude_shot_id=None):
         repo.shift_shot_numbers_up(project_id, scene_id, from_number)
 
 
+def feature_on(key):
+    """🛡️ الميزة دي مفتوحة لليوزر اللي داخل؟ (admin_users.FEATURES — المشغّل بيقفل ويفتح)."""
+    import admin_users
+    return admin_users.feature_on(st.session_state.get("_auth_user") or "", key)
+
+
+def feature_locked(key):
+    """سطر بيقول إن الميزة مقفولة على الحساب ده."""
+    import admin_users
+    st.caption(f"🔒 {t(admin_users.FEATURES[key])}: {t(admin_users.FEATURE_DENIED)}")
+
+
 # الأرقام اللي بتظهر جنب تحليلات الذكاء الاصطناعي تقديرية، والخدمة مجانية دلوقتي
 # (المالك 2026-09-26: "عشان محدش يتخض ويخاف يستخدمها").
 FREE_NOTE = "تكلفة تقديرية — مجاني دلوقتي"

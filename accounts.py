@@ -163,8 +163,11 @@ def _migrate_accounts(legacy_users: dict, company_name: str):
 def auth_users():
     """{username: password_hash} للمستخدمين الفعّالين — نفس الشكل اللي auth متعوّد عليه،
     فتسجيل الدخول وكوكي الجلسة شغالين من غير أي تغيير."""
+    # الحساب الموقوف أو اللي مدته خلصت (🛡️ إدارة الحسابات) مايدخلش، وجلسته المفتوحة بتقفل
+    today = dt.date.today().isoformat()
     return {r["username"]: r["password_hash"]
-            for r in fetch_all("SELECT username, password_hash FROM users WHERE active=1")}
+            for r in fetch_all("SELECT username, password_hash FROM users WHERE active=1 "
+                               "AND (expires_at IS NULL OR expires_at='' OR expires_at >= ?)", (today,))}
 
 
 def user(username):
@@ -287,6 +290,8 @@ def create_project(actor, company_id, name, project_type, resolution, orientatio
     المسلسل لازم يجي بعدد حلقاته (≥1)، والحلقات من 1 لـ N بتتعمل معاه على
     طول عشان رفع السكريبت يبقى "لأنهي حلقة" من أول يوم. type_details: dict
     بالتفاصيل الخاصة بالنوع، بيتخزن JSON."""
+    import admin_users
+    admin_users.require_feature(actor, "new_projects")
     if project_type == "مسلسل":
         try:
             episode_count = int(episode_count)
@@ -775,6 +780,8 @@ def _check_job_permission(job, permission):
 
 def add_to_project(actor, project_id, username, job, permission="edit"):
     """بيضيف مستخدم عنده حساب لفريق المشروع على طول."""
+    import admin_users
+    admin_users.require_feature(actor, "invite_team")
     p = _require_project_manager(actor, project_id)
     _check_job_permission(job, permission)
     name = auth.normalize_username(username)
@@ -822,6 +829,8 @@ def _hash_token(token):
 
 def create_invite(actor, project_id, invitee_name, contact, job, permission="edit"):
     """لينك دعوة للمشروع - بيرجّع التوكن (بيتعرض مرة واحدة للمدير يبعته)."""
+    import admin_users
+    admin_users.require_feature(actor, "invite_team")
     _require_project_manager(actor, project_id)
     _check_job_permission(job, permission)
     token = _secrets.token_urlsafe(24)

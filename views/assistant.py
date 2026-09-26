@@ -13,7 +13,7 @@ import assistant
 import assistant_jobs
 import repo
 from i18n import t
-from ui import go_to, open_page
+from ui import feature_on, go_to, open_page
 
 _HIST = "_asst_hist"
 _GO = "_asst_go"
@@ -125,7 +125,7 @@ def _chat():
 
 
 def render():
-    if not assistant_jobs.available() or not st.session_state.get("_auth_user"):
+    if not assistant_jobs.available() or not st.session_state.get("_auth_user") or not feature_on("assistant"):
         return
     st.markdown(_CSS % ("rtl" if st.session_state.get("ui_lang", "ar") == "ar" else "ltr"), unsafe_allow_html=True)
     with st.container(key="cf_assistant"):

@@ -20,7 +20,7 @@ import permissions
 import repo
 from database import scene_label
 from i18n import t, tr
-from ui import ltr
+from ui import feature_on, ltr
 
 _NONE = "—"
 # ألوان خفيفة لأرقام الغيارات في اللوحة (بتلف لو الغيارات أكتر)
@@ -318,4 +318,4 @@ def _render_items(project, project_id):
         data=lambda: export.build_wardrobe_sheet_excel(project, project_id, fetch_all),
         file_name=f"wardrobe_{project_id}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        key=f"dl_wardrobe_{project_id}")
+        key=f"dl_wardrobe_{project_id}", disabled=not feature_on("exports"))

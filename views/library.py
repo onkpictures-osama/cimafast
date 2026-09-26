@@ -14,7 +14,7 @@ import analysis_library as lib
 import links
 import permissions
 from i18n import t
-from ui import ltr
+from ui import feature_on, ltr
 from views import dramaturgy_panel
 
 _log = logging.getLogger("cimafast.library")
@@ -178,6 +178,7 @@ def _entry_card(current_user, row, can_import):
                 t("⬇️ نزّل ملف"), data=lambda: lib.to_file(lib.get(current_user, eid),
                                                          exported_by=current_user)[1],
                 file_name=lib.file_name(row), mime="application/json", key=f"lib_dl_{eid}",
+                disabled=not feature_on("exports"),
                 use_container_width=True, on_click="ignore")
         with c_del:
             if st.button(t("🗑️ احذف"), key=f"lib_del_{eid}", use_container_width=True,

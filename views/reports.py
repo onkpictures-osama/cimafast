@@ -4,7 +4,7 @@ import streamlit as st
 from database import fetch_all, scene_label
 from export import build_characters_sheet_excel, build_wardrobe_sheet_excel, build_general_breakdown_excel, build_locations_sheet_excel, build_props_sheet_excel, build_shot_list_excel, build_shot_list_pdf, build_shot_list_word
 from i18n import t, tr
-from ui import ltr
+from ui import feature_locked, feature_on, ltr
 import audit
 import repo
 
@@ -39,7 +39,9 @@ def render(project, project_id, _char_count, _loc_count, _scene_count, _shot_cou
                             + (f" … (+{ltr(len(rows) - len(_shown))})" if len(rows) > len(_shown) else ""))
         st.divider()
 
-    if _scene_count > 0:
+    if _scene_count > 0 and not feature_on("exports"):
+        feature_locked("exports")
+    elif _scene_count > 0:
         st.markdown(f"#### {t('📄 تصدير تفريغ اللقطات')}")
         st.caption(t("ملف تفريغ كامل قابل للطباعة، بفورمات سينمائي احترافي."))
 

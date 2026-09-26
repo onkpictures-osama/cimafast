@@ -15,7 +15,7 @@ import streamlit as st
 import accounts
 from auth import normalize_username
 from i18n import t
-from ui import close_page, ltr
+from ui import close_page, ltr, open_page
 from views.team import _app_url
 
 _SHOWN = "_acc_credentials"          # آخر كلمة سر اتطلعت — بتتمسح لما يدوس «تمام»
@@ -131,6 +131,8 @@ def render(current_user):
     st.subheader(f"👤 {t('حسابي')} — {(me or {}).get('display_name') or current_user}")
     st.caption(f"{t('اسم الدخول')}: {current_user}")
     if me and me["is_operator"]:
+        st.button(f"🛡️ {t('إدارة كل الحسابات')}", key="acc_open_admin", on_click=open_page, args=("admin",),
+                  type="primary", help=t("إيقاف، تعديل، قفل مزايا، نقل ملفات، دمج، وحذف"))
         _credentials_card()
         _create_form(current_user)
         _created_list(current_user)

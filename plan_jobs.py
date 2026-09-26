@@ -98,6 +98,8 @@ def latest(project_id, location_id):
 
 def submit(project_id, location_id, username):
     permissions.require("run_ai")
+    import admin_users
+    admin_users.require_feature(username, "ai_plan")
     job = latest(project_id, location_id)
     if job and job["state"] in ("queued", "running"):
         return job["job_id"]

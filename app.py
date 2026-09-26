@@ -13,7 +13,7 @@ from database import init_db, FIELD_HELP
 import theme
 
 from i18n import t, tr
-from ui import (LIBRARY_PAGES, PROJECT_PAGES, close_page, close_sidebar_now, ltr,
+from ui import (LIBRARY_PAGES, PROJECT_PAGES, close_page, close_sidebar_now, feature_locked, feature_on, ltr,
                 nav_link as _nav_link, open_page,
                 open_tab_by_slug, phase_tabs, request_close_sidebar)
 import views.import_tab, views.library, views.locations, views.characters, views.actors, views.props, views.scenes, views.shots, views.reports
@@ -21,7 +21,7 @@ import views.new_project
 import views.team
 import views.library_pages
 import views.invite
-import views.schedule, views.post, views.progress_bar, views.account, views.assistant
+import views.schedule, views.post, views.progress_bar, views.account, views.assistant, views.admin_panel
 import views.wardrobe
 import project_types
 import views.project_settings
@@ -135,6 +135,12 @@ def _render_login_screen():
             st.session_state["_login_attempts"] = attempts
             if attempts > 2:
                 time.sleep(min(attempts - 2, 4) * 0.5)
+            import admin_users
+            _blocked = admin_users.blocked_reason(username, password)
+            if _blocked:
+                # كلمة السر صح بس الحساب موقوف/منتهي/مدموج — نقوله السبب بدل «غلط»
+                st.error(f"🔒 {_blocked}")
+                st.stop()
             st.error("اسم المستخدم أو كلمة السر غلط / Wrong username or password")
             # كلمة السر بتفرق بين الكبير والصغير - أشهر سبب إن الموبايل كبّر
             # أول حرف لوحده. اسم المستخدم مش بيفرق (auth.normalize_username).
@@ -584,7 +590,9 @@ if permissions.can(_role, "create_project"):
     with _sb_projects.expander(tr("new_project"), key=f"new_proj_exp_{st.session_state.get('_new_proj_nonce', 0)}"):
         # النوع أول اختيار، وكل نوع ليه أسئلته (المسلسل: عدد الحلقات) -
         # views/new_project.py
-        if views.new_project.render(_current_user, company_id):
+        if not feature_on("new_projects"):
+            feature_locked("new_projects")
+        elif views.new_project.render(_current_user, company_id):
             st.rerun()
 
 # الشريط ده بيتبني قبل فحص "مفيش مشاريع" تحت (مش بعد اختيار المشروع):
@@ -683,8 +691,8 @@ def _render_library_page(page, project_id=None, project_company=None):
     st.stop()
 
 
-if _page == "account":
-    views.account.render(_current_user)
+if _page in ("account", "admin"):
+    (views.account if _page == "account" else views.admin_panel).render(_current_user)
     close_sidebar_now()
     st.stop()
 

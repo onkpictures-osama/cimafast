@@ -14,6 +14,7 @@ import repo
 from i18n import t
 from views.decoupage_components import plan_editor, script_panel
 from views.looks import can_edit
+from ui import feature_on
 
 # ألوان واضحة على الخلفية الغامقة، بالترتيب
 _SHOT_COLORS = ["#ffc828", "#4fc3f7", "#f06292", "#81c784", "#ba68c8", "#ff8a65", "#4db6ac", "#e57373",
@@ -67,7 +68,7 @@ def _plan_header(place, current):
 
 def _ai_box(project_id, scene_id, place, current, editable):
     """🤖 ارسمها لي: طلب في الطابور، والنتيجة بتتحفظ رسمة (source=ai) يعدّلها المستخدم."""
-    if not (place and editable and plan_jobs.available()):
+    if not (place and editable and plan_jobs.available() and feature_on("ai_plan")):
         return
     job = plan_jobs.latest(project_id, place["location_id"])
     state = (job or {}).get("state")
